@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MERCHANTS } from './data/merchants.js'
 import { fetchRecommendation } from './api/picka.js'
+import WalletHome from './components/WalletHome.jsx'
 import PickaQrHome from './components/PickaQrHome.jsx'
 import QrScreen from './components/QrScreen.jsx'
 import Loading from './components/Loading.jsx'
@@ -8,13 +9,15 @@ import Recommendation from './components/Recommendation.jsx'
 import styles from './App.module.css'
 
 // 화면 단계
-// HOME: QR만 있는 결제 시작 화면
+// HOME: 월렛(지갑) 홈 화면 - 카드 스택 + QR 결제하기
+// PAY_QR: QR만 있는 결제 시작 화면
 // LOADING_PAYMENT: "결제 정보 불러오는 중..." (3초)
-// PICKA_QR: 결제정보 + QR 화면
+// PICKA_QR: 결제정보(가맹점·업종·금액) + QR 화면
 // LOADING_COMPARE: "카드 혜택 비교중입니다..." (3초 + 백엔드 호출)
 // RESULT: 추천 결과
 const STEP = {
   HOME: 'home',
+  PAY_QR: 'pay_qr',
   LOADING_PAYMENT: 'loading_payment',
   PICKA_QR: 'picka_qr',
   LOADING_COMPARE: 'loading_compare',
@@ -73,7 +76,12 @@ export default function App() {
     }
   }, [step, transaction])
 
-  // HOME에서 QR 클릭 -> 결제정보(가상) 준비 후 로딩
+  // 월렛 홈에서 "QR 결제하기" -> QR만 있는 결제 시작 화면으로
+  function openPayQr() {
+    setStep(STEP.PAY_QR)
+  }
+
+  // QR만 있는 화면에서 QR 클릭 -> 결제정보(가상) 준비 후 로딩
   function startPayment() {
     setTransaction(pickRandomMerchant())
     setStep(STEP.LOADING_PAYMENT)
@@ -105,10 +113,25 @@ export default function App() {
               onError={() => setLogoBroken(true)}
             />
           )}
+
+          {step === STEP.HOME && (
+            <div className={styles.headerActions}>
+              <button type="button" className={styles.iconBtn} aria-label="카드 추가">
+                +
+              </button>
+              <button type="button" className={styles.iconBtn} aria-label="더보기">
+                ⋯
+              </button>
+            </div>
+          )}
         </header>
 
         <main className={styles.screen}>
-          {step === STEP.HOME && <PickaQrHome onScan={startPayment} />}
+          {step === STEP.HOME && <WalletHome onScan={openPayQr} />}
+
+          {step === STEP.PAY_QR && (
+            <PickaQrHome onScan={startPayment} onBack={reset} />
+          )}
 
           {step === STEP.LOADING_PAYMENT && (
             <Loading message="결제 정보 불러오는 중..." />
