@@ -1,0 +1,402 @@
+.txnBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+}
+
+.txnBar strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--picka-blue);
+  background: rgba(47, 91, 255, 0.1);
+  padding: 5px 10px;
+  border-radius: 999px;
+  margin: 0 0 12px;
+}
+
+.badgeAlt {
+  color: var(--ink-soft);
+  background: var(--bg);
+}
+
+/* 하이라이트 카드 컨테이너 */
+.heroCard {
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  padding: 24px 16px 16px 16px;
+  box-shadow: 0 8px 24px rgba(20, 30, 60, 0.08);
+}
+
+.heroCardHi {
+  border-color: var(--picka-blue);
+  box-shadow: 0 10px 30px rgba(47, 91, 255, 0.14);
+}
+
+/* ===== 실제 카드 프레임 ===== */
+/* 카드 + 바닥 그림자를 담는 무대 */
+.cardStage {
+  position: relative;
+  padding-bottom: 16px;
+}
+
+/* 바닥 그림자: 카드가 뜰수록 작고 옅어져 공중에 뜬 느낌 */
+.cardStage::after {
+  content: '';
+  position: absolute;
+  left: 13%;
+  right: 13%;
+  bottom: 0;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(20, 30, 60, 0.32);
+  filter: blur(10px);
+  z-index: 0;
+  animation: floatShadow 2.6s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.card {
+  aspect-ratio: 1.586 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  /* 카드 자체의 입체 그림자 (은은한 + 진한 2겹) */
+  box-shadow: 0 6px 14px rgba(20, 30, 60, 0.18),
+    0 16px 34px rgba(20, 30, 60, 0.24);
+  animation: floatCard 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 위아래로 경쾌하게 떠다니는 모션 */
+@keyframes floatCard {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes floatShadow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+}
+
+/* 접근성: 모션 최소화 설정 시 애니메이션 정지 */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+  .cardStage::after {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cardFallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #2f5bff 0%, #6a3cff 100%);
+  color: #fff;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardCompany {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cardBrand {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  opacity: 0.85;
+}
+
+.cardChip {
+  width: 40px;
+  height: 30px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #f5d27a, #c9a24a);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.cardBottom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardNumber {
+  font-size: 16px;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardNickname {
+  font-size: 12px;
+  opacity: 0.9;
+}
+/* ============================ */
+
+.heroBody {
+  padding-top: 16px;
+}
+
+.company {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 2px;
+}
+
+.cardName {
+  font-size: 19px;
+  font-weight: 800;
+  margin: 0 0 14px;
+}
+
+.benefitBox {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(18, 178, 106, 0.08);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.benefitLabel {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.benefitValue {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--good);
+}
+
+.reason {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+.reasonList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reasonList li {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.saving {
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff7e6;
+  border: 1px solid #ffe4a3;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin: 16px 0;
+  line-height: 1.5;
+}
+
+.othersSection {
+  margin-top: 16px;
+}
+
+.toggle {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.otherList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.otherItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.otherItem:hover {
+  border-color: var(--picka-blue);
+  box-shadow: 0 6px 16px rgba(47, 91, 255, 0.12);
+}
+
+.otherItem:active {
+  transform: scale(0.99);
+}
+
+.otherRank {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.otherInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.otherName {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recoTag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--picka-blue);
+  background: rgba(47, 91, 255, 0.12);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.otherReason {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.otherBenefit {
+  font-size: 14px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.resetBtn {
+  width: 100%;
+  margin-top: 22px;
+  padding: 15px;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 에러 / 추천 불가 */
+.errorWrap {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding-bottom: 30px;
+}
+
+.errorIcon {
+  font-size: 44px;
+  margin-bottom: 14px;
+}
+
+.errorTitle {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ghostBtn {
+  padding: 13px 20px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.primaryBtn {
+  padding: 13px 20px;
+  background: var(--picka-blue);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+}
