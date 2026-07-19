@@ -1,0 +1,46 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  cursor: pointer;
+}
+
+.icon {
+  width: 118px;
+  height: 118px;
+  border-radius: 30px;
+  background: linear-gradient(150deg, #10275F, #071844);
+  box-shadow: 0 24px 50px -12px rgba(0, 0, 0, .6),
+              0 0 0 1px rgba(255, 255, 255, .08) inset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pk-pop .5s ease;
+}
+
+.wordmark {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: var(--navy-text);
+}
+
+.tagline {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.hint {
+  position: absolute;
+  bottom: 60px;
+  font-size: 12.5px;
+  color: var(--text-4);
+  animation: pk-pulse 2s infinite;
+}
