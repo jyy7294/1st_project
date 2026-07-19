@@ -1,11 +1,11 @@
-import { gradientFor } from '../data/cards.js'
+import { gradientForCard } from '../data/cards.js'
 import styles from './CardFace.module.css'
 
 /**
  * 카드 앞면.
  *
  * @param {object} props
- * @param {object} props.card `{ card_company, card_name, last_four, nickname, gradient? }`
+ * @param {object} props.card `{ card_id, card_company, card_name, last_four, nickname }`
  * @param {'stack'|'detail'} [props.variant] 크기
  * @param {string} [props.spent] 이번 달 사용액 (포맷된 문자열)
  * @param {string} [props.benefit] 받은 혜택 (포맷된 문자열)
@@ -18,7 +18,7 @@ export default function CardFace({
   benefit,
   expiry,
 }) {
-  const background = card.gradient || gradientFor(card.card_company)
+  const background = gradientForCard(card)
 
   return (
     <div className={`${styles.card} ${styles[variant]}`} style={{ background }}>

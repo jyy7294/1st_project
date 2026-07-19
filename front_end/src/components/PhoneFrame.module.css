@@ -40,7 +40,7 @@
   left: 0;
   right: 0;
   height: 54px;
-  z-index: 40;
+  z-index: 52; /* 결제 화면(z-index 44) 위에도 시계·5G·배터리가 보이도록 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -97,7 +97,7 @@
   height: 34px;
   background: #05060a;
   border-radius: 20px;
-  z-index: 41;
+  z-index: 53; /* 상태바보다 위. Face ID 오버레이(60)보다는 아래 */
 }
 
 .homeIndicator {
