@@ -99,6 +99,7 @@ export default function PayConfirm() {
         <button
           type="button"
           className={shared.primaryBtn}
+          disabled={asBackdrop}
           onClick={() => dispatch({ type: A.SET_PAY_STEP, payStep: 'faceid' })}
         >
           🔒 결제하기
@@ -106,6 +107,7 @@ export default function PayConfirm() {
         <button
           type="button"
           className={shared.ghostBtn}
+          disabled={asBackdrop}
           onClick={() => dispatch({ type: A.SET_PAY_STEP, payStep: 'recommend' })}
         >
           다른 카드 선택

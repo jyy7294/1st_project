@@ -62,3 +62,8 @@
   font-size: 15px;
   font-weight: 600;
 }
+
+.ghostBtn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
