@@ -13,19 +13,15 @@ export default function PayAnalyzing() {
   const { state, dispatch } = useApp()
   const [step, setStep] = useState(0)
 
-  // 체크리스트 진행 애니메이션
+  // 체크리스트 진행 애니메이션.
+  // 마지막 단계에 닿으면 타이머를 걸지 않습니다 — setStep 업데이터는 순수하게 둡니다.
   useEffect(() => {
+    if (step >= STEP_LABELS.length) return undefined
     const timer = setInterval(() => {
-      setStep((s) => {
-        if (s >= STEP_LABELS.length) {
-          clearInterval(timer)
-          return s
-        }
-        return s + 1
-      })
+      setStep((s) => (s >= STEP_LABELS.length ? s : s + 1))
     }, STEP_INTERVAL_MS)
     return () => clearInterval(timer)
-  }, [])
+  }, [step])
 
   // 추천 API 호출. 최소 표시 시간을 함께 기다립니다.
   useEffect(() => {

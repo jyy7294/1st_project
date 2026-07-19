@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { sortByBenefit } from '../../utils/compare.js'
+import { orderedComparison } from '../../utils/compare.js'
 import { krw } from '../../utils/format.js'
 import styles from './PayFaceId.module.css'
 
@@ -24,10 +24,12 @@ export default function PayFaceId() {
     }
   }, [dispatch])
 
-  const ranked = sortByBenefit(state.result?.comparison)
+  const ranked = orderedComparison(state.result?.comparison)
   const chosen = ranked[state.payIdx] || ranked[0]
   const amount = state.transaction?.payment_amount || 0
   const final = amount - (chosen?.expected_benefit || 0)
+
+  if (!chosen) return null
 
   return (
     <div className={styles.overlay}>

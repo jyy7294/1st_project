@@ -1,7 +1,7 @@
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { sortByBenefit } from '../../utils/compare.js'
-import { gradientFor } from '../../data/cards.js'
+import { orderedComparison } from '../../utils/compare.js'
+import { gradientForCard } from '../../data/cards.js'
 import { krw } from '../../utils/format.js'
 import shared from './payShared.module.css'
 import styles from './PayConfirm.module.css'
@@ -10,7 +10,7 @@ export default function PayConfirm() {
   const { state, dispatch } = useApp()
   const { transaction, result, payIdx, payStep } = state
 
-  const ranked = sortByBenefit(result?.comparison)
+  const ranked = orderedComparison(result?.comparison)
   const chosen = ranked[payIdx] || ranked[0]
   const amount = transaction?.payment_amount || 0
   const discount = chosen?.expected_benefit || 0
@@ -58,7 +58,7 @@ export default function PayConfirm() {
           <div className={styles.cardRow}>
             <div
               className={styles.swatch}
-              style={{ background: gradientFor(chosen.card_company) }}
+              style={{ background: gradientForCard(chosen) }}
             />
             <div style={{ flex: 1 }}>
               <div className={styles.cardLabel}>선택된 카드</div>

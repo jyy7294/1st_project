@@ -1,14 +1,14 @@
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { sortByBenefit } from '../../utils/compare.js'
-import { gradientFor } from '../../data/cards.js'
+import { orderedComparison } from '../../utils/compare.js'
+import { gradientForCard } from '../../data/cards.js'
 import { krw } from '../../utils/format.js'
 import styles from './PayDone.module.css'
 
 export default function PayDone() {
   const { state, dispatch } = useApp()
 
-  const ranked = sortByBenefit(state.result?.comparison)
+  const ranked = orderedComparison(state.result?.comparison)
   const chosen = ranked[state.payIdx] || ranked[0]
   const amount = state.transaction?.payment_amount || 0
   const discount = chosen?.expected_benefit || 0
@@ -33,14 +33,14 @@ export default function PayDone() {
         <div className={styles.cardRow}>
           <div
             className={styles.swatch}
-            style={{ background: gradientFor(chosen.card_company) }}
+            style={{ background: gradientForCard(chosen) }}
           />
           <div style={{ flex: 1 }}>
             <div className={styles.cardName}>
               {chosen.card_company} {chosen.card_name}
             </div>
             <div className={styles.cardNumber}>
-              **** **** **** {chosen.last_four}
+              •••• •••• •••• {chosen.last_four}
             </div>
           </div>
         </div>
