@@ -1,0 +1,86 @@
+.shieldWrap {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.shield {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shieldRing { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(110, 166, 255, .25); }
+
+.shieldGlow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 107, 255, .3), transparent 70%);
+  animation: pk-ring 2s ease-in-out infinite;
+}
+
+.shieldCore {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #16294f, #0c1a3a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.shieldTitle { font-size: 17px; font-weight: 800; color: #fff; text-align: center; }
+.shieldSub { font-size: 12px; color: rgba(255, 255, 255, .45); margin-top: 4px; text-align: center; }
+
+.panelWrap { margin-top: 24px; }
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.swatch { width: 42px; height: 28px; border-radius: 6px; flex: none; }
+.cardLabel { font-size: 10.5px; color: rgba(255, 255, 255, .45); }
+.cardName { font-size: 14.5px; font-weight: 700; color: #fff; }
+.check { color: var(--green-pay); font-size: 16px; }
+
+.line { margin-top: 14px; font-size: 13px; }
+.lineValue { color: #fff; font-weight: 600; }
+.lineGood { color: var(--green-pay); font-weight: 700; }
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.totalLabel { font-size: 14px; font-weight: 700; color: #fff; }
+.totalValue { font-size: 26px; font-weight: 800; color: var(--blue-light); }
+.totalUnit { font-size: 14px; }
+
+.reason {
+  margin-top: 14px;
+  background: rgba(47, 107, 255, .1);
+  border-radius: 12px;
+  padding: 11px 13px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.reasonText { font-size: 11.5px; color: rgba(255, 255, 255, .55); line-height: 1.5; }
+
+.actions { margin-top: 20px; padding-bottom: 40px; display: flex; flex-direction: column; gap: 10px; }
