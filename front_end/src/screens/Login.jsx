@@ -86,7 +86,12 @@ export default function Login() {
         className={`${styles.social} ${styles.kakao}`}
         onClick={() => social('kakao')}
       >
-        <img className={styles.kakaoIcon} src="/assets/kakao-bubble-cut.png" alt="" />
+        <img
+          className={styles.kakaoIcon}
+          src="/assets/kakao-bubble-cut.png"
+          alt=""
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+        />
         카카오로 시작하기
       </button>
 

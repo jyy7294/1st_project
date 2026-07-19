@@ -254,3 +254,9 @@ QR 화면 "매장에서 QR 인식됨 (데모)" 탭
 - react-router, Tailwind, 상태관리 라이브러리 도입
 - 실제 OAuth 연동
 - 실제 카드사 카드 이미지 사용 (저작권 — 브랜드 컬러 그라데이션 유지)
+
+## 구현 현황
+
+- 2026-07-20: 이번 범위(Splash·Login·Home·QR·결제 7화면) 구현 완료.
+  구현 계획: `docs/superpowers/plans/2026-07-20-picka-wallet-frontend.md`
+- 남은 화면(Card Detail·Benefits·Cards 관리·소비 리포트·카드 등록)은 별도 스펙 필요.

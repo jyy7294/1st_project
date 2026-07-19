@@ -2,9 +2,8 @@ import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { sortByBenefit } from '../../utils/compare.js'
 import { gradientFor } from '../../data/cards.js'
+import { krw } from '../../utils/format.js'
 import styles from './PayDone.module.css'
-
-const KRW = (n) => Number(n || 0).toLocaleString('ko-KR')
 
 export default function PayDone() {
   const { state, dispatch } = useApp()
@@ -48,17 +47,17 @@ export default function PayDone() {
 
         <div className={styles.row}>
           <span className={styles.rowLabel}>결제 금액</span>
-          <span className={styles.rowValue}>{KRW(amount)}원</span>
+          <span className={styles.rowValue}>{krw(amount)}원</span>
         </div>
 
         <div className={styles.row}>
           <span className={styles.rowLabel}>✦ 절약 혜택</span>
-          <span className={styles.rowGood}>-{KRW(discount)}원</span>
+          <span className={styles.rowGood}>-{krw(discount)}원</span>
         </div>
 
         <div className={styles.total}>
           <span className={styles.totalLabel}>최종 승인 금액</span>
-          <span className={styles.totalValue}>{KRW(amount - discount)}원</span>
+          <span className={styles.totalValue}>{krw(amount - discount)}원</span>
         </div>
       </div>
 

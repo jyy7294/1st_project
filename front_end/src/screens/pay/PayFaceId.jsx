@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { sortByBenefit } from '../../utils/compare.js'
+import { krw } from '../../utils/format.js'
 import styles from './PayFaceId.module.css'
 
 const OK_AT_MS = 1200 // 인증 성공 표시
 const NEXT_AT_MS = 2100 // 승인 화면으로 이동
-
-const KRW = (n) => Number(n || 0).toLocaleString('ko-KR')
 
 export default function PayFaceId() {
   const { state, dispatch } = useApp()
@@ -61,7 +60,7 @@ export default function PayFaceId() {
           {ok ? '인증되었습니다' : 'Face ID로 인증하는 중…'}
         </div>
         <div className={styles.detail}>
-          {chosen?.card_company} · {KRW(final)}원
+          {chosen?.card_company} · {krw(final)}원
         </div>
       </div>
     </div>

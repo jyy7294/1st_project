@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import styles from './QrCode.module.css'
 
 /**
@@ -14,6 +15,8 @@ import styles from './QrCode.module.css'
  * @param {() => void} props.onRefresh 새로고침 핸들러
  */
 export default function QrCode({ token, expiresIn, expired, onRefresh }) {
+  const [broken, setBroken] = useState(false)
+
   return (
     <div
       id="picka-qr"
@@ -21,12 +24,26 @@ export default function QrCode({ token, expiresIn, expired, onRefresh }) {
       data-qr-token={token}
       data-qr-expires-in={expiresIn}
     >
-      <img
-        className={styles.image}
-        src="/assets/qr-tight.png"
-        alt="결제 QR 코드"
-        style={{ opacity: expired ? 0.1 : 1 }}
-      />
+      {broken ? (
+        <div
+          style={{
+            width: '100%', height: '100%', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            background: '#0A1D4F', color: '#fff', borderRadius: 8,
+            fontSize: 20, fontWeight: 800, letterSpacing: 2,
+          }}
+        >
+          QR
+        </div>
+      ) : (
+        <img
+          className={styles.image}
+          src="/assets/qr-tight.png"
+          alt="결제 QR 코드"
+          style={{ opacity: expired ? 0.1 : 1 }}
+          onError={() => setBroken(true)}
+        />
+      )}
 
       {expired && (
         <div className={styles.expiredOverlay}>

@@ -20,14 +20,6 @@
   animation: pk-pop .35s ease;
 }
 
-.row {
-  height: 36px;
-  width: 56px;
-  border-radius: 8px;
-  padding: 0;
-  box-shadow: none;
-}
-
 .head {
   display: flex;
   justify-content: space-between;

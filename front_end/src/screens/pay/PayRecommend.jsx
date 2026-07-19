@@ -2,10 +2,9 @@ import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { sortByBenefit } from '../../utils/compare.js'
 import { gradientFor } from '../../data/cards.js'
+import { krw } from '../../utils/format.js'
 import shared from './payShared.module.css'
 import styles from './PayRecommend.module.css'
-
-const KRW = (n) => Number(n || 0).toLocaleString('ko-KR')
 
 export default function PayRecommend() {
   const { state, dispatch } = useApp()
@@ -77,16 +76,16 @@ export default function PayRecommend() {
               <div className={styles.stat}>
                 <div className={styles.statLabel}>🏷 할인 혜택</div>
                 <div className={`${styles.statValue} ${styles.good}`}>
-                  -{KRW(discount)}원
+                  -{krw(discount)}원
                 </div>
                 <div className={styles.statNote}>{transaction?.payment_category}</div>
               </div>
               <div className={styles.stat}>
                 <div className={styles.statLabel}>최종 승인 금액</div>
                 <div className={`${styles.statValue} ${styles.plain}`}>
-                  {KRW(amount - discount)}원
+                  {krw(amount - discount)}원
                 </div>
-                <div className={styles.statNote}>정가 {KRW(amount)}원</div>
+                <div className={styles.statNote}>정가 {krw(amount)}원</div>
               </div>
             </div>
 
@@ -131,13 +130,13 @@ export default function PayRecommend() {
                 </div>
                 <div className={styles.rowSub}>
                   {card.eligible
-                    ? `할인 -${KRW(card.expected_benefit)}원`
+                    ? `할인 -${krw(card.expected_benefit)}원`
                     : '적용 가능한 혜택 없음'}
                 </div>
               </div>
               <div className={styles.rowRight}>
                 <div className={styles.rowAmount}>
-                  {KRW(amount - (card.expected_benefit || 0))}원
+                  {krw(amount - (card.expected_benefit || 0))}원
                 </div>
                 <div className={styles.rowNote}>결제 예상</div>
               </div>

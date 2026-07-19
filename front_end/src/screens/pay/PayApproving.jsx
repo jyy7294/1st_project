@@ -2,10 +2,10 @@ import { useEffect } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { sortByBenefit } from '../../utils/compare.js'
+import { krw } from '../../utils/format.js'
 import styles from './PayApproving.module.css'
 
 const APPROVE_MS = 4000
-const KRW = (n) => Number(n || 0).toLocaleString('ko-KR')
 
 export default function PayApproving() {
   const { state, dispatch } = useApp()
@@ -51,7 +51,7 @@ export default function PayApproving() {
         </div>
         <div className={styles.row}>
           <span className={styles.rowLabel}>Amount</span>
-          <span className={styles.rowValue}>₩{KRW(final)}</span>
+          <span className={styles.rowValue}>₩{krw(final)}</span>
         </div>
         <div className={styles.barTrack}>
           <div className={styles.barFill} />

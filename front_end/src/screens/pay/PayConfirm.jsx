@@ -2,10 +2,9 @@ import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { sortByBenefit } from '../../utils/compare.js'
 import { gradientFor } from '../../data/cards.js'
+import { krw } from '../../utils/format.js'
 import shared from './payShared.module.css'
 import styles from './PayConfirm.module.css'
-
-const KRW = (n) => Number(n || 0).toLocaleString('ko-KR')
 
 export default function PayConfirm() {
   const { state, dispatch } = useApp()
@@ -72,18 +71,18 @@ export default function PayConfirm() {
 
           <div className={`${shared.rowBetween} ${styles.line}`}>
             <span className={shared.muted}>결제 금액</span>
-            <span className={styles.lineValue}>{KRW(amount)}원</span>
+            <span className={styles.lineValue}>{krw(amount)}원</span>
           </div>
 
           <div className={`${shared.rowBetween} ${styles.line}`}>
             <span className={shared.muted}>할인 혜택</span>
-            <span className={styles.lineGood}>-{KRW(discount)}원</span>
+            <span className={styles.lineGood}>-{krw(discount)}원</span>
           </div>
 
           <div className={styles.total}>
             <span className={styles.totalLabel}>최종 결제 금액</span>
             <span className={styles.totalValue}>
-              {KRW(amount - discount)}
+              {krw(amount - discount)}
               <span className={styles.totalUnit}>원</span>
             </span>
           </div>

@@ -25,7 +25,7 @@ export default function Splash() {
 }
 
 /** PICKA 브랜드 마크 (인라인 SVG). 여러 화면에서 크기만 바꿔 씁니다. */
-export function PickaMark({ size = 26 }) {
+function PickaMark({ size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="150 124 242 289">
       <path

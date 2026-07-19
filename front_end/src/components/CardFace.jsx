@@ -6,7 +6,7 @@ import styles from './CardFace.module.css'
  *
  * @param {object} props
  * @param {object} props.card `{ card_company, card_name, last_four, nickname, gradient? }`
- * @param {'stack'|'detail'|'row'} [props.variant] 크기. row는 목록용 작은 색 블록
+ * @param {'stack'|'detail'} [props.variant] 크기
  * @param {string} [props.spent] 이번 달 사용액 (포맷된 문자열)
  * @param {string} [props.benefit] 받은 혜택 (포맷된 문자열)
  * @param {string} [props.expiry] 만료일 `MM/YY`
@@ -19,10 +19,6 @@ export default function CardFace({
   expiry,
 }) {
   const background = card.gradient || gradientFor(card.card_company)
-
-  if (variant === 'row') {
-    return <div className={`${styles.card} ${styles.row}`} style={{ background }} />
-  }
 
   return (
     <div className={`${styles.card} ${styles[variant]}`} style={{ background }}>

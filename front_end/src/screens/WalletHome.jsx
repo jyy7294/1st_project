@@ -61,7 +61,11 @@ export default function WalletHome() {
           <div className={styles.qrBarTitle}>QR 열기</div>
         </div>
         <div className={styles.qrBarIcon}>
-          <img src="/assets/qr-code.png" alt="QR" />
+          <img
+            src="/assets/qr-code.png"
+            alt="QR"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
         </div>
       </button>
 
