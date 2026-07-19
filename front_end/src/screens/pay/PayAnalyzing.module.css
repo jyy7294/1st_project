@@ -1,0 +1,88 @@
+.orbWrap { margin-top: 26px; display: flex; justify-content: center; }
+
+.orb {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring1 { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(110, 166, 255, .25); }
+.ring2 { position: absolute; inset: 18px; border-radius: 50%; border: 1px solid rgba(110, 166, 255, .2); }
+
+.spin {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border-top: 2px solid var(--blue-light);
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
+  animation: pk-spin 1.2s linear infinite;
+}
+
+.core {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #16294f, #0c1a3a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  animation: pk-float 2.4s ease-in-out infinite;
+}
+
+.head { text-align: center; margin-top: 22px; }
+.headTitle { font-size: 22px; font-weight: 800; color: #fff; }
+.headSub { font-size: 13px; color: rgba(255, 255, 255, .5); margin-top: 8px; line-height: 1.5; }
+
+.list {
+  margin-top: 26px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 16px;
+  padding: 8px 18px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .05);
+}
+
+.item:last-child { border-bottom: none; }
+
+.mark { font-size: 16px; }
+.itemName { flex: 1; font-size: 13.5px; color: rgba(255, 255, 255, .82); }
+.itemStatus { font-size: 12px; font-weight: 600; }
+
+.barWrap { margin-top: 26px; padding-top: 22px; padding-bottom: 40px; }
+
+.barTrack {
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .1);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2F6BFF, #6ea6ff);
+  transition: width .5s ease;
+}
+
+.barNote {
+  margin-top: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, .45);
+  line-height: 1.5;
+}
