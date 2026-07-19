@@ -1,0 +1,78 @@
+/* PICKA 디자인 토큰. 출처: design_handoff README의 Design Tokens 절. */
+:root {
+  /* Navy — 브랜드 */
+  --navy: #0E245D;
+  --navy-text: #0A1D4F;
+  --navy-grad: linear-gradient(145deg, #10275F, #071844);
+
+  /* Blue — 액센트 */
+  --blue: #2F6BFF;
+  --blue-hover: #1846D8;
+  --blue-light: #6ea6ff;
+
+  /* Teal — 혜택 */
+  --teal: #19D3C5;
+  --teal-deep: #0DAAA0;
+
+  /* Gold — 혜택 금액 */
+  --gold: #FFCE45;
+
+  /* 상태 */
+  --green-chart: #2F8F3E;
+  --green-pay: #4ADE80;
+  --danger: #e5484d;
+
+  /* 배경 */
+  --bg-app: #f4f5f8;
+  --bg-card: #ffffff;
+  --pay-dark: linear-gradient(180deg, #0a1224, #060b18);
+  --add-dark: linear-gradient(175deg, #0a1a41, #050f2b);
+
+  /* 텍스트 보조 */
+  --text-2: #7a8299;
+  --text-3: #9aa1b3;
+  --text-4: #a8aec0;
+  --line: #f1f2f6;
+  --line-strong: #e4e7ee;
+
+  /* 소셜 */
+  --kakao: #FEE500;
+  --kakao-ink: #191600;
+  --naver: #03C75A;
+
+  /* 라디우스 */
+  --r-card: 20px;
+  --r-btn: 14px;
+  --r-chip: 10px;
+
+  /* 그림자 */
+  --sh-card: 0 4px 14px rgba(14, 36, 93, .05);
+  --sh-raise: 0 16px 30px -14px rgba(14, 36, 93, .6);
+}
+
+@keyframes pk-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pk-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes pk-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes pk-up { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pk-spin { to { transform: rotate(360deg); } }
+@keyframes pk-grow { from { width: 0; } to { width: 100%; } }
+@keyframes pk-ring { 0%, 100% { transform: scale(1); opacity: .45; } 50% { transform: scale(1.18); opacity: .12; } }
+@keyframes pk-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes pk-islandgrow {
+  0% { opacity: .4; transform: translateX(-50%) translateY(-8px) scale(.32); }
+  60% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.06); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes pk-facespin {
+  0% { transform: rotate3d(1, -1, .15, 0deg) scale(.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: rotate3d(1, -1, .15, 360deg) scale(1); opacity: 1; }
+}
+@keyframes pk-facepop {
+  0% { opacity: 0; transform: translateX(-50%) scale(.2); }
+  60% { transform: translateX(-50%) scale(1.08); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+/* 화면 진입 공통 애니메이션 */
+.pk-screen { animation: pk-fade .32s cubic-bezier(.22, .61, .36, 1); }
