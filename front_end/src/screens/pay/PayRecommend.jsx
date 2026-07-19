@@ -12,7 +12,8 @@ export default function PayRecommend() {
   const { transaction, result, error, noEligibleCard, payIdx } = state
 
   const ranked = sortByBenefit(result?.comparison)
-  const chosen = ranked[payIdx] || ranked[0] || null
+  const selectedIdx = payIdx < ranked.length ? payIdx : 0
+  const chosen = ranked[selectedIdx] || null
   const amount = transaction?.payment_amount || 0
   const discount = chosen?.expected_benefit || 0
 
@@ -114,7 +115,7 @@ export default function PayRecommend() {
               key={card.card_id}
               className={[
                 styles.row,
-                i === payIdx ? styles.selected : '',
+                i === selectedIdx ? styles.selected : '',
                 card.eligible ? '' : styles.dim,
               ].join(' ')}
               onClick={() => dispatch({ type: A.SELECT_PAY_CARD, index: i })}

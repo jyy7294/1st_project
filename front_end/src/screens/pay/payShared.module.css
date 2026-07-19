@@ -46,6 +46,12 @@
   box-shadow: 0 14px 28px -10px rgba(47, 107, 255, .6);
 }
 
+.primaryBtn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .ghostBtn {
   width: 100%;
   height: 52px;

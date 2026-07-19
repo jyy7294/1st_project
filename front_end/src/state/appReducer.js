@@ -81,7 +81,7 @@ export function appReducer(state, action) {
       return { ...state, payStep: action.payStep }
 
     case A.SET_RESULT:
-      return { ...state, result: action.result, error: null, noEligibleCard: false }
+      return { ...state, result: action.result, error: null, noEligibleCard: false, payIdx: 0 }
 
     case A.SET_ERROR:
       return { ...state, error: action.message, result: null }
