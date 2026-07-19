@@ -114,7 +114,7 @@ export default function PayRecommend() {
           <div className={styles.grabber} />
           <div className={styles.sheetTitle}>다른 카드로 결제하기</div>
           <div className={styles.sheetSub}>
-            혜택 순서대로 정렬했어요. 원하는 카드를 선택하세요.
+            추천 순서대로 정렬했어요. 원하는 카드를 선택하세요.
           </div>
         </div>
 
