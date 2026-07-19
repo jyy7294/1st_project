@@ -17,9 +17,14 @@ export default function WalletHome() {
   useEffect(() => {
     if (cards.length > 0) return
     let cancelled = false
-    fetchMyCards().then((list) => {
-      if (!cancelled) dispatch({ type: A.SET_CARDS, cards: list })
-    })
+    fetchMyCards()
+      .then((list) => {
+        if (!cancelled) dispatch({ type: A.SET_CARDS, cards: list })
+      })
+      .catch((err) => {
+        // 보유카드를 못 불러와도 앱은 계속 동작합니다. 지갑은 빈 상태로 둡니다.
+        console.error('보유카드를 불러오지 못했습니다.', err)
+      })
     return () => {
       cancelled = true
     }

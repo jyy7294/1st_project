@@ -22,6 +22,12 @@
   margin-top: 6px;
 }
 
+/* 입력 2개 + 로그인 버튼을 감싸는 폼. 기존 세로 배치를 그대로 유지합니다. */
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
 .fields {
   margin-top: 34px;
   display: flex;
@@ -58,6 +64,14 @@
   padding: 0 4px;
   font-size: 12.5px;
   color: var(--text-3);
+}
+
+/* 아직 동작하지 않는 링크 — 비활성으로 보이게 합니다. */
+.linkOff {
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-bottom: 1px dashed currentColor;
 }
 
 .submit {

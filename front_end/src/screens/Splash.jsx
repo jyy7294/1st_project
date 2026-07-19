@@ -5,10 +5,23 @@ import styles from './Splash.module.css'
 export default function Splash() {
   const { dispatch } = useApp()
 
+  function start() {
+    dispatch({ type: A.SET_SCREEN, screen: 'login' })
+  }
+
   return (
     <div
       className={`${styles.screen} pk-screen`}
-      onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'login' })}
+      role="button"
+      tabIndex={0}
+      onClick={start}
+      onKeyDown={(e) => {
+        // 키보드 사용자도 스플래시를 넘어갈 수 있어야 합니다.
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          start()
+        }
+      }}
     >
       <div className={styles.icon}>
         <PickaMark size={72} />

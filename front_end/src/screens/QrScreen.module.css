@@ -93,6 +93,15 @@
   font-weight: 600;
 }
 
+/* QR 만료 시: 결제를 시작할 수 없음을 시각적으로 알립니다. */
+.demoBtnOff {
+  opacity: .4;
+  border-color: rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  color: rgba(255, 255, 255, .55);
+  cursor: not-allowed;
+}
+
 .footNote {
   margin-bottom: 40px;
   font-size: 12.5px;

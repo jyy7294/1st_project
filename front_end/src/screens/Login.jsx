@@ -20,7 +20,9 @@ export default function Login() {
     return () => clearTimeout(timer)
   }, [state.social, dispatch])
 
-  function submit() {
+  function submit(e) {
+    // Enter 로도 제출됩니다. 폼 기본 동작(페이지 새로고침)은 막습니다.
+    if (e) e.preventDefault()
     const result = verifyLogin(id, pw)
     if (result.ok) dispatch({ type: A.LOGIN_SUCCESS })
     else dispatch({ type: A.LOGIN_FAIL, message: result.message })
@@ -42,40 +44,43 @@ export default function Login() {
       <div className={styles.title}>PICKA에 오신 걸 환영해요</div>
       <div className={styles.sub}>카드 혜택을 최대로 챙길 시간이에요</div>
 
-      <div className={styles.fields}>
-        <input
-          className={styles.input}
-          value={id}
-          onChange={(e) => {
-            setId(e.target.value)
-            if (state.loginError) dispatch({ type: A.CLEAR_LOGIN_ERROR })
-          }}
-          placeholder="아이디 입력"
-          autoComplete="off"
-        />
-        <input
-          className={styles.input}
-          type="password"
-          value={pw}
-          onChange={(e) => {
-            setPw(e.target.value)
-            if (state.loginError) dispatch({ type: A.CLEAR_LOGIN_ERROR })
-          }}
-          placeholder="비밀번호"
-          autoComplete="new-password"
-        />
-      </div>
+      <form className={styles.form} onSubmit={submit}>
+        <div className={styles.fields}>
+          <input
+            className={styles.input}
+            value={id}
+            onChange={(e) => {
+              setId(e.target.value)
+              if (state.loginError) dispatch({ type: A.CLEAR_LOGIN_ERROR })
+            }}
+            placeholder="아이디 입력"
+            autoComplete="off"
+          />
+          <input
+            className={styles.input}
+            type="password"
+            value={pw}
+            onChange={(e) => {
+              setPw(e.target.value)
+              if (state.loginError) dispatch({ type: A.CLEAR_LOGIN_ERROR })
+            }}
+            placeholder="비밀번호"
+            autoComplete="new-password"
+          />
+        </div>
 
-      {state.loginError && <div className={styles.error}>{state.loginError}</div>}
+        {state.loginError && <div className={styles.error}>{state.loginError}</div>}
 
-      <div className={styles.links}>
-        <span>회원가입</span>
-        <span>비밀번호 찾기</span>
-      </div>
+        {/* 아직 연결되지 않은 링크 — 비활성 상태임이 보이도록 흐리게 표시합니다. */}
+        <div className={styles.links}>
+          <span className={styles.linkOff} aria-disabled="true">회원가입</span>
+          <span className={styles.linkOff} aria-disabled="true">비밀번호 찾기</span>
+        </div>
 
-      <button type="button" className={styles.submit} onClick={submit}>
-        로그인
-      </button>
+        <button type="submit" className={styles.submit}>
+          로그인
+        </button>
+      </form>
 
       <div className={styles.divider}>
         <i />간편 로그인<i />

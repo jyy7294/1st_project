@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { MERCHANTS } from '../data/merchants.js'
-import { gradientFor } from '../data/cards.js'
+import { gradientForCard } from '../data/cards.js'
 import QrCode from '../components/QrCode.jsx'
 import styles from './QrScreen.module.css'
 
@@ -72,7 +72,7 @@ export default function QrScreen() {
         <div className={styles.cardChip}>
           <span
             className={styles.cardSwatch}
-            style={{ background: card.gradient || gradientFor(card.card_company) }}
+            style={{ background: gradientForCard(card) }}
           />
           {card.card_company} {card.card_name}
         </div>
@@ -94,7 +94,12 @@ export default function QrScreen() {
         {expired ? '유효시간 만료' : `QR 유효시간 ${mm}:${ss}`}
       </div>
 
-      <button type="button" className={styles.demoBtn} onClick={recognize}>
+      <button
+        type="button"
+        className={`${styles.demoBtn} ${expired ? styles.demoBtnOff : ''}`}
+        disabled={expired}
+        onClick={recognize}
+      >
         🏪 매장에서 QR 인식됨 (데모)
       </button>
       <div className={styles.footNote}>화면을 매장 리더기에 인식시켜 주세요</div>
