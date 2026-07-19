@@ -46,7 +46,10 @@ export default function Login() {
         <input
           className={styles.input}
           value={id}
-          onChange={(e) => setId(e.target.value)}
+          onChange={(e) => {
+            setId(e.target.value)
+            if (state.loginError) dispatch({ type: A.CLEAR_LOGIN_ERROR })
+          }}
           placeholder="아이디 입력"
           autoComplete="off"
         />
@@ -54,7 +57,10 @@ export default function Login() {
           className={styles.input}
           type="password"
           value={pw}
-          onChange={(e) => setPw(e.target.value)}
+          onChange={(e) => {
+            setPw(e.target.value)
+            if (state.loginError) dispatch({ type: A.CLEAR_LOGIN_ERROR })
+          }}
           placeholder="비밀번호"
           autoComplete="new-password"
         />

@@ -4,6 +4,7 @@ export const A = {
   SET_SCREEN: 'SET_SCREEN',
   LOGIN_SUCCESS: 'LOGIN_SUCCESS',
   LOGIN_FAIL: 'LOGIN_FAIL',
+  CLEAR_LOGIN_ERROR: 'CLEAR_LOGIN_ERROR',
   SET_SOCIAL: 'SET_SOCIAL',
   SET_CARDS: 'SET_CARDS',
   TOGGLE_EXPANDED: 'TOGGLE_EXPANDED',
@@ -43,6 +44,9 @@ export function appReducer(state, action) {
 
     case A.LOGIN_FAIL:
       return { ...state, loginError: action.message }
+
+    case A.CLEAR_LOGIN_ERROR:
+      return { ...state, loginError: '' }
 
     case A.SET_SOCIAL:
       return { ...state, social: action.provider }
