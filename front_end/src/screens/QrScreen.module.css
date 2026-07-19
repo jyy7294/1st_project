@@ -1,0 +1,100 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(165deg, #10275F 0%, #071844 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header {
+  width: 100%;
+  padding: 60px 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { display: flex; align-items: center; gap: 8px; }
+
+.brandText {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: #fff;
+}
+
+.close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  font-size: 17px;
+}
+
+.cardChip {
+  margin-top: 16px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardSwatch {
+  width: 26px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-block;
+  flex: none;
+}
+
+.qrWrap { margin-top: 22px; }
+
+.token {
+  margin-top: 22px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .85);
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.timer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.timer.expired { color: rgba(255, 255, 255, .45); }
+
+.demoBtn {
+  margin-top: auto;
+  margin-bottom: 16px;
+  height: 48px;
+  padding: 0 22px;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: var(--r-btn);
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.footNote {
+  margin-bottom: 40px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, .4);
+}

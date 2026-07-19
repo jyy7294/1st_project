@@ -1,0 +1,44 @@
+.frame {
+  position: relative;
+  width: 262px;
+  height: 262px;
+  border-radius: 24px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .5);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: opacity .3s ease;
+}
+
+.expiredOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .94);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.expiredText { font-size: 13.5px; font-weight: 600; color: var(--navy-text); }
+
+.refresh {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(140deg, #10275F, #071844);
+  color: #fff;
+  font-size: 26px;
+  box-shadow: 0 12px 26px -8px rgba(14, 36, 93, .5);
+}
+
+.refreshHint { font-size: 12px; color: var(--text-2); }
