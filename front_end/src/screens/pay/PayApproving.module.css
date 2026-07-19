@@ -1,0 +1,100 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 44;
+  background: var(--pay-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 22px;
+}
+
+.brand { width: 100%; padding: 60px 0 8px; font-size: 14px; font-weight: 800; color: #fff; }
+
+.orb {
+  margin-top: 54px;
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(110, 166, 255, .25); }
+
+.glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 107, 255, .3), transparent 70%);
+  animation: pk-ring 1.8s ease-in-out infinite;
+}
+
+.spin {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border-top: 2px solid var(--blue-light);
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
+  animation: pk-spin 1s linear infinite;
+}
+
+.core {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #16294f, #0c1a3a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+}
+
+.head { text-align: center; margin-top: 26px; }
+.headTitle { font-size: 20px; font-weight: 800; color: #fff; }
+.headSub { font-size: 13px; color: rgba(255, 255, 255, .5); margin-top: 8px; line-height: 1.5; }
+
+.panel {
+  margin-top: 30px;
+  width: 100%;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.row { display: flex; justify-content: space-between; font-size: 13px; }
+.row + .row { margin-top: 12px; }
+.rowLabel { color: rgba(255, 255, 255, .5); }
+.rowValue { color: #fff; font-weight: 600; }
+
+.barTrack {
+  margin-top: 14px;
+  height: 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .1);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2F6BFF, #6ea6ff);
+  animation: pk-grow 2.2s ease-in-out forwards;
+}
+
+.foot {
+  margin-top: auto;
+  margin-bottom: 44px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, .4);
+  border: 1px solid rgba(255, 255, 255, .1);
+  padding: 8px 14px;
+  border-radius: 20px;
+}
