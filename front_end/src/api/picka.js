@@ -1,3 +1,5 @@
+import { WALLET_CARDS } from '../data/cards.js'
+
 // PICKA 백엔드(FastAPI) 연동.
 // uvicorn 기본 포트(8000)를 가정합니다. 백엔드 포트가 다르면 여기만 바꾸세요.
 const API_BASE = 'http://127.0.0.1:8000'
@@ -35,4 +37,20 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
   }
+}
+
+/**
+ * 사용자의 보유카드 목록을 가져옵니다.
+ *
+ * 지금은 프론트 목업(data/cards.js)을 반환합니다.
+ * 백엔드에 GET /api/v1/cards 가 생기면 이 함수 안쪽만 아래처럼 바꾸면 됩니다:
+ *
+ *   const res = await fetch(`${API_BASE}/api/v1/cards`)
+ *   if (!res.ok) throw new ApiError('보유카드를 불러오지 못했습니다.', res.status)
+ *   return res.json()
+ *
+ * @returns {Promise<Array>} 보유카드 배열
+ */
+export async function fetchMyCards() {
+  return WALLET_CARDS
 }
