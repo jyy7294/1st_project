@@ -1,5 +1,7 @@
 // 앱 전체 상태 전이. 순수 함수 — 타이머·fetch 같은 부수효과는 화면 컴포넌트가 가집니다.
 
+import { recommendedIndex } from '../utils/compare.js'
+
 export const A = {
   SET_SCREEN: 'SET_SCREEN',
   LOGIN_SUCCESS: 'LOGIN_SUCCESS',
@@ -26,7 +28,7 @@ export const initialState = {
   expanded: false, // 홈 카드 스택 펼침 여부
   active: 0, // 홈에서 선택된 카드 index
   transaction: null, // QR로 읽은 결제정보
-  payIdx: 0, // 정렬된 comparison 배열에서 결제에 쓸 카드 index
+  payIdx: 0, // comparison 배열(백엔드 순서)에서 결제에 쓸 카드 index
   result: null, // 백엔드 추천 응답
   error: null, // 추천 호출 실패 메시지
   noEligibleCard: false, // 404 — 이 업종에 혜택 카드가 없음
@@ -81,7 +83,15 @@ export function appReducer(state, action) {
       return { ...state, payStep: action.payStep }
 
     case A.SET_RESULT:
-      return { ...state, result: action.result, error: null, noEligibleCard: false, payIdx: 0 }
+      // 기본 선택 카드는 백엔드가 is_recommended 로 표시한 카드입니다.
+      // (보통 맨 앞이지만 순서에 기대지 않고 플래그로 찾습니다.)
+      return {
+        ...state,
+        result: action.result,
+        error: null,
+        noEligibleCard: false,
+        payIdx: recommendedIndex(action.result?.comparison),
+      }
 
     case A.SET_ERROR:
       return { ...state, error: action.message, result: null }
