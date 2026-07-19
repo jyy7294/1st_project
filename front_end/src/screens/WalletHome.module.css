@@ -1,0 +1,101 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-app);
+  overflow-y: auto;
+}
+
+.header {
+  padding: 62px 22px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { display: flex; align-items: center; gap: 9px; }
+
+.brandText {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.6px;
+}
+
+.headerActions { display: flex; gap: 10px; }
+
+.iconBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: none;
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1;
+  background: var(--navy);
+  color: #fff;
+}
+
+.iconBtn.light {
+  background: #fff;
+  color: var(--navy-text);
+  box-shadow: 0 2px 8px rgba(14, 36, 93, .08);
+  font-size: 17px;
+}
+
+.qrBar {
+  margin: 4px 22px 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--navy-grad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  border: none;
+  width: calc(100% - 44px);
+  box-shadow: var(--sh-raise);
+  text-align: left;
+}
+
+.qrBarLabel { font-size: 13px; color: rgba(255, 255, 255, .6); font-weight: 500; }
+.qrBarTitle { font-size: 17px; color: #fff; font-weight: 700; margin-top: 3px; }
+
+.qrBarIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+
+.qrBarIcon img { width: 38px; height: 38px; display: block; }
+
+.stack { position: relative; margin: 14px 22px 0; }
+
+.stackItem {
+  position: absolute;
+  left: 0;
+  right: 0;
+  cursor: pointer;
+  transform-origin: center;
+  transition: top .4s cubic-bezier(.22, .61, .36, 1),
+              transform .28s ease,
+              filter .28s ease;
+}
+
+.stackItem.selected {
+  transform: scale(1.05) translateY(-6px);
+  filter: drop-shadow(0 22px 34px rgba(10, 29, 79, .5));
+}
+
+.hint {
+  text-align: center;
+  padding: 22px 0 34px;
+  font-size: 12.5px;
+  color: var(--text-4);
+  cursor: pointer;
+}

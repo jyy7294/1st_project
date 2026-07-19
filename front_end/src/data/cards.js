@@ -29,6 +29,9 @@ export const WALLET_CARDS = [
     last_four: '1234',
     nickname: '생활비 카드',
     gradient: GRADIENTS['신한카드'],
+    spent: '318,000',
+    benefit: '22,400',
+    expiry: '12/27',
   },
   {
     card_id: 2262,
@@ -37,6 +40,9 @@ export const WALLET_CARDS = [
     last_four: '5678',
     nickname: '카페·외식 카드',
     gradient: GRADIENTS['롯데카드'],
+    spent: '506,000',
+    benefit: '31,200',
+    expiry: '03/28',
   },
   {
     card_id: 2261,
@@ -45,5 +51,8 @@ export const WALLET_CARDS = [
     last_four: '9012',
     nickname: '기본 할인 카드',
     gradient: DEFAULT_GRADIENT,
+    spent: '152,000',
+    benefit: '9,800',
+    expiry: '09/26',
   },
 ]
