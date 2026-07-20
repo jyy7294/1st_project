@@ -53,11 +53,6 @@
   --pk-dur: 2.4s;
 }
 
-.coreIcon {
-  display: block;
-  --pk-dur: 9s;
-}
-
 .head { text-align: center; margin-top: 22px; }
 .headTitle { font-size: 22px; font-weight: 800; color: #fff; }
 .headSub { font-size: 13px; color: rgba(255, 255, 255, .5); margin-top: 8px; line-height: 1.5; }

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { orderedComparison, hasNoEligibleCard } from '../../utils/compare.js'
@@ -5,6 +6,9 @@ import { gradientForCard } from '../../data/cards.js'
 import { krw } from '../../utils/format.js'
 import shared from './payShared.module.css'
 import styles from './PayRecommend.module.css'
+
+/** 이만큼 끌면 반대 상태(내림/올림)로 붙습니다. */
+const SNAP = 44
 
 export default function PayRecommend() {
   const { state, dispatch } = useApp()
@@ -19,6 +23,47 @@ export default function PayRecommend() {
   // 404(보유카드 없음) 뿐 아니라, 200이지만 모든 카드가 eligible=false 인 경우도
   // "이 업종엔 혜택 카드가 없어요" 안내를 보여줍니다. -0원 추천은 띄우지 않습니다.
   const noBenefitAnywhere = noEligibleCard || hasNoEligibleCard(ranked)
+
+  // '다른 카드로 결제하기' 시트를 잡아 내리면 뒤의 할인 혜택·최종 승인 금액이 보입니다.
+  const sheetRef = useRef(null)
+  const headRef = useRef(null)
+  const dragStart = useRef(null)
+  const [lowered, setLowered] = useState(false)
+  const [maxOffset, setMaxOffset] = useState(0)
+  const [dragOffset, setDragOffset] = useState(null)
+
+  // 내려도 손잡이(제목 줄)는 남겨서 다시 올릴 수 있게 합니다.
+  useLayoutEffect(() => {
+    const sheet = sheetRef.current
+    const head = headRef.current
+    if (!sheet || !head) return
+    setMaxOffset(Math.max(0, sheet.offsetHeight - head.offsetHeight))
+  }, [ranked.length])
+
+  const offset = dragOffset != null ? dragOffset : lowered ? maxOffset : 0
+
+  function onPointerDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    dragStart.current = { y: e.clientY, base: lowered ? maxOffset : 0 }
+    setDragOffset(dragStart.current.base)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function onPointerMove(e) {
+    if (!dragStart.current) return
+    const next = dragStart.current.base + (e.clientY - dragStart.current.y)
+    setDragOffset(Math.min(Math.max(next, 0), maxOffset))
+  }
+
+  function onPointerUp() {
+    if (!dragStart.current) return
+    const { base } = dragStart.current
+    const moved = (dragOffset ?? base) - base
+    dragStart.current = null
+    setDragOffset(null)
+    // 내려간 상태면 위로, 올라간 상태면 아래로 SNAP 이상 움직였을 때만 전환합니다.
+    if (Math.abs(moved) > SNAP) setLowered(moved > 0)
+  }
 
   function retry() {
     // 분석 화면으로 되돌리면 추천 API가 다시 호출됩니다.
@@ -107,10 +152,24 @@ export default function PayRecommend() {
         )}
       </div>
 
-      <div className={styles.scrim} />
+      <div className={`${styles.scrim} ${lowered ? styles.scrimOff : ''}`} />
 
-      <div className={`${styles.sheet} pk-anim-up`}>
-        <div className={styles.sheetHead}>
+      <div
+        ref={sheetRef}
+        className={`${styles.sheet} pk-anim-up`}
+        style={{
+          transform: offset ? `translateY(${offset}px)` : undefined,
+          transition: dragOffset != null ? 'none' : undefined,
+        }}
+      >
+        <div
+          ref={headRef}
+          className={styles.sheetHead}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
           <div className={styles.grabber} />
           <div className={styles.sheetTitle}>다른 카드로 결제하기</div>
           <div className={styles.sheetSub}>

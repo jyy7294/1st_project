@@ -75,10 +75,8 @@ export default function PayAnalyzing() {
           <div className={`${styles.ring1} pk-anim-ring`} />
           <div className={`${styles.ring2} pk-anim-ring`} />
           <div className={`${styles.spin} pk-anim-spin pk-reduced-loading`} />
-          <div className={`${styles.core} pk-anim-float`}>
-            {/* 중앙 아이콘만 천천히 돕니다. 바깥 오브의 float 은 그대로 유지됩니다. */}
-            <span className={`${styles.coreIcon} pk-anim-spin`}>🧠</span>
-          </div>
+          {/* 아이콘은 돌리지 않고 미세한 상하 움직임만 줍니다. 회전은 바깥 링이 맡습니다. */}
+          <div className={`${styles.core} pk-anim-float`}>🧠</div>
         </div>
       </div>
 

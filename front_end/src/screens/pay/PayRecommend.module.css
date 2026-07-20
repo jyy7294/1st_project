@@ -117,7 +117,11 @@
   top: 38%;
   pointer-events: none;
   background: linear-gradient(180deg, transparent, rgba(6, 11, 24, .55) 40%);
+  transition: opacity .32s ease;
 }
+
+/* 시트를 내리면 뒤 내용을 가리던 그림자도 걷습니다. */
+.scrimOff { opacity: 0; }
 
 .sheet {
   position: absolute;
@@ -134,9 +138,20 @@
   border-radius: 24px 24px 0 0;
   box-shadow: 0 -12px 40px -8px rgba(0, 0, 0, .55);
   --pk-dur: .35s;
+  /* 손잡이를 놓으면 올림/내림 위치로 부드럽게 붙습니다. */
+  transition: transform .32s cubic-bezier(.22, .61, .36, 1);
 }
 
-.sheetHead { padding: 14px 20px 6px; flex: none; }
+/* 여기만 잡아서 끕니다. 아래 카드 목록의 스크롤과 겹치지 않습니다. */
+.sheetHead {
+  padding: 14px 20px 6px;
+  flex: none;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.sheetHead:active { cursor: grabbing; }
 
 .grabber {
   width: 40px;
