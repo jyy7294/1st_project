@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { fetchMyCards } from '../api/picka.js'
 import CardFace from '../components/CardFace.jsx'
+import PickaLogo from '../components/PickaLogo.jsx'
 import styles from './WalletHome.module.css'
 
 const CARD_HEIGHT = 186
@@ -40,8 +41,7 @@ export default function WalletHome() {
     <div className={`${styles.screen} pk-screen`}>
       <div className={styles.header}>
         <div className={styles.brand}>
-          <PickaAppIcon />
-          <span className={styles.brandText}>지갑</span>
+          <PickaLogo height={30} />
         </div>
         <div className={styles.headerActions}>
           <button
@@ -65,6 +65,19 @@ export default function WalletHome() {
 
       <button
         type="button"
+        className={styles.adBanner}
+        onClick={() => dispatch({ type: A.START_RECO })}
+      >
+        <span className={styles.adIcon}>🔍</span>
+        <span className={styles.adBody}>
+          <span className={styles.adTitle}>내 소비패턴 분석 카드 추천</span>
+          <span className={styles.adSub}>소비 습관을 분석해 꼭 맞는 카드를 추천해드려요</span>
+        </span>
+        <span className={styles.adTag}>AD ›</span>
+      </button>
+
+      <button
+        type="button"
         className={styles.qrBar}
         onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'qr' })}
       >
@@ -83,8 +96,8 @@ export default function WalletHome() {
 
       {cards.length > 0 && (
         <div className={styles.statsToggle}>
-          <span className={styles.statsToggleLabel}>사용내역 표시</span>
-          <div className={styles.switch} role="group" aria-label="사용내역 표시">
+          <span className={styles.statsToggleLabel}>금액 표시</span>
+          <div className={styles.switch} role="group" aria-label="금액 표시">
             <button
               type="button"
               className={`${styles.switchBtn} ${showCardStats ? styles.switchOn : ''}`}
@@ -93,7 +106,6 @@ export default function WalletHome() {
             >
               ON
             </button>
-            <span className={styles.switchDivider}>·</span>
             <button
               type="button"
               className={`${styles.switchBtn} ${showCardStats ? '' : styles.switchOff}`}
@@ -160,33 +172,3 @@ export default function WalletHome() {
   )
 }
 
-/** 헤더용 앱 아이콘 (네이비 사각 배경 + 마크). */
-function PickaAppIcon() {
-  return (
-    <svg width="26" height="26" viewBox="24 24 464 464">
-      <rect x="24" y="24" width="464" height="464" rx="108" fill="#0E245D" />
-      <g>
-        <PickaMarkPaths />
-      </g>
-    </svg>
-  )
-}
-
-function PickaMarkPaths() {
-  return (
-    <>
-      <path
-        d="M150 398V168C150 143.699 169.699 124 194 124H286C344.542 124 392 171.458 392 230C392 281.568 355.159 324.569 306.36 334.07L288 268C313.688 264.031 328 248.513 328 226C328 201.699 308.301 182 284 182H232C218.745 182 208 192.745 208 206V398H150Z"
-        fill="#fff"
-      />
-      <path
-        d="M150 324L278 287C297.562 281.343 317.956 292.79 322.586 312.623L332.7 355.938C337.415 376.13 322.955 395.905 302.31 397.94L150 413V324Z"
-        fill="#2F6BFF"
-      />
-      <path
-        d="M191 315L251 251.5C261.2 240.7 279.9 244.2 285.3 258.4L304 307.6C307.4 316.5 300.8 326 291.3 326H200.2C191.3 326 184.9 319.8 191 315Z"
-        fill="#19D3C5"
-      />
-    </>
-  )
-}

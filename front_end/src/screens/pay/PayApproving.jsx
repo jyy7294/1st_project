@@ -28,7 +28,9 @@ export default function PayApproving() {
 
   return (
     <div className={`${styles.screen} pk-screen`}>
-      <div className={styles.brand}>picka</div>
+      <div className={styles.brand}>
+        picka
+      </div>
 
       <div className={styles.orb} role="status" aria-live="polite">
         <div className={styles.ring} />

@@ -14,13 +14,6 @@
 
 .brand { display: flex; align-items: center; gap: 9px; }
 
-.brandText {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--navy-text);
-  letter-spacing: -.6px;
-}
-
 .headerActions { display: flex; gap: 10px; }
 
 .iconBtn {
@@ -44,27 +37,28 @@
 
 .qrBar {
   margin: 4px 22px 8px;
-  padding: 24px 27px;
-  border-radius: 27px;
-  background: var(--navy-grad);
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #eef1f6;
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  border: none;
   width: calc(100% - 44px);
-  box-shadow: var(--sh-raise);
+  box-shadow: 0 8px 22px -12px rgba(14, 36, 93, .28);
   text-align: left;
 }
 
-.qrBarLabel { font-size: 19.5px; color: rgba(255, 255, 255, .6); font-weight: 500; }
-.qrBarTitle { font-size: 25.5px; color: #fff; font-weight: 700; margin-top: 5px; }
+.qrBarLabel { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.qrBarTitle { font-size: 17px; color: var(--navy-text); font-weight: 700; margin-top: 3px; }
 
 .qrBarIcon {
-  width: 69px;
-  height: 69px;
-  border-radius: 18px;
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
   background: #fff;
+  border: 1px solid #eef1f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,7 +66,7 @@
   flex: none;
 }
 
-.qrBarIcon img { width: 57px; height: 57px; display: block; }
+.qrBarIcon img { width: 50px; height: 50px; display: block; }
 
 .stack { position: relative; margin: 14px 22px 0; }
 
@@ -92,41 +86,100 @@
   filter: drop-shadow(0 22px 34px rgba(10, 29, 79, .5));
 }
 
+/* 소비패턴 분석 카드 추천 배너 (AD) */
+.adBanner {
+  margin: 6px 22px 12px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 16px;
+  background: #f0f1f5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 44px);
+  text-align: left;
+}
+
+.adIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  flex: none;
+  background: linear-gradient(140deg, var(--blue), var(--teal));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.adBody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.adTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adSub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adTag { flex: none; font-size: 11px; font-weight: 600; color: var(--text-3); }
+
 /*
- * 카드 스택 위 — 카드 앞면의 사용내역 표시를 켜고 끕니다. 배경 없이 글자만 둡니다.
- * 왼쪽 여백 42px = 스택 여백 22px + 카드 안쪽 패딩 20px.
- * 카드에 적힌 카드사명과 글자 시작점을 맞춥니다.
+ * 카드 스택 위 — 카드 앞면의 금액 표시를 켜고 끕니다.
+ * 카드 바깥선(22px)에서 4px 만 안쪽으로 넣어 카드 모서리 곡선과 시각적으로 맞춥니다.
  */
 .statsToggle {
-  margin: 14px 22px 0 42px;
+  margin: 14px 22px 0 26px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .statsToggleLabel {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-text);
 }
 
-.switch { display: flex; align-items: center; gap: 6px; flex: none; }
-.switchDivider { font-size: 11px; color: var(--line-strong); }
+/* ON/OFF 를 알약 하나로 묶습니다. 선택된 쪽만 안쪽 알약이 채워집니다. */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 2px;
+  border-radius: 999px;
+  background: #e7eaf1;
+}
 
 .switchBtn {
   border: none;
   background: none;
-  padding: 2px 2px;
+  padding: 5px 13px;
+  border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .3px;
-  color: var(--text-4);
-  transition: color .18s ease;
+  font-weight: 700;
+  color: var(--text-3);
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
 }
 
-/* 선택된 쪽만 진하게 — 배경 없이 글자 색으로만 상태를 보여줍니다. */
+/* 선택된 쪽만 흰 알약으로 떠오릅니다. */
 .switchBtn.switchOn,
-.switchBtn.switchOff { color: var(--navy); }
+.switchBtn.switchOff {
+  background: #fff;
+  color: var(--navy-text);
+  box-shadow: 0 1px 3px rgba(14, 36, 93, .18);
+}
 
 .empty {
   margin: 30px 22px 34px;

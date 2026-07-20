@@ -73,7 +73,9 @@ export default function PayRecommend() {
   return (
     <div className={`${styles.screen} pk-screen`}>
       <div className={styles.scroll}>
-        <div className={`${shared.brandRow} ${shared.end}`}>picka</div>
+        <div className={`${shared.brandRow} ${shared.end}`}>
+          picka
+        </div>
 
         {error && <ErrorNotice message={error} onRetry={retry} />}
 

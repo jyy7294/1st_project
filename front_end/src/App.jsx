@@ -7,6 +7,8 @@ import CardDetail from './screens/CardDetail.jsx'
 import CardBenefits from './screens/CardBenefits.jsx'
 import CardsManage from './screens/CardsManage.jsx'
 import Report from './screens/Report.jsx'
+import Recommend from './screens/Recommend.jsx'
+import RecommendDetail from './screens/RecommendDetail.jsx'
 import AddCard from './screens/add/AddCard.jsx'
 import QrScreen from './screens/QrScreen.jsx'
 import PayReceived from './screens/pay/PayReceived.jsx'
@@ -25,6 +27,8 @@ const SCREENS = {
   benefits: CardBenefits,
   cards: CardsManage,
   report: Report,
+  recommend: Recommend,
+  recoDetail: RecommendDetail,
   add: AddCard,
   qr: QrScreen,
 }

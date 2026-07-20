@@ -8,6 +8,8 @@
   overflow-y: auto;
 }
 
+.logo { margin-bottom: 6px; }
+
 .title {
   font-size: 24px;
   font-weight: 700;

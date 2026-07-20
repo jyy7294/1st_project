@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { MERCHANTS } from '../data/merchants.js'
+import PickaMark from '../components/PickaMark.jsx'
 import QrCode from '../components/QrCode.jsx'
 import styles from './QrScreen.module.css'
 
@@ -77,7 +78,7 @@ export default function QrScreen() {
     <div className={`${styles.screen} pk-screen`}>
       <div className={styles.header}>
         <div className={styles.brand}>
-          <QrMark />
+          <PickaMark size={26} />
           <span className={styles.brandText}>picka</span>
         </div>
         <button
@@ -130,22 +131,3 @@ export default function QrScreen() {
   )
 }
 
-/** QR 화면 헤더용 흰색 마크. */
-function QrMark() {
-  return (
-    <svg width="26" height="26" viewBox="150 124 242 289">
-      <path
-        d="M150 398V168C150 143.699 169.699 124 194 124H286C344.542 124 392 171.458 392 230C392 281.568 355.159 324.569 306.36 334.07L288 268C313.688 264.031 328 248.513 328 226C328 201.699 308.301 182 284 182H232C218.745 182 208 192.745 208 206V398H150Z"
-        fill="#fff"
-      />
-      <path
-        d="M150 324L278 287C297.562 281.343 317.956 292.79 322.586 312.623L332.7 355.938C337.415 376.13 322.955 395.905 302.31 397.94L150 413V324Z"
-        fill="#2F6BFF"
-      />
-      <path
-        d="M191 315L251 251.5C261.2 240.7 279.9 244.2 285.3 258.4L304 307.6C307.4 316.5 300.8 326 291.3 326H200.2C191.3 326 184.9 319.8 191 315Z"
-        fill="#19D3C5"
-      />
-    </svg>
-  )
-}

@@ -18,6 +18,9 @@ export const A = {
   TOGGLE_NOTIFY: 'TOGGLE_NOTIFY',
   SET_CARD_STATS: 'SET_CARD_STATS',
   REMOVE_CARD: 'REMOVE_CARD',
+  START_RECO: 'START_RECO',
+  SET_RECO_TYPE: 'SET_RECO_TYPE',
+  OPEN_RECO_DETAIL: 'OPEN_RECO_DETAIL',
   SET_REPORT_MONTH: 'SET_REPORT_MONTH',
   TOGGLE_REPORT_CARD: 'TOGGLE_REPORT_CARD',
   START_ADD: 'START_ADD',
@@ -43,7 +46,7 @@ export const EMPTY_TERMS = { t1: false, t2: false, t3: false, t4: false }
 
 export const initialState = {
   screen: 'splash', // 'splash' | 'login' | 'home' | 'detail' | 'benefits'
-  //                   | 'cards' | 'report' | 'add' | 'qr'
+  //                   | 'cards' | 'report' | 'recommend' | 'recoDetail' | 'add' | 'qr'
   payStep: 'none', // 'none' | 'received' | 'analyzing' | 'recommend'
   //                  | 'confirm' | 'faceid' | 'approving' | 'done'
   cards: [], // fetchMyCards() 결과
@@ -58,6 +61,8 @@ export const initialState = {
   addForm: EMPTY_ADD_FORM,
   terms: EMPTY_TERMS,
   addedCard: null, // 방금 등록한 카드 (등록 완료 화면에 표시)
+  recoType: 'credit', // 카드 추천 화면 탭: 'credit' | 'check'
+  recoSelId: null, // 분석 결과를 보고 있는 추천 카드 id. null 이면 1위
   reportMonth: LATEST_MONTH_INDEX, // 리포트에서 보고 있는 달
   reportCardOpen: -1, // 리포트 '카드별 혜택'에서 펼친 카드 index. -1 이면 모두 접힘
   transaction: null, // QR로 읽은 결제정보
@@ -136,6 +141,16 @@ export function appReducer(state, action) {
         screen: 'home',
       }
     }
+
+    case A.START_RECO:
+      return { ...state, screen: 'recommend', recoType: 'credit', recoSelId: null }
+
+    case A.SET_RECO_TYPE:
+      // 탭을 바꾸면 목록이 통째로 달라지므로 선택도 1위로 되돌립니다.
+      return { ...state, recoType: action.recoType, recoSelId: null }
+
+    case A.OPEN_RECO_DETAIL:
+      return { ...state, screen: 'recoDetail', recoSelId: action.id }
 
     case A.SET_REPORT_MONTH:
       // 달을 바꾸면 펼쳐둔 카드는 접습니다 (다른 달 금액이 남아 보이지 않게).

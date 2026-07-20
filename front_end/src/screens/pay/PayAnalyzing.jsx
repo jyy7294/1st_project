@@ -68,7 +68,9 @@ export default function PayAnalyzing() {
 
   return (
     <div className={`${shared.screen} pk-screen`}>
-      <div className={`${shared.brandRow} ${shared.end}`}>picka</div>
+      <div className={`${shared.brandRow} ${shared.end}`}>
+        picka
+      </div>
 
       <div className={styles.orbWrap} role="status" aria-live="polite">
         <div className={styles.orb}>

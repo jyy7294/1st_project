@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { verifyLogin, SOCIAL_URL } from '../api/auth.js'
+import PickaLogo from '../components/PickaLogo.jsx'
 import styles from './Login.module.css'
 
 const SOCIAL_LABEL = { kakao: '카카오', naver: '네이버' }
@@ -39,7 +40,7 @@ export default function Login() {
 
   return (
     <div className={`${styles.screen} pk-screen`}>
-      <Wordmark />
+      <PickaLogo height={35} className={styles.logo} />
 
       <div className={styles.title}>PICKA에 오신 걸 환영해요</div>
       <div className={styles.sub}>카드 혜택을 최대로 챙길 시간이에요</div>
@@ -123,30 +124,3 @@ export default function Login() {
   )
 }
 
-/** 로그인 화면 상단의 가로형 로고. */
-function Wordmark() {
-  return (
-    <svg width="120" height="35" viewBox="0 0 1100 320" style={{ marginBottom: 6 }}>
-      <g transform="translate(28 20)">
-        <path
-          d="M34 250V62C34 42.1177 50.1177 26 70 26H145C192.496 26 231 64.5035 231 112C231 153.862 201.077 188.75 161.45 196.45L146 142C167.014 138.72 179 126.42 179 108C179 88.1177 162.882 72 143 72H101C89.9543 72 81 80.9543 81 92V250H34Z"
-          fill="#0E245D"
-        />
-        <path
-          d="M34 187L135.5 157.5C151.188 152.94 167.53 162.128 171.25 178.038L179.38 212.808C183.168 229.009 171.57 244.876 155 246.5L34 258V187Z"
-          fill="#2F6BFF"
-        />
-        <path
-          d="M65.3 181.2L113.8 130.1C122.2 121.2 137.2 124.1 141.7 135.8L156.6 174.9C159.3 182 154 189.6 146.4 189.6H72.8C65.6 189.6 60.4 185.1 65.3 181.2Z"
-          fill="#19D3C5"
-        />
-      </g>
-      <text
-        x="330" y="220" fill="#0A1D4F" fontFamily="Pretendard,sans-serif"
-        fontSize="180" fontWeight="800" letterSpacing="-7"
-      >
-        picka
-      </text>
-    </svg>
-  )
-}

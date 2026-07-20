@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
+import PickaMark from '../../components/PickaMark.jsx'
 import shared from './payShared.module.css'
 import styles from './PayReceived.module.css'
 
@@ -23,7 +24,10 @@ export default function PayReceived() {
 
   return (
     <div className={`${shared.screen} pk-screen`}>
-      <div className={shared.brandRow}>picka</div>
+      <div className={shared.brandRow}>
+        <PickaMark size={22} />
+        <span>picka</span>
+      </div>
 
       <div className={styles.title}>거래 정보를 확인했습니다.</div>
       <div className={styles.sub}>결제 내용을 확인하고 잠시만 기다려주세요.</div>
