@@ -3,6 +3,7 @@ import { A } from '../../state/appReducer.js'
 import { orderedComparison } from '../../utils/compare.js'
 import { gradientForCard } from '../../data/cards.js'
 import { krw } from '../../utils/format.js'
+import ServiceNotice from './ServiceNotice.jsx'
 import shared from './payShared.module.css'
 import styles from './PayConfirm.module.css'
 
@@ -101,7 +102,7 @@ export default function PayConfirm() {
           disabled={asBackdrop}
           onClick={() => dispatch({ type: A.SET_PAY_STEP, payStep: 'faceid' })}
         >
-          🔒 결제하기
+          결제하기
         </button>
         <button
           type="button"
@@ -111,6 +112,8 @@ export default function PayConfirm() {
         >
           다른 카드 선택
         </button>
+
+        <ServiceNotice />
       </div>
     </div>
   )

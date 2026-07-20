@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { MERCHANTS } from '../data/merchants.js'
-import { gradientForCard } from '../data/cards.js'
 import QrCode from '../components/QrCode.jsx'
 import styles from './QrScreen.module.css'
 
@@ -32,7 +31,7 @@ function pickMerchant() {
 }
 
 export default function QrScreen() {
-  const { state, dispatch } = useApp()
+  const { dispatch } = useApp()
   const [seconds, setSeconds] = useState(QR_LIFETIME_SEC)
   const [seed, setSeed] = useState(1)
   // QR 인식 상태. 결제정보 로딩(PayReceived) 직전의 짧은 구간입니다.
@@ -60,8 +59,6 @@ export default function QrScreen() {
   const expired = seconds <= 0
   const mm = Math.floor(seconds / 60)
   const ss = String(seconds % 60).padStart(2, '0')
-
-  const card = state.cards[state.active] || state.cards[0]
 
   function refresh() {
     if (recognizing) return
@@ -92,16 +89,10 @@ export default function QrScreen() {
         </button>
       </div>
 
-      {card && (
-        <div className={styles.cardChip}>
-          <span
-            className={styles.cardSwatch}
-            style={{ background: gradientForCard(card) }}
-          />
-          {card.card_company} {card.card_name}
-        </div>
-      )}
-
+      {/*
+        결제할 카드는 QR 인식 뒤 추천 단계에서 정해집니다.
+        여기서 카드명을 미리 보여주면 이미 선택된 것처럼 읽혀서 띄우지 않습니다.
+      */}
       <div className={styles.qrWrap}>
         <QrCode
           token={makeToken(seed)}

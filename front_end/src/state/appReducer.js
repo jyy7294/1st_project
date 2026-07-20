@@ -16,8 +16,7 @@ export const A = {
   GO_HOME: 'GO_HOME',
   SET_MENU: 'SET_MENU',
   TOGGLE_NOTIFY: 'TOGGLE_NOTIFY',
-  SET_LABEL_SHEET: 'SET_LABEL_SHEET',
-  SET_NICKNAME: 'SET_NICKNAME',
+  SET_CARD_STATS: 'SET_CARD_STATS',
   REMOVE_CARD: 'REMOVE_CARD',
   SET_REPORT_MONTH: 'SET_REPORT_MONTH',
   TOGGLE_REPORT_CARD: 'TOGGLE_REPORT_CARD',
@@ -54,7 +53,7 @@ export const initialState = {
   detailReturn: 'home', // 카드 상세에서 뒤로 갈 화면 ('home' | 'cards')
   menuOpen: false, // 상세 화면 ⋯ 메뉴
   notify: true, // 상세 화면 알림 설정
-  labelSheet: false, // 라벨 편집 바텀시트
+  showCardStats: true, // 카드 앞면에 사용금액·받은 혜택을 표시할지
   addStep: 'scan', // 'scan' | 'input' | 'terms' | 'done'
   addForm: EMPTY_ADD_FORM,
   terms: EMPTY_TERMS,
@@ -103,7 +102,7 @@ export function appReducer(state, action) {
     }
 
     case A.OPEN_CARD:
-      // 라벨 칩 클릭·카드 더블클릭·결제수단 관리 목록에서 상세로 들어옵니다.
+      // 카드 더블클릭·결제수단 관리 목록에서 상세로 들어옵니다.
       // 뒤로가기가 원래 있던 화면으로 돌아가도록 from 을 기억해 둡니다.
       return {
         ...state,
@@ -111,11 +110,10 @@ export function appReducer(state, action) {
         detailReturn: action.from || 'home',
         active: action.index,
         menuOpen: false,
-        labelSheet: action.labelSheet === true,
       }
 
     case A.GO_HOME:
-      return { ...state, screen: 'home', expanded: false, menuOpen: false, labelSheet: false }
+      return { ...state, screen: 'home', expanded: false, menuOpen: false }
 
     case A.SET_MENU:
       return { ...state, menuOpen: action.open }
@@ -123,15 +121,8 @@ export function appReducer(state, action) {
     case A.TOGGLE_NOTIFY:
       return { ...state, notify: !state.notify, menuOpen: false }
 
-    case A.SET_LABEL_SHEET:
-      return { ...state, labelSheet: action.open }
-
-    case A.SET_NICKNAME: {
-      const cards = state.cards.map((card, i) =>
-        i === action.index ? { ...card, nickname: action.nickname } : card,
-      )
-      return { ...state, cards, labelSheet: false }
-    }
+    case A.SET_CARD_STATS:
+      return { ...state, showCardStats: action.show }
 
     case A.REMOVE_CARD: {
       // 카드를 지우면 선택 index가 배열 밖을 가리킬 수 있어 홈으로 되돌립니다.
@@ -142,7 +133,6 @@ export function appReducer(state, action) {
         active: 0,
         expanded: false,
         menuOpen: false,
-        labelSheet: false,
         screen: 'home',
       }
     }

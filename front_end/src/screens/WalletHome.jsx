@@ -11,7 +11,7 @@ const OFFSET_EXPANDED = 176 // 펼친 카드 간격
 
 export default function WalletHome() {
   const { state, dispatch } = useApp()
-  const { cards, expanded, active, cardsLoaded } = state
+  const { cards, expanded, active, cardsLoaded, showCardStats } = state
 
   // 보유카드는 화면 진입 시 한 번만 불러옵니다.
   // (카드를 모두 지웠을 때 다시 불러오지 않도록 개수가 아니라 로드 여부로 판단합니다.)
@@ -81,6 +81,31 @@ export default function WalletHome() {
         </div>
       </button>
 
+      {cards.length > 0 && (
+        <div className={styles.statsToggle}>
+          <span className={styles.statsToggleLabel}>사용내역 표시</span>
+          <div className={styles.switch} role="group" aria-label="사용내역 표시">
+            <button
+              type="button"
+              className={`${styles.switchBtn} ${showCardStats ? styles.switchOn : ''}`}
+              aria-pressed={showCardStats}
+              onClick={() => dispatch({ type: A.SET_CARD_STATS, show: true })}
+            >
+              ON
+            </button>
+            <span className={styles.switchDivider}>·</span>
+            <button
+              type="button"
+              className={`${styles.switchBtn} ${showCardStats ? '' : styles.switchOff}`}
+              aria-pressed={!showCardStats}
+              onClick={() => dispatch({ type: A.SET_CARD_STATS, show: false })}
+            >
+              OFF
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={styles.stack} style={{ height: stackHeight }}>
         {cards.map((card, i) => {
           const selected = expanded && i === active
@@ -90,7 +115,7 @@ export default function WalletHome() {
               className={`${styles.stackItem} ${selected ? styles.selected : ''}`}
               style={{ top: i * offset, zIndex: selected ? 20 : i }}
               onClick={() => dispatch({ type: A.SELECT_CARD, index: i })}
-              // 카드를 두 번 누르면 상세로, 라벨 칩을 누르면 라벨 편집이 열린 상세로 갑니다.
+              // 카드를 두 번 누르면 상세로 들어갑니다.
               onDoubleClick={() => dispatch({ type: A.OPEN_CARD, index: i })}
             >
               <CardFace
@@ -99,9 +124,7 @@ export default function WalletHome() {
                 spent={card.spent}
                 benefit={card.benefit}
                 expiry={card.expiry}
-                onLabelClick={() =>
-                  dispatch({ type: A.OPEN_CARD, index: i, labelSheet: true })
-                }
+                showStats={showCardStats}
               />
             </div>
           )

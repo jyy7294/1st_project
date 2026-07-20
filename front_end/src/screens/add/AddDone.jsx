@@ -33,10 +33,6 @@ export default function AddDone() {
 
       <div className={styles.doneFacts}>
         <div className={styles.doneFact}>
-          <span className={styles.doneFactLabel}>카드 별칭</span>
-          <span className={styles.doneFactValue}>{card.nickname}</span>
-        </div>
-        <div className={styles.doneFact}>
           <span className={styles.doneFactLabel}>보유 카드</span>
           <span className={styles.doneFactValue}>{state.cards.length}장</span>
         </div>

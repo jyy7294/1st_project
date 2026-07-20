@@ -1,7 +1,7 @@
+import { useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import CardFace from '../components/CardFace.jsx'
-import LabelSheet from '../components/LabelSheet.jsx'
 import { benefitsForCard } from '../data/benefits.js'
 import { recentForCard } from '../data/transactions.js'
 import { benefitView } from '../utils/benefit.js'
@@ -14,6 +14,8 @@ const HIGHLIGHT_COUNT = 3
 export default function CardDetail() {
   const { state, dispatch } = useApp()
   const card = state.cards[state.active]
+  // 카드 제거는 되돌릴 수 없어 확인 창을 한 번 거칩니다.
+  const [confirmRemove, setConfirmRemove] = useState(false)
 
   // 카드를 지운 직후처럼 선택 index가 비면 홈으로 되돌립니다.
   if (!card) return null
@@ -65,7 +67,10 @@ export default function CardDetail() {
               <button
                 type="button"
                 className={`${styles.menuItem} ${styles.danger}`}
-                onClick={() => dispatch({ type: A.REMOVE_CARD, index: state.active })}
+                onClick={() => {
+                  dispatch({ type: A.SET_MENU, open: false })
+                  setConfirmRemove(true)
+                }}
               >
                 🗑️ 카드 제거
               </button>
@@ -81,30 +86,13 @@ export default function CardDetail() {
           spent={card.spent}
           benefit={card.benefit}
           expiry={card.expiry}
-          onLabelClick={() => dispatch({ type: A.SET_LABEL_SHEET, open: true })}
+          showStats={state.showCardStats}
         />
-      </div>
-
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'benefits' })}
-        >
-          상세 혜택
-        </button>
-        <button
-          type="button"
-          className={styles.ghostBtn}
-          onClick={() => dispatch({ type: A.SET_LABEL_SHEET, open: true })}
-        >
-          라벨 편집
-        </button>
       </div>
 
       <div className={styles.sectionHead}>
         <span className={styles.sectionTitle}>주요 혜택</span>
-        {benefits.length > HIGHLIGHT_COUNT && (
+        {benefits.length > 0 && (
           <button
             type="button"
             className={styles.moreBtn}
@@ -165,7 +153,43 @@ export default function CardDetail() {
         ))}
       </div>
 
-      {state.labelSheet && <LabelSheet />}
+      {confirmRemove && (
+        <div className={styles.confirmDim} onClick={() => setConfirmRemove(false)}>
+          <div
+            className={`${styles.confirm} pk-anim-pop-ease`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-card-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.confirmIcon}>🗑️</div>
+            <div className={styles.confirmTitle} id="remove-card-title">
+              정말로 카드를 삭제하시겠습니까?
+            </div>
+            <div className={styles.confirmSub}>
+              {card.card_company} {card.card_name} · {card.last_four}
+              <br />
+              삭제하면 결제 추천 대상에서 제외됩니다.
+            </div>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.confirmCancel}
+                onClick={() => setConfirmRemove(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.confirmDelete}
+                onClick={() => dispatch({ type: A.REMOVE_CARD, index: state.active })}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

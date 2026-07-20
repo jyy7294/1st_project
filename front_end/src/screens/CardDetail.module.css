@@ -61,30 +61,6 @@
 
 .cardWrap { margin: 12px 20px 0; }
 
-.actions { display: flex; gap: 10px; margin: 16px 20px 0; }
-
-.primaryBtn {
-  flex: 1;
-  height: 44px;
-  border: none;
-  border-radius: 13px;
-  background: var(--navy);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.ghostBtn {
-  flex: 1;
-  height: 44px;
-  border: 1.5px solid #dfe3ec;
-  border-radius: 13px;
-  background: #fff;
-  color: var(--navy-text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
 .sectionHead {
   margin: 24px 20px 10px;
   display: flex;
@@ -197,6 +173,71 @@
 }
 
 .txDate { font-size: 11.5px; color: var(--text-4); }
+
+/* 카드 제거 확인 창 — 되돌릴 수 없는 동작이라 한 번 더 묻습니다. */
+.confirmDim {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: rgba(10, 29, 79, .45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 34px;
+}
+
+.confirm {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px 22px 18px;
+  text-align: center;
+  box-shadow: 0 24px 50px -12px rgba(10, 29, 79, .45);
+  --pk-dur: .22s;
+}
+
+.confirmIcon { font-size: 30px; }
+
+.confirmTitle {
+  margin-top: 12px;
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.3px;
+  word-break: keep-all;
+}
+
+.confirmSub {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  word-break: keep-all;
+}
+
+.confirmActions { display: flex; gap: 10px; margin-top: 20px; }
+
+.confirmCancel,
+.confirmDelete {
+  flex: 1;
+  height: 46px;
+  border-radius: 13px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.confirmCancel {
+  border: 1.5px solid #dfe3ec;
+  background: #fff;
+  color: var(--navy-text);
+}
+
+.confirmDelete {
+  border: none;
+  background: var(--danger);
+  color: #fff;
+}
 
 .txAmountBox { text-align: right; flex: none; }
 .txAmount { font-size: 14.5px; font-weight: 700; color: var(--navy-text); }

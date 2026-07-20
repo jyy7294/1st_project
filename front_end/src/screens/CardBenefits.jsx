@@ -34,7 +34,6 @@ export default function CardBenefits() {
           <div className={styles.summaryCompany}>{card.card_company}</div>
           <div className={styles.summaryProduct}>{card.card_name}</div>
         </div>
-        {card.nickname && <span className={styles.summaryChip}>{card.nickname}</span>}
       </div>
 
       <div className={styles.sectionHead}>
