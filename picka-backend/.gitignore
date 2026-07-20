@@ -12,3 +12,21 @@ env/
 # 에디터 설정 파일 제외
 .vscode/
 .idea/
+
+# Secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+
+# IDE
+**/.vscode/
+**/.idea/
+
+# Local/generated data
+picka-backend/data/*.json
+picka-backend/data/*.csv

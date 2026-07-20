@@ -17,21 +17,30 @@ USER_CARD_STATUS = {
         "last_four": "1234",
         "nickname": "생활비 카드",
         "previous_month_spending": 450000,
-        "monthly_benefit_used": 2000
+        "monthly_benefit_used": 2000, # 사용자가 이번 달에 사용한 혜택 금액, 카드 전체 할인 사용량
+
+        # 추가
+        "benefit_usage": {}
     },
     2262: {
         "user_card_id": 2,
         "last_four": "5678",
         "nickname": "카페·외식 카드",
         "previous_month_spending": 500000,
-        "monthly_benefit_used": 4000
+        "monthly_benefit_used": 4000,
+
+        # 추가
+        "benefit_usage": {}
     },
     2261: {
         "user_card_id": 3,
         "last_four": "9012",
         "nickname": "기본 할인 카드",
         "previous_month_spending": 150000,
-        "monthly_benefit_used": 0
+        "monthly_benefit_used": 0,
+
+        # 추가
+        "benefit_usage": {}
     }
 }
 
@@ -89,7 +98,25 @@ def get_user_cards() -> list[dict]:
             "monthly_benefit_used": user_status[
                 "monthly_benefit_used"
             ],
-            "benefits": card.get("혜택", [])
+            "card_monthly_benefit_used": user_status[
+                "monthly_benefit_used"
+            ],
+            "monthly_total_limit": card.get("통합한도_월"),
+            "benefits": card.get("혜택", []),
+            "benefit_usage": user_status.get(
+                "benefit_usage",
+                {}
+            ),
+            "benefit_usage_this_month": user_status.get(
+                "benefit_usage",
+                {},
+            ),
+            "selected_option_group": user_status.get(
+                "selected_option_group"
+            ),
+            "selected_option_benefit_id": user_status.get(
+                "selected_option_benefit_id"
+            ),
         })
 
     return result
