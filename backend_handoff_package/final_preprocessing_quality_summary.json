@@ -1,0 +1,24 @@
+{
+  "release_status": "BLOCKED",
+  "release_note": "카드 추천 점수 과대평가를 막기 위해 blocker 항목 해결 전 100% 완료로 보면 안 됨.",
+  "card_count": 1559,
+  "benefit_count": 8476,
+  "grade_counts": {
+    "C_표시전용": 3253,
+    "B_추정계산": 2195,
+    "A_확정계산": 1962,
+    "D_제외권장": 1066
+  },
+  "a_count": 1962,
+  "b_count": 2195,
+  "display_or_exclude_count": 4319,
+  "high_rate_missing_cap": 0,
+  "high_rate_missing_cap_raw": 14,
+  "official_update_backlog": 200,
+  "must_check_first": 0,
+  "rule_review_needed": 5415,
+  "merchant_test_ok": 30,
+  "merchant_test_total": 30,
+  "alias_count": 688,
+  "blocker_count": 1
+}
