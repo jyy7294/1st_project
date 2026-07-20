@@ -33,9 +33,12 @@ export default function PayFaceId() {
 
   return (
     <div className={styles.overlay}>
-      <div className={`${styles.island} ${ok ? styles.ok : ''}`}>
+      <div
+        className={`${styles.island} ${ok ? `${styles.ok} pk-anim-facepop` : 'pk-anim-islandgrow'}`}
+      >
         {ok ? (
           <svg
+            className={`${styles.okIcon} pk-anim-pop`}
             width="62" height="62" viewBox="0 0 44 44" fill="none"
             stroke="#34C759" strokeWidth="3.4"
             strokeLinecap="round" strokeLinejoin="round"
@@ -43,21 +46,27 @@ export default function PayFaceId() {
             <path d="M34 15 19 31l-8-8" />
           </svg>
         ) : (
-          <svg
-            className={styles.faceIcon}
-            width="74" height="74" viewBox="0 0 44 44" fill="none"
-            stroke="#34C759" strokeWidth="3"
-            strokeLinecap="round" strokeLinejoin="round"
-          >
-            <circle cx="22" cy="22" r="18" />
-            <path d="M16 17v3" />
-            <path d="M28 17v3" />
-            <path d="M15 26a10 10 0 0 0 14 0" />
-          </svg>
+          <>
+            {/* 인증 중 얼굴 아이콘 주변으로 퍼지는 스캔 링 */}
+            <span className={`${styles.scanRing} pk-anim-ring`} />
+            <span className={`${styles.faceScan} pk-anim-facescan`}>
+              <svg
+                className={`${styles.faceIcon} pk-anim-facespin`}
+                width="74" height="74" viewBox="0 0 44 44" fill="none"
+                stroke="#34C759" strokeWidth="3"
+                strokeLinecap="round" strokeLinejoin="round"
+              >
+                <circle cx="22" cy="22" r="18" />
+                <path d="M16 17v3" />
+                <path d="M28 17v3" />
+                <path d="M15 26a10 10 0 0 0 14 0" />
+              </svg>
+            </span>
+          </>
         )}
       </div>
 
-      <div className={styles.caption}>
+      <div className={styles.caption} role="status" aria-live="polite">
         <div className={`${styles.hint} ${ok ? styles.ok : styles.scanning}`}>
           {ok ? '인증되었습니다' : 'Face ID로 인증하는 중…'}
         </div>

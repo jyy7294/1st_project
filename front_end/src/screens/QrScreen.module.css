@@ -55,7 +55,39 @@
   flex: none;
 }
 
-.qrWrap { margin-top: 22px; }
+.qrWrap { margin-top: 22px; position: relative; }
+
+/* QR 인식 구간 오버레이 — 새 문구 없이 로딩만 알립니다. */
+.recognizeVeil {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: rgba(7, 24, 68, .55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recognizePulse {
+  position: absolute;
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 107, 255, .45), transparent 70%);
+  --pk-dur: 1.8s;
+}
+
+.recognizeRing {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border-top: 2px solid var(--blue-light);
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
+  --pk-dur: 1s;
+}
 
 .token {
   margin-top: 22px;

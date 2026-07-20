@@ -3,6 +3,11 @@ import PhoneFrame from './components/PhoneFrame.jsx'
 import Splash from './screens/Splash.jsx'
 import Login from './screens/Login.jsx'
 import WalletHome from './screens/WalletHome.jsx'
+import CardDetail from './screens/CardDetail.jsx'
+import CardBenefits from './screens/CardBenefits.jsx'
+import CardsManage from './screens/CardsManage.jsx'
+import Report from './screens/Report.jsx'
+import AddCard from './screens/add/AddCard.jsx'
 import QrScreen from './screens/QrScreen.jsx'
 import PayReceived from './screens/pay/PayReceived.jsx'
 import PayAnalyzing from './screens/pay/PayAnalyzing.jsx'
@@ -16,6 +21,11 @@ const SCREENS = {
   splash: Splash,
   login: Login,
   home: WalletHome,
+  detail: CardDetail,
+  benefits: CardBenefits,
+  cards: CardsManage,
+  report: Report,
+  add: AddCard,
   qr: QrScreen,
 }
 
@@ -30,7 +40,7 @@ const PAY_SCREENS = {
 }
 
 // 어두운 배경 화면 — 상태바/홈인디케이터를 흰색으로 바꿉니다.
-const DARK_SCREENS = new Set(['qr'])
+const DARK_SCREENS = new Set(['qr', 'add'])
 
 function Router() {
   const { state } = useApp()

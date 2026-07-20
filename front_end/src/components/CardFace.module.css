@@ -17,7 +17,7 @@
   border-radius: 22px;
   padding: 22px 24px;
   box-shadow: 0 22px 40px -18px rgba(10, 29, 79, .6);
-  animation: pk-pop .35s ease;
+  --pk-dur: .35s;
 }
 
 .head {
@@ -41,6 +41,17 @@
   border-radius: 8px;
   flex: none;
 }
+
+/* 클릭 가능한 라벨 칩 — 눌러서 카드 상세로 들어갑니다. */
+.chipBtn {
+  border: none;
+  font-family: inherit;
+  line-height: 1.2;
+  transition: background .2s ease, transform .15s ease;
+}
+
+.chipBtn:hover { background: rgba(255, 255, 255, .34); }
+.chipBtn:active { transform: scale(.94); }
 
 .number {
   font-size: 16px;

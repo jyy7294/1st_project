@@ -111,7 +111,7 @@ export default function Login() {
       {state.social && (
         <div className={styles.overlay}>
           <div
-            className={styles.spinner}
+            className={`${styles.spinner} pk-anim-spin`}
             style={{ borderTopColor: SOCIAL_COLOR[state.social] }}
           />
           <div className={styles.overlayText}>

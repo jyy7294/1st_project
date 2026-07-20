@@ -92,6 +92,29 @@
   filter: drop-shadow(0 22px 34px rgba(10, 29, 79, .5));
 }
 
+.empty {
+  margin: 30px 22px 34px;
+  padding: 28px 20px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--sh-card);
+  text-align: center;
+}
+
+.emptyText { font-size: 13.5px; color: var(--text-2); line-height: 1.6; }
+
+.emptyBtn {
+  margin-top: 18px;
+  height: 46px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 13px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .hint {
   text-align: center;
   padding: 22px 0 34px;

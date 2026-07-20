@@ -44,7 +44,7 @@ export default function PayConfirm() {
       <div className={styles.shieldWrap}>
         <div className={styles.shield}>
           <div className={styles.shieldRing} />
-          <div className={styles.shieldGlow} />
+          <div className={`${styles.shieldGlow} pk-anim-ring`} />
           <div className={styles.shieldCore}>🛡️</div>
         </div>
         <div>

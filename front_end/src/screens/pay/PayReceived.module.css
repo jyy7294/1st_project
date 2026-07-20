@@ -56,7 +56,27 @@
   gap: 14px;
 }
 
+.spinnerWrap {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 회전 링 뒤에서 퍼지는 원 — 로딩이 살아 있다는 신호만 더합니다. */
+/* 실제 animation 은 전역 .pk-anim-* 클래스가 겁니다 (styles/tokens.css 주석 참고). */
+.spinnerGlow {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 107, 255, .32), transparent 70%);
+  --pk-dur: 1.8s;
+}
+
 .spinner {
+  position: relative;
   width: 46px;
   height: 46px;
   border-radius: 50%;
@@ -64,7 +84,7 @@
   border-right: 2px solid transparent;
   border-bottom: 2px solid transparent;
   border-left: 2px solid transparent;
-  animation: pk-spin 1s linear infinite;
+  --pk-dur: 1s;
 }
 
 .loadingText { font-size: 13px; color: rgba(255, 255, 255, .55); }

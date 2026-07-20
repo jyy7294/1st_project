@@ -58,8 +58,11 @@ export default function PayReceived() {
         </div>
       </div>
 
-      <div className={styles.loadingWrap}>
-        <div className={styles.spinner} />
+      <div className={styles.loadingWrap} role="status" aria-live="polite">
+        <div className={styles.spinnerWrap}>
+          <span className={`${styles.spinnerGlow} pk-anim-ring`} />
+          <span className={`${styles.spinner} pk-anim-spin pk-reduced-loading`} />
+        </div>
         <div className={styles.loadingText}>결제 정보를 불러오는 중…</div>
       </div>
     </div>

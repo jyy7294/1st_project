@@ -131,7 +131,7 @@
   height: 44px;
   border-radius: 50%;
   border: 3px solid var(--line-strong);
-  animation: pk-spin .8s linear infinite;
+  --pk-dur: .8s;
 }
 
 .overlayText {

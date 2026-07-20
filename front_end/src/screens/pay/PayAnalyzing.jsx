@@ -70,12 +70,15 @@ export default function PayAnalyzing() {
     <div className={`${shared.screen} pk-screen`}>
       <div className={`${shared.brandRow} ${shared.end}`}>picka</div>
 
-      <div className={styles.orbWrap}>
+      <div className={styles.orbWrap} role="status" aria-live="polite">
         <div className={styles.orb}>
-          <div className={styles.ring1} />
-          <div className={styles.ring2} />
-          <div className={styles.spin} />
-          <div className={styles.core}>🧠</div>
+          <div className={`${styles.ring1} pk-anim-ring`} />
+          <div className={`${styles.ring2} pk-anim-ring`} />
+          <div className={`${styles.spin} pk-anim-spin pk-reduced-loading`} />
+          <div className={`${styles.core} pk-anim-float`}>
+            {/* 중앙 아이콘만 천천히 돕니다. 바깥 오브의 float 은 그대로 유지됩니다. */}
+            <span className={`${styles.coreIcon} pk-anim-spin`}>🧠</span>
+          </div>
         </div>
       </div>
 

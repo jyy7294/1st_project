@@ -109,7 +109,7 @@ export default function PayRecommend() {
 
       <div className={styles.scrim} />
 
-      <div className={styles.sheet}>
+      <div className={`${styles.sheet} pk-anim-up`}>
         <div className={styles.sheetHead}>
           <div className={styles.grabber} />
           <div className={styles.sheetTitle}>다른 카드로 결제하기</div>

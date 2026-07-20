@@ -28,7 +28,7 @@
   inset: 0;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(47, 107, 255, .3), transparent 70%);
-  animation: pk-ring 1.8s ease-in-out infinite;
+  --pk-dur: 1.8s;
 }
 
 .spin {
@@ -39,9 +39,10 @@
   border-right: 2px solid transparent;
   border-bottom: 2px solid transparent;
   border-left: 2px solid transparent;
-  animation: pk-spin 1s linear infinite;
+  --pk-dur: 1s;
 }
 
+/* 바깥 링(.spin)이 도는 동안 안쪽 원은 계속 숨을 쉽니다. */
 .core {
   width: 64px;
   height: 64px;
@@ -51,6 +52,7 @@
   align-items: center;
   justify-content: center;
   font-size: 26px;
+  --pk-dur: 2s;
 }
 
 .head { text-align: center; margin-top: 26px; }
@@ -83,7 +85,7 @@
   height: 100%;
   border-radius: 4px;
   background: linear-gradient(90deg, #2F6BFF, #6ea6ff);
-  animation: pk-grow 2.2s ease-in-out forwards;
+  --pk-dur: 2.2s;
 }
 
 .foot {

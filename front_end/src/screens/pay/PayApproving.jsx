@@ -30,11 +30,11 @@ export default function PayApproving() {
     <div className={`${styles.screen} pk-screen`}>
       <div className={styles.brand}>picka</div>
 
-      <div className={styles.orb}>
+      <div className={styles.orb} role="status" aria-live="polite">
         <div className={styles.ring} />
-        <div className={styles.glow} />
-        <div className={styles.spin} />
-        <div className={styles.core}>🔐</div>
+        <div className={`${styles.glow} pk-anim-ring`} />
+        <div className={`${styles.spin} pk-anim-spin pk-reduced-loading`} />
+        <div className={`${styles.core} pk-anim-corepulse`}>🔐</div>
       </div>
 
       <div className={styles.head}>
@@ -56,7 +56,7 @@ export default function PayApproving() {
           <span className={styles.rowValue}>₩{krw(final)}</span>
         </div>
         <div className={styles.barTrack}>
-          <div className={styles.barFill} />
+          <div className={`${styles.barFill} pk-anim-grow`} />
         </div>
       </div>
 

@@ -23,7 +23,7 @@ export default function Splash() {
         }
       }}
     >
-      <div className={styles.icon}>
+      <div className={`${styles.icon} pk-anim-pop-ease`}>
         <PickaMark size={72} />
       </div>
 
@@ -32,7 +32,7 @@ export default function Splash() {
         <div className={styles.tagline}>내 카드 혜택, 제대로 누리기</div>
       </div>
 
-      <div className={styles.hint}>화면을 눌러 시작하기</div>
+      <div className={`${styles.hint} pk-anim-pulse`}>화면을 눌러 시작하기</div>
     </div>
   )
 }

@@ -21,7 +21,7 @@ export default function PayDone() {
 
       <div className={styles.badge}>
         <div className={styles.badgeGlow} />
-        <div className={styles.badgeCore}>✓</div>
+        <div className={`${styles.badgeCore} pk-anim-pop`}>✓</div>
       </div>
 
       <div className={styles.head}>

@@ -10,6 +10,7 @@ import styles from './CardFace.module.css'
  * @param {string} [props.spent] 이번 달 사용액 (포맷된 문자열)
  * @param {string} [props.benefit] 받은 혜택 (포맷된 문자열)
  * @param {string} [props.expiry] 만료일 `MM/YY`
+ * @param {() => void} [props.onLabelClick] 라벨 칩 클릭. 주면 칩이 버튼이 됩니다.
  */
 export default function CardFace({
   card,
@@ -17,17 +18,36 @@ export default function CardFace({
   spent,
   benefit,
   expiry,
+  onLabelClick,
 }) {
   const background = gradientForCard(card)
 
   return (
-    <div className={`${styles.card} ${styles[variant]}`} style={{ background }}>
+    <div
+      className={`${styles.card} ${styles[variant]} ${variant === 'detail' ? 'pk-anim-pop-ease' : ''}`}
+      style={{ background }}
+    >
       <div className={styles.head}>
         <div>
           <div className={styles.company}>{card.card_company}</div>
           <div className={styles.product}>{card.card_name}</div>
         </div>
-        {card.nickname && <span className={styles.chip}>{card.nickname}</span>}
+        {card.nickname &&
+          (onLabelClick ? (
+            <button
+              type="button"
+              className={`${styles.chip} ${styles.chipBtn}`}
+              // 카드 자체의 클릭(선택/펼치기)까지 번지지 않게 막습니다.
+              onClick={(e) => {
+                e.stopPropagation()
+                onLabelClick()
+              }}
+            >
+              {card.nickname}
+            </button>
+          ) : (
+            <span className={styles.chip}>{card.nickname}</span>
+          ))}
       </div>
 
       <div className={styles.number}>•••• •••• •••• {card.last_four}</div>
