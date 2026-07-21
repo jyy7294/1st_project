@@ -1,0 +1,244 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-app);
+  overflow-y: auto;
+}
+
+.header {
+  padding: 60px 20px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.headerTitle { font-size: 16px; font-weight: 700; color: var(--navy-text); }
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(14, 36, 93, .08);
+  font-size: 17px;
+  color: var(--navy-text);
+}
+
+.menuWrap { position: relative; }
+
+.menu {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 60;
+  width: 190px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px -6px rgba(10, 29, 79, .28);
+  overflow: hidden;
+  --pk-dur: .18s;
+}
+
+.menuItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+  font-size: 14px;
+  color: var(--navy-text);
+  text-align: left;
+}
+
+.menuItem:last-child { border-bottom: none; }
+.menuValue { font-size: 12px; font-weight: 700; color: var(--blue); }
+.menuItem.danger { color: var(--danger); font-weight: 600; justify-content: flex-start; }
+
+.cardWrap { margin: 12px 20px 0; }
+
+.sectionHead {
+  margin: 24px 20px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle { font-size: 15px; font-weight: 700; color: var(--navy-text); }
+
+.moreBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.list { margin: 0 20px; display: flex; flex-direction: column; gap: 8px; }
+
+.empty {
+  padding: 22px 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: var(--sh-card);
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.benefitRow {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: var(--sh-card);
+}
+
+.icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+
+.benefitBody { flex: 1; min-width: 0; }
+
+.benefitHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.benefitTitle { font-size: 14px; font-weight: 700; color: var(--navy-text); }
+.benefitRate { font-size: 12.5px; font-weight: 700; color: var(--blue-hover); flex: none; }
+
+.benefitDesc {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.txPanel {
+  margin: 0 20px 40px;
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--sh-card);
+}
+
+.txPanel .empty { box-shadow: none; border-radius: 0; }
+
+.txRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.txRow:last-child { border-bottom: none; }
+
+.txBody { flex: 1; min-width: 0; }
+
+.txPlace {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--navy-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txMeta { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+
+.txTag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue-hover);
+  background: #e6f0ff;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.txDate { font-size: 11.5px; color: var(--text-4); }
+
+/* 카드 제거 확인 창 — 되돌릴 수 없는 동작이라 한 번 더 묻습니다. */
+.confirmDim {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: rgba(10, 29, 79, .45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 34px;
+}
+
+.confirm {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px 22px 18px;
+  text-align: center;
+  box-shadow: 0 24px 50px -12px rgba(10, 29, 79, .45);
+  --pk-dur: .22s;
+}
+
+.confirmIcon { font-size: 30px; }
+
+.confirmTitle {
+  margin-top: 12px;
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.3px;
+  word-break: keep-all;
+}
+
+.confirmSub {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  word-break: keep-all;
+}
+
+.confirmActions { display: flex; gap: 10px; margin-top: 20px; }
+
+.confirmCancel,
+.confirmDelete {
+  flex: 1;
+  height: 46px;
+  border-radius: 13px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.confirmCancel {
+  border: 1.5px solid #dfe3ec;
+  background: #fff;
+  color: var(--navy-text);
+}
+
+.confirmDelete {
+  border: none;
+  background: var(--danger);
+  color: #fff;
+}
+
+.txAmountBox { text-align: right; flex: none; }
+.txAmount { font-size: 14.5px; font-weight: 700; color: var(--navy-text); }
+.txSaved { font-size: 11px; font-weight: 600; color: var(--teal-deep); margin-top: 2px; }

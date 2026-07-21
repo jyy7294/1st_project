@@ -1,0 +1,233 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 44;
+  background: var(--pay-dark);
+}
+
+.scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 0 22px 340px;
+}
+
+.badgeRow { text-align: center; margin-top: 8px; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--blue-light);
+  background: rgba(47, 107, 255, .15);
+  border: 1px solid rgba(47, 107, 255, .3);
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+
+.title { text-align: center; margin-top: 16px; font-size: 22px; font-weight: 800; color: #fff; }
+
+.lead {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, .55);
+  line-height: 1.5;
+}
+
+.bigCard {
+  margin-top: 20px;
+  height: 180px;
+  border-radius: 18px;
+  box-shadow: 0 22px 40px -18px rgba(10, 29, 79, .7);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.bigCardHead { display: flex; justify-content: space-between; align-items: flex-start; }
+.bigCardCompany { font-size: 11px; color: rgba(255, 255, 255, .6); }
+.bigCardName { font-size: 16px; font-weight: 700; margin-top: 1px; }
+.bigCardBrand { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: rgba(255, 255, 255, .8); }
+.bigCardNumber { font-size: 16px; letter-spacing: 3px; color: rgba(255, 255, 255, .8); }
+
+.stats { display: flex; gap: 10px; margin-top: 14px; }
+
+.stat {
+  flex: 1;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: var(--r-btn);
+  padding: 13px 14px;
+}
+
+.statLabel { font-size: 11px; color: rgba(255, 255, 255, .5); }
+.statValue { font-size: 18px; font-weight: 800; margin-top: 4px; }
+.statValue.good { color: var(--green-pay); }
+.statValue.plain { color: #fff; }
+.statNote { font-size: 10.5px; color: rgba(255, 255, 255, .4); margin-top: 2px; }
+
+.reason {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, .04);
+  border-radius: var(--r-btn);
+  padding: 13px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.reasonText { font-size: 12px; color: rgba(255, 255, 255, .6); line-height: 1.5; }
+
+/* 오류·혜택없음 안내 */
+.notice {
+  margin-top: 20px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 18px;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.noticeIcon { font-size: 30px; }
+.noticeTitle { margin-top: 12px; font-size: 16px; font-weight: 700; color: #fff; }
+.noticeBody { margin-top: 8px; font-size: 13px; color: rgba(255, 255, 255, .55); line-height: 1.5; }
+
+.retry {
+  margin-top: 16px;
+  height: 44px;
+  padding: 0 22px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: var(--r-btn);
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 바텀시트 */
+.scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 38%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(6, 11, 24, .55) 40%);
+  transition: opacity .32s ease;
+}
+
+/* 시트를 내리면 뒤 내용을 가리던 그림자도 걷습니다. */
+.scrimOff { opacity: 0; }
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 62%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(16, 23, 44, .86);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-bottom: none;
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -12px 40px -8px rgba(0, 0, 0, .55);
+  --pk-dur: .35s;
+  /* 손잡이를 놓으면 올림/내림 위치로 부드럽게 붙습니다. */
+  transition: transform .32s cubic-bezier(.22, .61, .36, 1);
+}
+
+/* 여기만 잡아서 끕니다. 아래 카드 목록의 스크롤과 겹치지 않습니다. */
+.sheetHead {
+  padding: 14px 20px 6px;
+  flex: none;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.sheetHead:active { cursor: grabbing; }
+
+.grabber {
+  width: 40px;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .25);
+  margin: 0 auto 14px;
+}
+
+.sheetTitle { font-size: 16px; font-weight: 800; color: #fff; }
+.sheetSub { margin-top: 4px; font-size: 12.5px; color: rgba(255, 255, 255, .5); }
+
+.sheetList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--r-btn);
+  cursor: pointer;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.row.selected {
+  background: rgba(47, 107, 255, .16);
+  border-color: rgba(110, 166, 255, .6);
+}
+
+.row.dim { opacity: .55; }
+
+.rank {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(47, 107, 255, .2);
+  color: var(--blue-light);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swatch { width: 42px; height: 28px; border-radius: 6px; flex: none; }
+
+.rowMain { flex: 1; min-width: 0; }
+
+.rowName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowSub { font-size: 11.5px; color: rgba(255, 255, 255, .45); margin-top: 1px; }
+.rowRight { text-align: right; flex: none; }
+.rowAmount { font-size: 15px; font-weight: 800; color: var(--blue-light); }
+.rowNote { font-size: 10px; color: rgba(255, 255, 255, .4); }
+
+.sheetFoot {
+  flex: none;
+  padding: 12px 20px 26px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

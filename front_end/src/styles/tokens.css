@@ -1,0 +1,162 @@
+/* PICKA 디자인 토큰. 출처: design_handoff README의 Design Tokens 절. */
+:root {
+  /* Navy — 브랜드 */
+  --navy: #0E245D;
+  --navy-text: #0A1D4F;
+  --navy-grad: linear-gradient(145deg, #10275F, #071844);
+
+  /* Blue — 액센트 */
+  --blue: #2F6BFF;
+  --blue-hover: #1846D8;
+  --blue-light: #6ea6ff;
+
+  /* Teal — 혜택 */
+  --teal: #19D3C5;
+  --teal-deep: #0DAAA0;
+
+  /* Gold — 혜택 금액 */
+  --gold: #FFCE45;
+
+  /* 상태 */
+  --green-chart: #2F8F3E;
+  --green-pay: #4ADE80;
+  --danger: #e5484d;
+
+  /* 배경 */
+  --bg-app: #f4f5f8;
+  --bg-card: #ffffff;
+  --pay-dark: linear-gradient(180deg, #0a1224, #060b18);
+  --add-dark: linear-gradient(175deg, #0a1a41, #050f2b);
+
+  /* 텍스트 보조 */
+  --text-2: #7a8299;
+  --text-3: #9aa1b3;
+  --text-4: #a8aec0;
+  --line: #f1f2f6;
+  --line-strong: #e4e7ee;
+
+  /* 소셜 */
+  --kakao: #FEE500;
+  --kakao-ink: #191600;
+  --naver: #03C75A;
+
+  /* 라디우스 */
+  --r-card: 20px;
+  --r-btn: 14px;
+  --r-chip: 10px;
+
+  /* 그림자 */
+  --sh-card: 0 4px 14px rgba(14, 36, 93, .05);
+  --sh-raise: 0 16px 30px -14px rgba(14, 36, 93, .6);
+}
+
+@keyframes pk-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pk-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes pk-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes pk-up { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pk-spin { to { transform: rotate(360deg); } }
+@keyframes pk-grow { from { width: 0; } to { width: 100%; } }
+@keyframes pk-ring { 0%, 100% { transform: scale(1); opacity: .45; } 50% { transform: scale(1.18); opacity: .12; } }
+@keyframes pk-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+/* 카드 등록 스캔 화면 */
+@keyframes pk-scan {
+  0% { top: 16%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: 84%; opacity: 0; }
+}
+@keyframes pk-cardglow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(76, 141, 255, .35); }
+  50% { box-shadow: 0 0 22px 2px rgba(76, 141, 255, .45); }
+}
+
+@keyframes pk-islandgrow {
+  0% { opacity: .4; transform: translateX(-50%) translateY(-8px) scale(.32); }
+  60% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.06); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes pk-facespin {
+  0% { transform: rotate3d(1, -1, .15, 0deg) scale(.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: rotate3d(1, -1, .15, 360deg) scale(1); opacity: 1; }
+}
+@keyframes pk-facepop {
+  0% { opacity: 0; transform: translateX(-50%) scale(.2); }
+  60% { transform: translateX(-50%) scale(1.08); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+/* Face ID 아이콘이 인증 중 은은하게 밝아졌다 어두워지는 스캔 호흡 */
+@keyframes pk-facescan {
+  0%, 100% { opacity: .55; transform: scale(.94); }
+  50% { opacity: 1; transform: scale(1); }
+}
+/* 로딩 오브 중앙 아이콘의 pulse (밝기는 유지하고 크기만 숨 쉬듯) */
+@keyframes pk-corepulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+/* 화면 진입 공통 애니메이션 */
+.pk-screen { animation: pk-fade .32s cubic-bezier(.22, .61, .36, 1); }
+
+/*
+ * 전역 애니메이션 유틸 클래스.
+ *
+ * CSS Module(.module.css) 안에서 `animation: pk-spin ...` 이라고 쓰면
+ * 빌드 시 이름이 `_pk-spin_8ywbn_1` 처럼 스코프되는데, @keyframes 는 이 파일(전역)에
+ * 있어서 이름이 어긋나고 애니메이션이 조용히 죽습니다.
+ * 그래서 animation 선언은 여기 전역에 두고, 화면에서는 이 클래스를 함께 붙입니다.
+ * 속도·방향은 모듈 CSS 에서 --pk-dur / --pk-dir 로 조절합니다
+ * (CSS 변수 이름은 스코프되지 않습니다).
+ */
+.pk-anim-spin {
+  animation: pk-spin var(--pk-dur, 1s) linear infinite;
+  animation-direction: var(--pk-dir, normal);
+}
+
+.pk-anim-ring {
+  animation: pk-ring var(--pk-dur, 1.8s) ease-in-out infinite;
+  animation-direction: var(--pk-dir, normal);
+}
+
+.pk-anim-fade { animation: pk-fade var(--pk-dur, .25s) ease; }
+.pk-anim-float { animation: pk-float var(--pk-dur, 2.4s) ease-in-out infinite; }
+.pk-anim-corepulse { animation: pk-corepulse var(--pk-dur, 2s) ease-in-out infinite; }
+.pk-anim-grow { animation: pk-grow var(--pk-dur, 2.2s) ease-in-out forwards; }
+.pk-anim-pop { animation: pk-pop var(--pk-dur, .32s) cubic-bezier(.34, 1.56, .64, 1); }
+.pk-anim-pop-ease { animation: pk-pop var(--pk-dur, .35s) ease; }
+.pk-anim-pulse { animation: pk-pulse var(--pk-dur, 2s) infinite; }
+.pk-anim-up { animation: pk-up var(--pk-dur, .3s) cubic-bezier(.22, .61, .36, 1); }
+
+/* 카드 스캔: 테두리 glow 와 미세한 float 을 서로 다른 주기로 겹칩니다. */
+.pk-anim-cardscan {
+  animation: pk-cardglow 2s ease-in-out infinite,
+             pk-float 3.2s ease-in-out infinite;
+}
+
+.pk-anim-scanbeam { animation: pk-scan 1.6s ease-in-out infinite; }
+
+/* Face ID */
+.pk-anim-islandgrow { animation: pk-islandgrow .55s cubic-bezier(.34, 1.56, .64, 1); }
+.pk-anim-facepop { animation: pk-facepop .3s cubic-bezier(.34, 1.56, .64, 1); }
+.pk-anim-facespin { animation: pk-facespin .62s cubic-bezier(.33, 0, .15, 1) .1s both; }
+.pk-anim-facescan { animation: pk-facescan 2s ease-in-out .72s infinite; }
+
+/*
+ * 접근성: 동작 최소화를 켠 사용자에게는 회전·큰 이동을 없애고 fade 로만 알립니다.
+ * 화면 전환과 문구는 그대로라 정보 손실은 없습니다.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* 로딩이 진행 중임은 알려야 하므로 회전 대신 옅은 깜빡임으로 대체합니다. */
+  .pk-reduced-loading { animation: pk-pulse 1.6s ease-in-out infinite !important; }
+  .pk-screen { animation: pk-fade .2s ease !important; }
+}

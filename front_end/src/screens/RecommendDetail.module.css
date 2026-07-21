@@ -1,0 +1,174 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  overflow-y: auto;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #fff;
+  padding: 56px 20px 6px;
+  display: flex;
+  align-items: center;
+}
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 11px;
+  background: var(--bg-app);
+  font-size: 17px;
+  color: var(--navy-text);
+}
+
+.headWrap { padding: 14px 22px 0; }
+
+.title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.5px;
+  line-height: 1.3;
+}
+
+.gain { color: var(--teal-deep); }
+
+.current {
+  margin-top: 16px;
+  display: inline-flex;
+  padding: 10px 16px;
+  border: 1px solid #eef1f6;
+  border-radius: var(--r-btn);
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.currentValue { color: var(--navy-text); font-weight: 700; margin-left: 6px; }
+
+.cardWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 22px 0;
+}
+
+.cardArt {
+  width: 172px;
+  aspect-ratio: .63;
+  border-radius: 14px;
+  box-shadow: 0 22px 44px -14px rgba(10, 29, 79, .5);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  --pk-dur: .45s;
+}
+
+.cardShort { font-size: 17px; font-weight: 800; line-height: 1.15; }
+.cardIssuer { font-size: 11px; color: rgba(255, 255, 255, .8); }
+
+.cardName { margin-top: 20px; font-size: 20px; font-weight: 800; color: var(--navy-text); }
+
+.summary {
+  margin: 26px 22px 0;
+  background: #f4f6fa;
+  border-radius: 18px;
+  padding: 24px 22px;
+}
+
+.summaryTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e6e9f0;
+}
+
+.summaryLabel { font-size: 22px; font-weight: 800; color: var(--navy-text); }
+
+.summaryValue {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -1px;
+}
+
+.figure { display: flex; justify-content: space-between; margin-top: 16px; font-size: 14px; }
+.figure + .figure { margin-top: 10px; }
+.figureLabel { color: var(--text-3); }
+.figureValue { color: var(--navy-text); }
+.figureCash { color: var(--teal-deep); font-weight: 700; }
+
+.section { padding: 30px 22px 0; }
+.sectionTitle { font-size: 17px; font-weight: 800; color: var(--navy-text); }
+.sectionTitle.spaced { margin-top: 28px; }
+
+.catList { margin-top: 16px; display: flex; flex-direction: column; }
+
+.catRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bg-app);
+}
+
+.catIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+
+.catName { flex: 1; font-size: 15px; font-weight: 700; color: var(--navy-text); }
+.catAmount { font-size: 16px; font-weight: 800; color: var(--teal-deep); }
+
+.notes {
+  margin: 16px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note { font-size: 12.5px; color: var(--text-2); line-height: 1.6; }
+
+/* 접기/펼치기 버튼 — 목록 아래에 조용히 붙습니다. */
+.more {
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.contact { margin-top: 20px; font-size: 12px; color: var(--text-4); line-height: 1.7; }
+
+.linkWrap { padding: 30px 22px 40px; }
+
+.link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--navy-grad);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.link:hover { color: #fff; }

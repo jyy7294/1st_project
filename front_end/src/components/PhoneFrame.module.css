@@ -1,0 +1,116 @@
+.stage {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.bezel {
+  position: relative;
+  width: 430px;
+  height: 902px;
+  border-radius: 56px;
+  background: #0a0d16;
+  padding: 13px;
+  box-shadow: 0 40px 90px -20px rgba(7, 25, 68, .45),
+              0 0 0 2px rgba(255, 255, 255, .06) inset;
+}
+
+.bezelInner {
+  position: absolute;
+  inset: 6px;
+  border-radius: 52px;
+  background: linear-gradient(145deg, #2a2f3d, #0a0d16);
+  z-index: 0;
+}
+
+.viewport {
+  position: relative;
+  z-index: 1;
+  width: 404px;
+  height: 876px;
+  border-radius: 46px;
+  overflow: hidden;
+}
+
+.statusBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 54px;
+  z-index: 52; /* 결제 화면(z-index 44) 위에도 시계·5G·배터리가 보이도록 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 30px 0;
+  pointer-events: none;
+  color: var(--navy-text);
+}
+
+.statusBar.dark { color: #fff; }
+
+.clock {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+
+.statusRight {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.net {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.battery {
+  width: 24px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  display: inline-block;
+  position: relative;
+  opacity: .9;
+}
+
+.batteryFill {
+  position: absolute;
+  inset: 1.5px;
+  right: 5px;
+  background: currentColor;
+  border-radius: 1px;
+  display: block;
+}
+
+.island {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 118px;
+  height: 34px;
+  background: #05060a;
+  border-radius: 20px;
+  z-index: 53; /* 상태바보다 위. Face ID 오버레이(60)보다는 아래 */
+}
+
+.homeIndicator {
+  position: absolute;
+  bottom: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 132px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(10, 29, 79, .25);
+  z-index: 50;
+  pointer-events: none;
+}
+
+.homeIndicator.dark { background: rgba(255, 255, 255, .5); }

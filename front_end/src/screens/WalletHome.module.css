@@ -1,0 +1,213 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-app);
+  overflow-y: auto;
+}
+
+.header {
+  padding: 62px 22px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { display: flex; align-items: center; gap: 9px; }
+
+.headerActions { display: flex; gap: 10px; }
+
+.iconBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: none;
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1;
+  background: var(--navy);
+  color: #fff;
+}
+
+.iconBtn.light {
+  background: #fff;
+  color: var(--navy-text);
+  box-shadow: 0 2px 8px rgba(14, 36, 93, .08);
+  font-size: 17px;
+}
+
+.qrBar {
+  margin: 4px 22px 8px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #eef1f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  width: calc(100% - 44px);
+  box-shadow: 0 8px 22px -12px rgba(14, 36, 93, .28);
+  text-align: left;
+}
+
+.qrBarLabel { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.qrBarTitle { font-size: 17px; color: var(--navy-text); font-weight: 700; margin-top: 3px; }
+
+.qrBarIcon {
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
+  background: #fff;
+  border: 1px solid #eef1f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+
+.qrBarIcon img { width: 50px; height: 50px; display: block; }
+
+.stack { position: relative; margin: 14px 22px 0; }
+
+.stackItem {
+  position: absolute;
+  left: 0;
+  right: 0;
+  cursor: pointer;
+  transform-origin: center;
+  transition: top .4s cubic-bezier(.22, .61, .36, 1),
+              transform .28s ease,
+              filter .28s ease;
+}
+
+.stackItem.selected {
+  transform: scale(1.05) translateY(-6px);
+  filter: drop-shadow(0 22px 34px rgba(10, 29, 79, .5));
+}
+
+/* 소비패턴 분석 카드 추천 배너 (AD) */
+.adBanner {
+  margin: 6px 22px 12px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 16px;
+  background: #f0f1f5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 44px);
+  text-align: left;
+}
+
+.adIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  flex: none;
+  background: linear-gradient(140deg, var(--blue), var(--teal));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.adBody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.adTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adSub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adTag { flex: none; font-size: 11px; font-weight: 600; color: var(--text-3); }
+
+/*
+ * 카드 스택 위 — 카드 앞면의 금액 표시를 켜고 끕니다.
+ * 카드 바깥선(22px)에서 4px 만 안쪽으로 넣어 카드 모서리 곡선과 시각적으로 맞춥니다.
+ */
+.statsToggle {
+  margin: 14px 22px 0 26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statsToggleLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-text);
+}
+
+/* ON/OFF 를 알약 하나로 묶습니다. 선택된 쪽만 안쪽 알약이 채워집니다. */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 2px;
+  border-radius: 999px;
+  background: #e7eaf1;
+}
+
+.switchBtn {
+  border: none;
+  background: none;
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+/* 선택된 쪽만 흰 알약으로 떠오릅니다. */
+.switchBtn.switchOn,
+.switchBtn.switchOff {
+  background: #fff;
+  color: var(--navy-text);
+  box-shadow: 0 1px 3px rgba(14, 36, 93, .18);
+}
+
+.empty {
+  margin: 30px 22px 34px;
+  padding: 28px 20px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--sh-card);
+  text-align: center;
+}
+
+.emptyText { font-size: 13.5px; color: var(--text-2); line-height: 1.6; }
+
+.emptyBtn {
+  margin-top: 18px;
+  height: 46px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 13px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hint {
+  text-align: center;
+  padding: 22px 0 34px;
+  font-size: 12.5px;
+  color: var(--text-4);
+  cursor: pointer;
+}

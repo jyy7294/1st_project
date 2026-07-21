@@ -1,0 +1,175 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  overflow-y: auto;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #fff;
+  padding: 56px 20px 6px;
+  display: flex;
+  align-items: center;
+}
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 11px;
+  background: var(--bg-app);
+  font-size: 17px;
+  color: var(--navy-text);
+}
+
+.titleWrap { padding: 14px 22px 0; }
+
+.title {
+  font-size: 23px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.5px;
+}
+
+.title + .title { margin-top: 6px; }
+
+.tabs { padding: 22px 22px 0; display: flex; gap: 8px; }
+
+.tab {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #f0f1f5;
+  color: var(--text-2);
+}
+
+.tab.tabOn { background: var(--navy); color: #fff; }
+
+.divider { height: 1px; background: #eef1f6; margin: 20px 22px 0; }
+
+.empty {
+  padding: 40px 22px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+/* 1위 */
+.topSection { padding: 22px 22px 0; }
+
+.rankTop { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+.crown { font-size: 20px; }
+.rankTopText { font-size: 19px; font-weight: 800; color: #7A5AF8; }
+
+.row { display: flex; gap: 16px; }
+
+.cardArtWrap { width: 118px; flex: none; }
+
+.cardArt {
+  width: 100%;
+  aspect-ratio: .63;
+  border-radius: 12px;
+  box-shadow: 0 14px 28px -10px rgba(10, 29, 79, .5);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.cardShort { font-size: 14px; font-weight: 800; line-height: 1.15; }
+.cardIssuer { font-size: 10px; color: rgba(255, 255, 255, .75); }
+
+.info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.cardName { font-size: 15px; font-weight: 700; color: var(--navy-text); }
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 10px;
+}
+
+.totalLabel { font-size: 15px; font-weight: 800; color: var(--navy-text); }
+
+.totalValue {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.5px;
+}
+
+.totalRight { display: flex; align-items: center; gap: 4px; }
+.totalValueSm { font-size: 19px; font-weight: 800; color: var(--navy-text); letter-spacing: -.5px; }
+.chevron { color: #c4ccda; }
+
+.figure {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.figure + .figure { margin-top: 5px; }
+.figureLabel { color: var(--text-3); }
+.figureValue { color: var(--navy-text); }
+.figureCash { color: var(--teal-deep); font-weight: 700; }
+
+.analyzeBtn {
+  margin-top: 14px;
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: var(--r-btn);
+  background: var(--navy-grad);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 2위 이하 */
+.restSection { padding: 22px 22px 0; }
+
+.restHead { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.rank { font-size: 18px; font-weight: 800; color: var(--navy-text); }
+.restName { font-size: 15px; font-weight: 700; color: var(--navy-text); }
+
+.restRow {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+}
+
+.cardArtWrapSm { width: 96px; flex: none; }
+
+.cardArtSm {
+  width: 100%;
+  aspect-ratio: .63;
+  border-radius: 12px;
+  box-shadow: 0 10px 22px -10px rgba(10, 29, 79, .45);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+.cardShortSm { font-size: 12px; font-weight: 800; line-height: 1.15; }
+.cardIssuerSm { font-size: 9px; color: rgba(255, 255, 255, .75); }
+
+.footNote {
+  text-align: center;
+  padding: 22px 0 40px;
+  font-size: 12px;
+  color: var(--text-4);
+}

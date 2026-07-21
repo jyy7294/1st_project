@@ -1,0 +1,143 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 74px 30px 40px;
+  overflow-y: auto;
+}
+
+.logo { margin-bottom: 6px; }
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--navy-text);
+  letter-spacing: -.5px;
+  margin-top: 18px;
+}
+
+.sub {
+  font-size: 14px;
+  color: var(--text-2);
+  margin-top: 6px;
+}
+
+/* 입력 2개 + 로그인 버튼을 감싸는 폼. 기존 세로 배치를 그대로 유지합니다. */
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.fields {
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input {
+  height: 54px;
+  padding: 0 16px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-btn);
+  background: #fafbfc;
+  font-size: 15px;
+  color: var(--navy-text);
+  font-family: inherit;
+  outline: none;
+}
+
+.input:focus { border-color: var(--blue); }
+
+.error {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.links {
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 0 4px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+/* 아직 동작하지 않는 링크 — 비활성으로 보이게 합니다. */
+.linkOff {
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-bottom: 1px dashed currentColor;
+}
+
+.submit {
+  margin-top: 22px;
+  height: 54px;
+  border: none;
+  border-radius: var(--r-btn);
+  background: linear-gradient(150deg, #10275F, #071844);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px -8px rgba(14, 36, 93, .5);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 0 18px;
+  color: #c3c8d4;
+  font-size: 12px;
+}
+
+.divider i { flex: 1; height: 1px; background: #eceef3; }
+
+.social {
+  height: 52px;
+  border: none;
+  border-radius: var(--r-btn);
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.kakao { background: var(--kakao); color: var(--kakao-ink); }
+.naver { margin-top: 10px; background: var(--naver); color: #fff; }
+.kakaoIcon { width: 20px; height: 20px; display: block; }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, .86);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  z-index: 20;
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--line-strong);
+  --pk-dur: .8s;
+}
+
+.overlayText {
+  font-size: 14px;
+  color: var(--navy-text);
+  font-weight: 600;
+}
