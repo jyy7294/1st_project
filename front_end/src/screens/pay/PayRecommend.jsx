@@ -21,7 +21,7 @@ export default function PayRecommend() {
   const discount = chosen?.expected_benefit || 0
 
   // 404(보유카드 없음) 뿐 아니라, 200이지만 모든 카드가 eligible=false 인 경우도
-  // "이 업종엔 혜택 카드가 없어요" 안내를 보여줍니다. -0원 추천은 띄우지 않습니다.
+  // "이 업종에 해당하는 혜택 카드가 없어요" 안내를 보여줍니다. -0원 추천은 띄우지 않습니다.
   const noBenefitAnywhere = noEligibleCard || hasNoEligibleCard(ranked)
 
   // '다른 카드로 결제하기' 시트를 잡아 내리면 뒤의 할인 혜택·최종 승인 금액이 보입니다.
@@ -82,11 +82,11 @@ export default function PayRecommend() {
         {noBenefitAnywhere && (
           <div className={styles.notice}>
             <div className={styles.noticeIcon}>💡</div>
-            <div className={styles.noticeTitle}>이 업종엔 혜택 카드가 없어요</div>
+            <div className={styles.noticeTitle}>이 업종에 해당하는 혜택 카드가 없어요</div>
             <div className={styles.noticeBody}>
               {transaction?.payment_category} 업종에 적용되는 혜택이 없습니다.
               <br />
-              아래에서 아무 카드로나 결제하세요.
+              원하시는 카드로 결제하세요.
             </div>
           </div>
         )}

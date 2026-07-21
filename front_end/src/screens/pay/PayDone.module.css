@@ -84,8 +84,40 @@
 .totalLabel { font-size: 13px; color: rgba(255, 255, 255, .6); }
 .totalValue { font-size: 22px; font-weight: 800; color: var(--blue-light); }
 
-.homeBtn {
+/* 결제 직후 카테고리 추천 배너 */
+.recoBanner {
   margin-top: 22px;
+  width: 100%;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  animation: pk-up .5s cubic-bezier(.22, .61, .36, 1) .3s both;
+}
+
+.recoIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex: none;
+  background: linear-gradient(140deg, var(--blue), var(--teal));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.recoBody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.recoText { font-size: 13.5px; font-weight: 700; color: #fff; line-height: 1.4; }
+.recoCat { color: #8fe9df; }
+.recoMore { font-size: 12.5px; font-weight: 700; color: var(--blue-light); margin-top: 6px; }
+
+.homeBtn {
+  margin-top: 16px;
   margin-bottom: 40px;
   width: 100%;
   height: 54px;

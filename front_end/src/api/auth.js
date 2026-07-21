@@ -1,20 +1,49 @@
-// 목업 로그인. 백엔드에 인증 API가 없어서 프론트에서 검증합니다.
-// 실제 인증 API가 생기면 verifyLogin() 안쪽만 교체하면 됩니다.
+// 로그인.
+//
+// 백엔드 POST /api/v1/auth/login 응답이 성공한 경우에만 로그인 처리합니다.
+// 백엔드에 인증 미들웨어가 없어 access_token 은 검증되지 않으므로,
+// 응답으로 받은 user.user_id 를 이후 모든 API 호출에 실어 보냅니다.
 
-const DEMO_ID = 'KDA4'
-const DEMO_PW = '1234'
+import { API_BASE, request } from './client.js'
 
-/** 소셜 로그인 버튼이 새 탭으로 여는 주소. */
-export const SOCIAL_URL = {
-  kakao: 'https://accounts.kakao.com/login/?continue=https%3A%2F%2Fwww.kakao.com',
-  naver: 'https://nid.naver.com/nidlogin.login',
+export { API_BASE }
+
+/** 소셜 로그인 인가 URL을 백엔드에서 받아옵니다. */
+export async function fetchSocialAuthorizeUrl(provider) {
+  const data = await request(`/api/v1/auth/${provider}/authorize`)
+  return data?.authorization_url || null
 }
 
 /**
- * 아이디·비밀번호를 검증합니다.
- * @returns {{ok: true} | {ok: false, message: string}}
+ * 아이디(이메일)·비밀번호로 로그인합니다.
+ *
+ * @returns {Promise<{ok: true, user: {userId: number, email: string, name: string}, token: string|null}
+ *                  | {ok: false, message: string}>}
  */
-export function verifyLogin(id, pw) {
-  if (id.trim() === DEMO_ID && pw === DEMO_PW) return { ok: true }
-  return { ok: false, message: '아이디 또는 비밀번호가 올바르지 않아요.' }
+export async function login(id, pw) {
+  const email = id.trim()
+
+  try {
+    const data = await request('/api/v1/auth/login', {
+      method: 'POST',
+      body: { email, password: pw },
+    })
+
+    const userId = data?.user?.user_id
+    if (!userId) {
+      return { ok: false, message: '로그인 응답에 사용자 정보가 없어요.' }
+    }
+
+    return {
+      ok: true,
+      token: data?.access_token || null,
+      user: {
+        userId,
+        email: data?.user?.email || email,
+        name: data?.user?.name || '',
+      },
+    }
+  } catch (err) {
+    return { ok: false, message: err?.message || '로그인에 실패했어요.' }
+  }
 }

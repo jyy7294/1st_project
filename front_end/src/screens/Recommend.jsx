@@ -14,7 +14,8 @@ export default function Recommend() {
   const { state, dispatch } = useApp()
   const { recoType, cards } = state
 
-  const list = rankedRecommendations(recoType, cards)
+  const category = state.recoCategory
+  const list = rankedRecommendations(recoType, cards, category)
   const top = list[0]
   const rest = list.slice(1)
 
@@ -34,7 +35,12 @@ export default function Recommend() {
       </div>
 
       <div className={styles.titleWrap}>
-        <div className={styles.title}>내 카드 {cards.length}장 대신 쓸 때</div>
+        {category && <div className={styles.catChip}>📍 조금 전 {category} 결제 기준</div>}
+        <div className={styles.title}>
+          {category
+            ? `${category} 결제, 지금보다 더 할인 받아요`
+            : `내 카드 ${cards.length}장 대신 쓸 때`}
+        </div>
         <div className={styles.title}>혜택 많이 받는 카드 순위</div>
       </div>
 
@@ -130,7 +136,9 @@ export default function Recommend() {
       ))}
 
       <div className={styles.footNote}>
-        내 소비패턴 기반으로 추천된 {TYPE_LABEL[recoType]} 순위예요
+        {category
+          ? `${category} 혜택 기준으로 추천된 ${TYPE_LABEL[recoType]} 순위예요`
+          : `내 소비패턴 기반으로 추천된 ${TYPE_LABEL[recoType]} 순위예요`}
       </div>
     </div>
   )
@@ -148,10 +156,17 @@ function Figures({ card }) {
         <span className={styles.figureLabel}>연회비</span>
         <span className={styles.figureValue}>-{krw(card.fee)}원</span>
       </span>
-      <span className={styles.figure}>
-        <span className={styles.figureLabel}>캐시백</span>
-        <span className={styles.figureCash}>최대 {krw(card.cashback)}원</span>
-      </span>
+      {card.cashback ? (
+        <span className={styles.figure}>
+          <span className={styles.figureLabel}>캐시백</span>
+          <span className={styles.figureCash}>최대 {krw(card.cashback)}원</span>
+        </span>
+      ) : (
+        <span className={styles.figure}>
+          <span className={styles.figureLabel}>할인율</span>
+          <span className={styles.figureCash}>{card.rate}%</span>
+        </span>
+      )}
     </>
   )
 }

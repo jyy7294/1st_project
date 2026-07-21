@@ -1,6 +1,7 @@
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { orderedComparison } from '../../utils/compare.js'
+import { hasCategoryCards } from '../../utils/recommend.js'
 import { gradientForCard } from '../../data/cards.js'
 import { krw } from '../../utils/format.js'
 import styles from './PayDone.module.css'
@@ -12,6 +13,7 @@ export default function PayDone() {
   const chosen = ranked[state.payIdx] || ranked[0]
   const amount = state.transaction?.payment_amount || 0
   const discount = chosen?.expected_benefit || 0
+  const category = state.transaction?.payment_category
 
   if (!chosen) return null
 
@@ -62,6 +64,25 @@ export default function PayDone() {
           <span className={styles.totalValue}>{krw(amount - discount)}원</span>
         </div>
       </div>
+
+      {/* 방금 결제한 업종에 더 좋은 카드가 있으면 추천 순위로 안내합니다. */}
+      {hasCategoryCards(category) && (
+        <button
+          type="button"
+          className={styles.recoBanner}
+          onClick={() => dispatch({ type: A.START_RECO, category })}
+        >
+          <span className={styles.recoIcon}>💡</span>
+          <span className={styles.recoBody}>
+            <span className={styles.recoText}>
+              조금 전 이용하신 <span className={styles.recoCat}>{category}</span>에서
+              <br />
+              혜택을 받을 수 있는 카드가 있어요
+            </span>
+            <span className={styles.recoMore}>구경하러 가기 ›</span>
+          </span>
+        </button>
+      )}
 
       <button
         type="button"

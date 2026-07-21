@@ -1,10 +1,19 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
-import { A } from '../state/appReducer.js'
+import { A, cardStatsVisible } from '../state/appReducer.js'
 import { fetchMyCards } from '../api/picka.js'
 import CardFace from '../components/CardFace.jsx'
 import PickaLogo from '../components/PickaLogo.jsx'
 import styles from './WalletHome.module.css'
+
+/** 이만큼 끌어올리면 완전히 접힙니다. 그 사이는 손을 따라 서서히 접힙니다. */
+const COLLAPSE_TRAVEL = 260
+
+/** 손을 뗐을 때 이 비율을 넘겼으면 접고, 아니면 원래대로 되돌립니다. */
+const COLLAPSE_SNAP = 0.45
+
+/** 이 거리 이상 움직이면 탭이 아니라 스와이프로 봅니다. */
+const DRAG_SLOP = 8
 
 const CARD_HEIGHT = 186
 const OFFSET_COLLAPSED = 54 // 접힌 카드 간격
@@ -12,27 +21,66 @@ const OFFSET_EXPANDED = 176 // 펼친 카드 간격
 
 export default function WalletHome() {
   const { state, dispatch } = useApp()
-  const { cards, expanded, active, cardsLoaded, showCardStats } = state
+  const { cards, expanded, active, cardsLoaded, showCardStats, user } = state
 
   // 보유카드는 화면 진입 시 한 번만 불러옵니다.
   // (카드를 모두 지웠을 때 다시 불러오지 않도록 개수가 아니라 로드 여부로 판단합니다.)
   useEffect(() => {
-    if (cardsLoaded) return
+    if (cardsLoaded || !user?.userId) return
     let cancelled = false
-    fetchMyCards()
+    fetchMyCards(user.userId)
       .then((list) => {
         if (!cancelled) dispatch({ type: A.SET_CARDS, cards: list })
       })
       .catch((err) => {
         // 보유카드를 못 불러와도 앱은 계속 동작합니다. 지갑은 빈 상태로 둡니다.
-        console.error('보유카드를 불러오지 못했습니다.', err)
+        if (!cancelled) {
+          dispatch({ type: A.SET_CARDS_ERROR, message: err?.message || '보유카드를 불러오지 못했습니다.' })
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [cardsLoaded, dispatch])
+  }, [cardsLoaded, user?.userId, dispatch])
 
-  const offset = expanded ? OFFSET_EXPANDED : OFFSET_COLLAPSED
+  // 펼친 카드 뭉치를 위로 스와이프하면 접습니다. 아래 안내 문구 버튼은 그대로 둡니다.
+  const drag = useRef(null)
+  const swiped = useRef(false)
+  // 끌어올린 정도 0~1. 손을 따라 카드 간격이 좁아집니다. null 이면 드래그 중이 아님.
+  const [progress, setProgress] = useState(null)
+  // 잡고 있는 카드 index. 손을 대면 살짝 커져서 '잡혔다'는 게 보입니다.
+  const [grabbed, setGrabbed] = useState(-1)
+
+  function onPointerDown(e) {
+    if (!expanded) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    drag.current = { y: e.clientY }
+    swiped.current = false
+    setProgress(0)
+  }
+
+  function onPointerMove(e) {
+    if (!drag.current) return
+    const up = drag.current.y - e.clientY
+    if (up > DRAG_SLOP) swiped.current = true
+    // 위로 끈 거리를 0~1 로 바꿔 카드 간격에 그대로 반영합니다.
+    setProgress(Math.max(0, Math.min(up / COLLAPSE_TRAVEL, 1)))
+  }
+
+  function onPointerUp() {
+    setGrabbed(-1)
+    if (!drag.current) return
+    const reached = (progress ?? 0) >= COLLAPSE_SNAP
+    drag.current = null
+    setProgress(null)
+    if (reached) dispatch({ type: A.TOGGLE_EXPANDED })
+  }
+
+  const dragging = progress !== null
+  // 드래그 중에는 펼친 간격 → 접힌 간격 사이를 손 위치대로 오갑니다.
+  const offset = expanded
+    ? OFFSET_EXPANDED + (OFFSET_COLLAPSED - OFFSET_EXPANDED) * (progress ?? 0)
+    : OFFSET_COLLAPSED
   const stackHeight = cards.length
     ? (cards.length - 1) * offset + CARD_HEIGHT + 8
     : 0
@@ -118,15 +166,40 @@ export default function WalletHome() {
         </div>
       )}
 
-      <div className={styles.stack} style={{ height: stackHeight }}>
+      <div
+        className={[
+          styles.stack,
+          expanded ? styles.stackDraggable : '',
+          dragging ? styles.dragging : '',
+        ].join(' ')}
+        style={{ height: stackHeight }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {cards.map((card, i) => {
           const selected = expanded && i === active
           return (
             <div
               key={card.card_id}
-              className={`${styles.stackItem} ${selected ? styles.selected : ''}`}
-              style={{ top: i * offset, zIndex: selected ? 20 : i }}
-              onClick={() => dispatch({ type: A.SELECT_CARD, index: i })}
+              className={[
+                styles.stackItem,
+                selected ? styles.selected : '',
+                grabbed === i ? styles.grabbed : '',
+              ].join(' ')}
+              style={{ top: i * offset, zIndex: grabbed === i ? 30 : selected ? 20 : i }}
+              onPointerDown={() => {
+                if (expanded) setGrabbed(i)
+              }}
+              onClick={() => {
+                // 스와이프로 접은 직후에는 카드 선택이 따라오지 않게 막습니다.
+                if (swiped.current) {
+                  swiped.current = false
+                  return
+                }
+                dispatch({ type: A.SELECT_CARD, index: i })
+              }}
               // 카드를 두 번 누르면 상세로 들어갑니다.
               onDoubleClick={() => dispatch({ type: A.OPEN_CARD, index: i })}
             >
@@ -136,14 +209,25 @@ export default function WalletHome() {
                 spent={card.spent}
                 benefit={card.benefit}
                 expiry={card.expiry}
-                showStats={showCardStats}
+                showStats={cardStatsVisible(state, card)}
               />
             </div>
           )
         })}
       </div>
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && state.cardsError ? (
+        <div className={styles.empty}>
+          <div className={styles.emptyText}>{state.cardsError}</div>
+          <button
+            type="button"
+            className={styles.emptyBtn}
+            onClick={() => dispatch({ type: A.SET_CARDS, cards: [] }) || window.location.reload()}
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : cards.length === 0 ? (
         <div className={styles.empty}>
           <div className={styles.emptyText}>
             등록된 카드가 없어요.
@@ -164,7 +248,7 @@ export default function WalletHome() {
           onClick={() => dispatch({ type: A.TOGGLE_EXPANDED })}
         >
           {expanded
-            ? '카드를 두 번 탭하면 상세 · 여기를 눌러 접기'
+            ? '카드를 두 번 탭하면 상세 · 위로 쓸어올리거나 여기를 눌러 접기'
             : '카드를 탭해 펼쳐보세요'}
         </div>
       )}

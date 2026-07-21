@@ -68,7 +68,20 @@
 
 .qrBarIcon img { width: 50px; height: 50px; display: block; }
 
-.stack { position: relative; margin: 14px 22px 0; }
+.stack {
+  position: relative;
+  margin: 14px 22px 0;
+  /* 카드 간격이 바뀌면 높이도 같이 따라옵니다. */
+  transition: height .4s cubic-bezier(.22, .61, .36, 1);
+}
+
+/* 드래그 중에는 손 움직임을 그대로 따라야 하므로 애니메이션을 끕니다. */
+.dragging { transition: none; }
+.dragging .stackItem { transition: transform .16s cubic-bezier(.34, 1.56, .64, 1), filter .16s ease; }
+
+/* 펼친 상태에서만 스와이프를 받습니다. 접혀 있을 때는 화면 스크롤을 방해하지 않습니다. */
+.stackDraggable { touch-action: none; cursor: grab; }
+.stackDraggable:active { cursor: grabbing; }
 
 .stackItem {
   position: absolute;
@@ -82,8 +95,16 @@
 }
 
 .stackItem.selected {
-  transform: scale(1.05) translateY(-6px);
-  filter: drop-shadow(0 22px 34px rgba(10, 29, 79, .5));
+  transform: scale(1.02) translateY(-3px);
+  filter: drop-shadow(0 14px 22px rgba(10, 29, 79, .34));
+}
+
+/* 손으로 잡고 있는 카드 — 조금 더 커지고 그림자가 깊어져 들린 느낌을 줍니다.
+   선택 상태보다 뒤에 둬서 두 상태가 겹칠 때 이 값이 이깁니다. */
+.stackItem.grabbed {
+  transform: scale(1.1) translateY(-10px);
+  filter: drop-shadow(0 28px 40px rgba(10, 29, 79, .55));
+  transition: transform .16s cubic-bezier(.34, 1.56, .64, 1), filter .16s ease;
 }
 
 /* 소비패턴 분석 카드 추천 배너 (AD) */

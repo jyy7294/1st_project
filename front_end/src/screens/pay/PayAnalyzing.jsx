@@ -34,7 +34,7 @@ export default function PayAnalyzing() {
       let data = null
       let failure = null
       try {
-        data = await fetchRecommendation(state.transaction)
+        data = await fetchRecommendation(state.user?.userId, state.transaction)
       } catch (err) {
         failure = err
       }
@@ -62,7 +62,7 @@ export default function PayAnalyzing() {
     return () => {
       cancelled = true
     }
-  }, [state.transaction, dispatch])
+  }, [state.transaction, state.user?.userId, dispatch])
 
   const cardCount = state.cards.length
 

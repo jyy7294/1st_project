@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { SCANNED_PRODUCT, buildRegisteredCard, gradientForCard } from '../../data/cards.js'
+import { registerCard } from '../../api/picka.js'
 import { lastFourOf } from '../../utils/cardForm.js'
 import styles from './add.module.css'
 
@@ -18,16 +20,35 @@ export default function AddTerms() {
 
   const requiredDone = terms.t1 && terms.t2 && terms.t3
   const allChecked = requiredDone && terms.t4
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
 
-  const submit = () => {
-    if (!requiredDone) return
-    dispatch({
-      type: A.ADD_CARD,
-      card: buildRegisteredCard({
-        last_four: lastFourOf(addForm.number),
-        expiry: addForm.expiry,
-      }),
-    })
+  const submit = async () => {
+    if (!requiredDone || pending) return
+    setPending(true)
+    setError('')
+
+    try {
+      // 백엔드가 카드번호로 실제 카드 상품을 찾아 등록해 줍니다.
+      const data = await registerCard(state.user?.userId, addForm, 'manual')
+      const registered = data?.card || {}
+      dispatch({
+        type: A.ADD_CARD,
+        card: buildRegisteredCard({
+          card_id: registered.card_id,
+          card_company: registered.card_company,
+          card_name: registered.card_name,
+          last_four: lastFourOf(addForm.number),
+          expiry: addForm.expiry,
+        }),
+      })
+      // 지갑 목록을 다시 받아오도록 표시합니다.
+      dispatch({ type: A.SET_CARDS_ERROR, message: null })
+    } catch (err) {
+      setError(err?.message || '카드를 등록하지 못했어요.')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -102,11 +123,13 @@ export default function AddTerms() {
       <button
         type="button"
         className={`${styles.primaryBtn} ${styles.pinToBottom}`}
-        disabled={!requiredDone}
+        disabled={!requiredDone || pending}
         onClick={submit}
       >
         등록 완료
       </button>
+
+      {error && <div className={styles.registerError}>{error}</div>}
     </div>
   )
 }
