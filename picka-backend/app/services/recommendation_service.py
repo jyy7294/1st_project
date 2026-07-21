@@ -2,9 +2,7 @@ from app.services.llm_service import (
     LLMServiceError,
     judge_ambiguous_benefit,
 )
-from user_cards import get_user_cards
 
-BENEFIT_SIMILAR_THRESHOLD = 500
 DEFAULT_BENEFIT_DETAIL = (
     "상세 유의사항은 카드사 공식 상품설명서를 확인해 주세요."
 )
@@ -1126,8 +1124,10 @@ def calculate_card_benefit(
     payment_category: str,
     payment_amount: int,
     merchant_name: str | None = None,
-):
-
+) -> dict:
+    """
+    Calculate the benefit for a given card and payment details.
+    """
     applicable_benefits = []
     failure_reasons = []
     failure_calculation = None
@@ -1189,7 +1189,12 @@ def calculate_card_benefit(
         if benefit_unit not in {"%", "원", "KRW"}:
             continue
 
-        llm_category_override = False
+        if not is_category_matched(
+            benefit,
+            payment_category
+        ):
+            continue
+
         if should_use_llm(benefit) and merchant_name:
             try:
                 judgment = judge_ambiguous_benefit(
@@ -1222,14 +1227,6 @@ def calculate_card_benefit(
                     f"혜택 적용 불가: {judgment.reason}"
                 )
                 continue
-
-            llm_category_override = True
-
-        if not llm_category_override and not is_category_matched(
-            benefit,
-            payment_category
-        ):
-            continue
 
         calculation = calculate_scored_benefit(
             card=card,
@@ -1349,6 +1346,12 @@ def calculate_card_benefit(
             "monthly_remaining": calculation_fields[
                 "monthly_remaining"
             ],
+            "monthly_transaction_count": int(
+                card.get("monthly_transaction_count", 0) or 0
+            ),
+            "current_month_spending": int(
+                card.get("current_month_spending", 0) or 0
+            ),
             "option_group": calculation_fields.get(
                 "option_group"
             ),
@@ -1419,6 +1422,12 @@ def calculate_card_benefit(
         "monthly_remaining": best_benefit[
             "monthly_remaining"
         ],
+        "monthly_transaction_count": int(
+            card.get("monthly_transaction_count", 0) or 0
+        ),
+        "current_month_spending": int(
+            card.get("current_month_spending", 0) or 0
+        ),
         "option_group": best_benefit["option_group"],
         "is_option_benefit": best_benefit[
             "is_option_benefit"
@@ -1466,8 +1475,10 @@ def performance_priority_key(
     # 1. 실적 조건이 있고 아직 달성하지 않은 카드
     # 2. 이번 결제로 실적을 바로 달성하는 카드
     # 3. 결제 후 남는 실적금액이 적은 카드
-    # 4. 현재 달성률이 높은 카드
-    # 5. 예상 혜택이 큰 카드
+    # 4. 해당 월에 자주 사용한 카드
+    # 5. 해당 월 사용금액이 큰 카드
+    # 6. 현재 달성률이 높은 카드
+    # 7. 예상 혜택이 큰 카드
     return (
         not (
             required > 0
@@ -1475,6 +1486,8 @@ def performance_priority_key(
         ),
         not reaches_target,
         remaining_after,
+        -card.get("monthly_transaction_count", 0),
+        -card.get("current_month_spending", 0),
         -achievement_rate,
         -card.get("expected_benefit", 0)
     )
@@ -1511,15 +1524,11 @@ def rank_cards(
 
         return ranked, "performance_only"
 
-    # 최고 혜택 카드와 500원 이내 차이인 카드들
+    # 최고 혜택 카드와 예상 혜택이 정확히 같은 카드들
     similar_cards = [
         card
         for card in benefit_sorted
-        if (
-            best_benefit
-            - card["expected_benefit"]
-            <= BENEFIT_SIMILAR_THRESHOLD
-        )
+        if card["expected_benefit"] == best_benefit
     ]
 
     # 혜택 차이가 비슷한 카드가 2장 이상인 경우
@@ -1557,32 +1566,28 @@ def recommend_cards(
     merchant_name: str,
     payment_category: str,
     payment_amount: int,
-    user_card_states: list[dict] | None = None,
+    user_card_states: list[dict],
 ) -> dict:
     """
     사용자의 모든 보유카드를 비교하고 추천 순위를 반환합니다.
 
     추천 기준:
     1. 혜택 차이가 크면 예상 혜택이 큰 카드 추천
-    2. 혜택 차이가 500원 이하이면 실적 달성에 유리한 카드 추천
+    2. 예상 혜택이 동일하면 실적 달성에 유리한 카드 추천
     3. 모든 카드 혜택이 0원이면 실적 달성에 유리한 카드 추천
     """
 
-    user_cards = (
-        user_card_states
-        if user_card_states is not None
-        else get_user_cards()
-    )
+    user_cards = user_card_states
     results = []
 
     # 1. 보유카드별 예상 혜택 계산
     for card in user_cards:
         card_result = calculate_card_benefit(
-            card=card,
-            merchant_name=merchant_name,
-            payment_category=payment_category,
-            payment_amount=payment_amount,
-        )
+    card=card,
+    merchant_name=merchant_name,
+    payment_category=payment_category,
+    payment_amount=payment_amount,
+)
 
         results.append(card_result)
 
@@ -1598,6 +1603,9 @@ def recommend_cards(
             "recommended_card": None,
             "additional_saving": 0,
             "saving_message": "추천 가능한 카드가 없습니다.",
+            "performance_prompt": None,
+            "selection_required": False,
+            "selectable_cards": [],
             "other_cards": [],
             "comparison": []
         }
@@ -1612,16 +1620,39 @@ def recommend_cards(
         "expected_benefit"
     ]
 
-    second_benefit_amount = (
-        results[1]["expected_benefit"]
-        if len(results) >= 2
-        else 0
-    )
+    performance_eligible_cards = [
+        card
+        for card in results
+        if (
+            card.get("performance_required", 0) > 0
+            and card.get("needs_performance", False)
+        )
+    ]
 
-    benefit_gap = (
-        best_benefit_amount
-        - second_benefit_amount
-    )
+    if best_benefit_amount <= 0 and not performance_eligible_cards:
+        for index, card in enumerate(results, start=1):
+            card["rank"] = index
+            card["is_recommended"] = False
+            card["difference_from_best_benefit"] = 0
+            card["ranking_reason"] = "현재 거래에서 적용 가능한 혜택 없음"
+
+        message = "혜택이 적용되는 카드가 없습니다. 원하시는 카드로 결제하세요."
+        return {
+            "transaction": {
+                "merchant_name": merchant_name,
+                "category": payment_category,
+                "amount": payment_amount,
+            },
+            "recommendation_basis": "user_selection",
+            "recommended_card": None,
+            "additional_saving": 0,
+            "saving_message": message,
+            "performance_prompt": None,
+            "selection_required": True,
+            "selectable_cards": results,
+            "other_cards": results,
+            "comparison": results,
+        }
 
     # 3. 최종 추천 카드 결정
     if best_benefit_amount <= 0:
@@ -1632,27 +1663,22 @@ def recommend_cards(
 
         recommendation_basis = "performance_only"
 
-    elif (
-        len(results) >= 2
-        and benefit_gap
-        <= BENEFIT_SIMILAR_THRESHOLD
-    ):
-        # 최고 혜택과 500원 이내인 카드만 후보로 선정
-        similar_cards = [
+    elif len(results) >= 2:
+        # 예상 혜택이 정확히 같은 카드만 실적 기준으로 비교
+        same_benefit_cards = [
             card
             for card in results
-            if (
-                best_benefit_amount
-                - card["expected_benefit"]
-                <= BENEFIT_SIMILAR_THRESHOLD
-            )
+            if card["expected_benefit"] == best_benefit_amount
         ]
 
-        recommended_card = select_card_by_performance(
-            similar_cards
-        )
-
-        recommendation_basis = "performance_tiebreak"
+        if len(same_benefit_cards) >= 2:
+            recommended_card = select_card_by_performance(
+                same_benefit_cards
+            )
+            recommendation_basis = "performance_tiebreak"
+        else:
+            recommended_card = results[0]
+            recommendation_basis = "benefit"
 
     else:
         # 혜택 차이가 크면 혜택 1위 카드 추천
@@ -1748,13 +1774,13 @@ def recommend_cards(
             )
 
             recommended_card["reason"] = (
-                "카드별 예상 혜택 차이가 크지 않아, "
+                "카드별 예상 혜택이 동일하여, "
                 "전월 실적 달성에 더 유리한 "
                 "카드를 추천합니다."
             )
 
             recommended_card["reason_details"] = [
-                "유사한 예상 혜택의 카드 중 선정",
+                "동일한 예상 혜택의 카드 중 선정",
                 (
                     f"결제 후 남은 실적 "
                     f"{remaining:,}원"
@@ -1840,7 +1866,7 @@ def recommend_cards(
 
     elif recommendation_basis == "performance_tiebreak":
         saving_message = (
-            "예상 혜택 차이가 크지 않아 "
+            "예상 혜택이 동일하여 "
             "전월 실적 달성에 유리한 카드를 추천했습니다."
         )
 
@@ -1849,6 +1875,35 @@ def recommend_cards(
             "적용 가능한 즉시 혜택이 없어 "
             "전월 실적 달성에 유리한 카드를 추천했습니다."
         )
+
+    performance_candidates = [
+        card
+        for card in results
+        if (
+            card.get("reaches_target_with_payment", False)
+            and card["card_id"] != recommended_card_id
+        )
+    ]
+    performance_card = select_card_by_performance(
+        performance_candidates
+    )
+    performance_prompt = None
+    if performance_card is not None:
+        remaining = performance_card.get(
+            "performance_remaining_before",
+            0,
+        )
+        performance_prompt = {
+            "card_id": performance_card["card_id"],
+            "card_name": performance_card["card_name"],
+            "remaining_before_payment": remaining,
+            "message": (
+                f"{performance_card['card_name']}은(는) 실적 달성까지 "
+                f"{remaining:,}원 남았습니다. 이번 결제로 실적을 "
+                "달성할 수 있습니다. 이 카드로 결제하시겠습니까?"
+            ),
+            "action_label": "예",
+        }
 
     return {
         "transaction": {
@@ -1860,6 +1915,9 @@ def recommend_cards(
         "recommended_card": recommended_card,
         "additional_saving": additional_saving,
         "saving_message": saving_message,
+        "performance_prompt": performance_prompt,
+        "selection_required": False,
+        "selectable_cards": [],
         "other_cards": other_cards,
         "comparison": results
     }
@@ -1867,6 +1925,7 @@ def recommend_cards(
 
 if __name__ == "__main__":
     recommendation = recommend_cards(
+    user_card_states=[],
     merchant_name="성신문구",
     payment_category="문구",
     payment_amount=20000

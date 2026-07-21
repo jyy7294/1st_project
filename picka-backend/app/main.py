@@ -1006,7 +1006,10 @@ def create_recommendation(
             user_card_states=user_card_states,
         )
 
-        if result["recommended_card"] is None:
+        if (
+            result["recommended_card"] is None
+            and not result.get("selection_required", False)
+        ):
             raise HTTPException(
                 status_code=404,
                 detail="추천 가능한 카드가 없습니다.",

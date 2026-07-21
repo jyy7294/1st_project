@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import (
@@ -11,6 +11,7 @@ from app.models import (
     CardBenefit,
     MerchantAlias,
     MonthlyCardUsage,
+    Transaction,
     User,
     UserCard,
 )
@@ -118,14 +119,29 @@ def build_user_card_states(
         raise NoActiveUserCardsError("활성 보유 카드가 없습니다.")
 
     card_ids = [user_card.card_id for user_card in user_cards]
-    monthly_rows = db.scalars(
-        select(MonthlyCardUsage).where(
+    monthly_results = db.execute(
+        select(MonthlyCardUsage, func.count(Transaction.id))
+        .outerjoin(
+            Transaction,
+            and_(
+                Transaction.user_id == MonthlyCardUsage.user_id,
+                Transaction.card_id == MonthlyCardUsage.card_id,
+                Transaction.usage_month == MonthlyCardUsage.usage_month,
+            ),
+        )
+        .where(
             MonthlyCardUsage.user_id == user_id,
             MonthlyCardUsage.card_id.in_(card_ids),
             MonthlyCardUsage.usage_month == usage_month,
         )
+        .group_by(MonthlyCardUsage.id)
     ).all()
+    monthly_rows = [row[0] for row in monthly_results]
     monthly_by_card = {row.card_id: row for row in monthly_rows}
+    transaction_counts = {
+        monthly.card_id: count
+        for monthly, count in monthly_results
+    }
 
     usage_rows = db.scalars(
         select(BenefitUsage).where(
@@ -180,6 +196,10 @@ def build_user_card_states(
                 ),
                 "current_month_spending": (
                     monthly.current_month_spending if monthly else 0
+                ),
+                "monthly_transaction_count": transaction_counts.get(
+                    card.id,
+                    0,
                 ),
                 "monthly_total_limit": card.monthly_total_limit,
                 "card_monthly_benefit_used": card_used,
