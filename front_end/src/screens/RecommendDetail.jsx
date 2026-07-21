@@ -22,7 +22,7 @@ const CATEGORY_PREVIEW = 3
  */
 export default function RecommendDetail() {
   const { state, dispatch } = useApp()
-  const card = findRecommendation(state.recoType, state.recoSelId, state.cards)
+  const card = findRecommendation(state.recoType, state.recoSelId, state.cards, state.recoCategory)
   // 목록이 길어 화면이 답답해지지 않도록 접어 두고, 필요할 때만 펼칩니다.
   const [catOpen, setCatOpen] = useState(false)
   const [recoNoteOpen, setRecoNoteOpen] = useState(false)
@@ -82,10 +82,17 @@ export default function RecommendDetail() {
           <span className={styles.figureLabel}>연회비</span>
           <span className={styles.figureValue}>-{krw(card.fee)}원</span>
         </div>
-        <div className={styles.figure}>
-          <span className={styles.figureLabel}>캐시백</span>
-          <span className={styles.figureCash}>최대 {krw(card.cashback)}원</span>
-        </div>
+        {card.cashback ? (
+          <div className={styles.figure}>
+            <span className={styles.figureLabel}>캐시백</span>
+            <span className={styles.figureCash}>최대 {krw(card.cashback)}원</span>
+          </div>
+        ) : (
+          <div className={styles.figure}>
+            <span className={styles.figureLabel}>{state.recoCategory || '주요'} 할인율</span>
+            <span className={styles.figureCash}>{card.rate}%</span>
+          </div>
+        )}
       </div>
 
       <section className={styles.section}>
@@ -135,7 +142,7 @@ export default function RecommendDetail() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          카드 자세히 보기
+          카드 신청하기
         </a>
       </div>
     </div>

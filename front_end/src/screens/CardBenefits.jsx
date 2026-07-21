@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { gradientForCard } from '../data/cards.js'
-import { benefitsForCard } from '../data/benefits.js'
+import { fetchCardDetail } from '../api/picka.js'
 import { benefitView } from '../utils/benefit.js'
 import styles from './CardBenefits.module.css'
 
@@ -9,10 +10,29 @@ import styles from './CardBenefits.module.css'
 export default function CardBenefits() {
   const { state, dispatch } = useApp()
   const card = state.cards[state.active]
+  const [rows, setRows] = useState([])
+
+  const userId = state.user?.userId
+  const cardId = card?.card_id
+
+  useEffect(() => {
+    if (!userId || !cardId) return undefined
+    let cancelled = false
+    fetchCardDetail(userId, cardId)
+      .then((data) => {
+        if (!cancelled) setRows(data.benefits)
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId, cardId])
 
   if (!card) return null
 
-  const benefits = benefitsForCard(card).map(benefitView)
+  const benefits = rows.map(benefitView)
 
   return (
     <div className={`${styles.screen} pk-screen`}>

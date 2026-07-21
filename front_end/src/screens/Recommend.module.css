@@ -27,6 +27,20 @@
 
 .titleWrap { padding: 14px 22px 0; }
 
+/* 결제 직후 들어왔을 때 어떤 업종 기준인지 알려주는 칩 */
+.catChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #E6FAF7;
+  color: var(--teal-deep);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
 .title {
   font-size: 23px;
   font-weight: 800;

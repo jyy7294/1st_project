@@ -6,6 +6,7 @@ import { LATEST_MONTH_INDEX } from '../data/report.js'
 export const A = {
   SET_SCREEN: 'SET_SCREEN',
   LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  SET_CARDS_ERROR: 'SET_CARDS_ERROR',
   LOGIN_FAIL: 'LOGIN_FAIL',
   CLEAR_LOGIN_ERROR: 'CLEAR_LOGIN_ERROR',
   SET_SOCIAL: 'SET_SOCIAL',
@@ -15,8 +16,8 @@ export const A = {
   OPEN_CARD: 'OPEN_CARD',
   GO_HOME: 'GO_HOME',
   SET_MENU: 'SET_MENU',
-  TOGGLE_NOTIFY: 'TOGGLE_NOTIFY',
   SET_CARD_STATS: 'SET_CARD_STATS',
+  SET_CARD_STATS_FOR: 'SET_CARD_STATS_FOR',
   REMOVE_CARD: 'REMOVE_CARD',
   START_RECO: 'START_RECO',
   SET_RECO_TYPE: 'SET_RECO_TYPE',
@@ -55,14 +56,17 @@ export const initialState = {
   active: 0, // 홈에서 선택된 카드 index
   detailReturn: 'home', // 카드 상세에서 뒤로 갈 화면 ('home' | 'cards')
   menuOpen: false, // 상세 화면 ⋯ 메뉴
-  notify: true, // 상세 화면 알림 설정
-  showCardStats: true, // 카드 앞면에 사용금액·받은 혜택을 표시할지
+  showCardStats: false, // 카드 앞면에 사용금액·받은 혜택을 표시할지. 기본은 숨김
+  // 카드별 예외. { [card_id]: true|false } — 없으면 위 전체 설정을 따릅니다.
+  cardStatsById: {},
   addStep: 'scan', // 'scan' | 'input' | 'terms' | 'done'
   addForm: EMPTY_ADD_FORM,
   terms: EMPTY_TERMS,
   addedCard: null, // 방금 등록한 카드 (등록 완료 화면에 표시)
   recoType: 'credit', // 카드 추천 화면 탭: 'credit' | 'check'
   recoSelId: null, // 분석 결과를 보고 있는 추천 카드 id. null 이면 1위
+  // 결제 직후 '구경하러 가기'로 들어오면 그 결제 업종이 담깁니다. null 이면 일반 추천.
+  recoCategory: null,
   reportMonth: LATEST_MONTH_INDEX, // 리포트에서 보고 있는 달
   reportCardOpen: -1, // 리포트 '카드별 혜택'에서 펼친 카드 index. -1 이면 모두 접힘
   transaction: null, // QR로 읽은 결제정보
@@ -72,6 +76,9 @@ export const initialState = {
   noEligibleCard: false, // 404 — 이 업종에 혜택 카드가 없음
   loginError: '',
   social: null, // 'kakao' | 'naver' | null
+  // 로그인한 사용자. 백엔드에 인증 미들웨어가 없어 user_id 를 모든 요청에 실어 보냅니다.
+  user: null, // { userId, email, name }
+  cardsError: null, // 보유카드 조회 실패 메시지
 }
 
 export function appReducer(state, action) {
@@ -80,7 +87,18 @@ export function appReducer(state, action) {
       return { ...state, screen: action.screen }
 
     case A.LOGIN_SUCCESS:
-      return { ...state, screen: 'home', loginError: '', social: null }
+      // 사용자가 바뀌면 이전 지갑 데이터는 버리고 다시 불러옵니다.
+      return {
+        ...state,
+        screen: 'home',
+        loginError: '',
+        social: null,
+        user: action.user || state.user,
+        cards: [],
+        cardsLoaded: false,
+        cardsError: null,
+        active: 0,
+      }
 
     case A.LOGIN_FAIL:
       return { ...state, loginError: action.message }
@@ -92,7 +110,10 @@ export function appReducer(state, action) {
       return { ...state, social: action.provider }
 
     case A.SET_CARDS:
-      return { ...state, cards: action.cards, cardsLoaded: true }
+      return { ...state, cards: action.cards, cardsLoaded: true, cardsError: null }
+
+    case A.SET_CARDS_ERROR:
+      return { ...state, cardsLoaded: true, cardsError: action.message }
 
     case A.TOGGLE_EXPANDED:
       return { ...state, expanded: !state.expanded }
@@ -123,11 +144,15 @@ export function appReducer(state, action) {
     case A.SET_MENU:
       return { ...state, menuOpen: action.open }
 
-    case A.TOGGLE_NOTIFY:
-      return { ...state, notify: !state.notify, menuOpen: false }
-
     case A.SET_CARD_STATS:
-      return { ...state, showCardStats: action.show }
+      // 전체 설정을 바꾸면 카드별 예외는 지워 한 번에 맞춥니다.
+      return { ...state, showCardStats: action.show, cardStatsById: {} }
+
+    case A.SET_CARD_STATS_FOR:
+      return {
+        ...state,
+        cardStatsById: { ...state.cardStatsById, [action.cardId]: action.show },
+      }
 
     case A.REMOVE_CARD: {
       // 카드를 지우면 선택 index가 배열 밖을 가리킬 수 있어 홈으로 되돌립니다.
@@ -143,7 +168,15 @@ export function appReducer(state, action) {
     }
 
     case A.START_RECO:
-      return { ...state, screen: 'recommend', recoType: 'credit', recoSelId: null }
+      return {
+        ...state,
+        screen: 'recommend',
+        recoType: 'credit',
+        recoSelId: null,
+        recoCategory: action.category || null,
+        // 결제 흐름에서 넘어온 경우 결제 화면을 닫습니다.
+        payStep: 'none',
+      }
 
     case A.SET_RECO_TYPE:
       // 탭을 바꾸면 목록이 통째로 달라지므로 선택도 1위로 되돌립니다.
@@ -247,4 +280,15 @@ export function appReducer(state, action) {
     default:
       return state
   }
+}
+
+/**
+ * 이 카드의 금액을 표시할지. 카드별 설정이 있으면 그것을, 없으면 전체 설정을 따릅니다.
+ *
+ * @param {object} state
+ * @param {{card_id: number|string}} card
+ */
+export function cardStatsVisible(state, card) {
+  const override = state.cardStatsById?.[card?.card_id]
+  return override === undefined ? state.showCardStats : override
 }

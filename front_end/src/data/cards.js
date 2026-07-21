@@ -12,6 +12,12 @@ const GRADIENTS = {
   현대카드: 'linear-gradient(140deg,#10275F,#071844)',
   삼성카드: 'linear-gradient(140deg,#3a3f4a,#1c1f26)',
   KB국민카드: 'linear-gradient(140deg,#5A5A5A,#2e2e2e)',
+  우리카드: 'linear-gradient(140deg,#0067AC,#00427a)',
+  하나카드: 'linear-gradient(140deg,#00857F,#00615c)',
+  NH농협카드: 'linear-gradient(140deg,#0F8B3C,#0a6129)',
+  IBK기업은행: 'linear-gradient(140deg,#2A5CAA,#1b3c6f)',
+  토스뱅크: 'linear-gradient(140deg,#3182f6,#1b64da)',
+  카카오뱅크: 'linear-gradient(140deg,#ffd83d,#f2b705)',
 }
 
 const DEFAULT_GRADIENT = 'linear-gradient(140deg,#10275F,#071844)'
@@ -47,15 +53,17 @@ export const SCANNED_PRODUCT = {
  * card_id 는 카드 상품 번호가 아니라 임시 식별자라서
  * data/benefits.js·transactions.js 에는 없고, 상세 화면이 빈 상태를 보여줍니다.
  *
- * @param {{last_four: string, expiry: string}} input
+ * @param {{card_id?: number, card_company?: string, card_name?: string,
+ *           last_four: string, expiry: string}} input
  */
-export function buildRegisteredCard({ last_four, expiry }) {
+export function buildRegisteredCard({ card_id, card_company, card_name, last_four, expiry }) {
   return {
-    ...SCANNED_PRODUCT,
-    card_id: `new-${last_four}-${expiry}`,
+    card_id: card_id ?? `new-${last_four}-${expiry}`,
+    card_company: card_company || SCANNED_PRODUCT.card_company,
+    card_name: card_name || SCANNED_PRODUCT.card_name,
     last_four,
     expiry,
-    nickname: '생활비',
+    nickname: '',
     spent: '0',
     benefit: '0',
   }

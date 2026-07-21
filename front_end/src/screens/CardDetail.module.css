@@ -27,12 +27,19 @@
 
 .menuWrap { position: relative; }
 
+/* 메뉴 바깥 클릭을 받는 투명 레이어. 메뉴(z-index 60)보다 한 단계 아래에 깝니다. */
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+}
+
 .menu {
   position: absolute;
   top: 44px;
   right: 0;
   z-index: 60;
-  width: 190px;
+  width: 214px;
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 14px 34px -6px rgba(10, 29, 79, .28);
@@ -53,10 +60,38 @@
   font-size: 14px;
   color: var(--navy-text);
   text-align: left;
+  white-space: nowrap;
 }
 
 .menuItem:last-child { border-bottom: none; }
-.menuValue { font-size: 12px; font-weight: 700; color: var(--blue); }
+
+/* 메뉴 안의 ON/OFF — 홈의 금액 표시 토글과 같은 알약 모양입니다. */
+.menuSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 2px;
+  border-radius: 999px;
+  background: #e7eaf1;
+}
+
+.menuSwitchBtn {
+  border: none;
+  background: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.menuSwitchBtn.menuSwitchOn {
+  background: #fff;
+  color: var(--navy-text);
+  box-shadow: 0 1px 3px rgba(14, 36, 93, .18);
+}
 .menuItem.danger { color: var(--danger); font-weight: 600; justify-content: flex-start; }
 
 .cardWrap { margin: 12px 20px 0; }
@@ -149,6 +184,10 @@
 }
 
 .txRow:last-child { border-bottom: none; }
+
+/* 내역이 3건보다 적을 때 높이를 유지하는 빈 줄 */
+.txBlank { opacity: .5; }
+.txBlank .txPlace { font-size: 13px; font-weight: 500; color: var(--text-4); }
 
 .txBody { flex: 1; min-width: 0; }
 
