@@ -1,0 +1,74 @@
+[
+  {
+    "scenario_id": "S001",
+    "name": "카페 결제, A등급 우선",
+    "payment": {
+      "merchant_name": "스타벅스강남R점",
+      "amount": 12000,
+      "category": "카페/디저트"
+    },
+    "user_state": {
+      "previous_month_spend": 600000,
+      "benefit_usage_this_month": {}
+    },
+    "expected_rule": "A_확정계산 혜택 우선, 같은 점수면 월 잔여한도 큰 카드 우선"
+  },
+  {
+    "scenario_id": "S002",
+    "name": "고할인 B등급은 보수캡 적용",
+    "payment": {
+      "merchant_name": "넷플릭스",
+      "amount": 17000,
+      "category": "디지털구독"
+    },
+    "user_state": {
+      "previous_month_spend": 500000,
+      "benefit_usage_this_month": {}
+    },
+    "expected_rule": "B_추정계산은 임시월캡 또는 수동보정 한도 내에서만 계산"
+  },
+  {
+    "scenario_id": "S003",
+    "name": "월 한도 소진 카드 제외",
+    "payment": {
+      "merchant_name": "GS25역삼타워점",
+      "amount": 8000,
+      "category": "편의점"
+    },
+    "user_state": {
+      "previous_month_spend": 400000,
+      "benefit_usage_this_month": {
+        "example_benefit_id": 10000
+      }
+    },
+    "expected_rule": "해당 혜택의 월최대혜택액을 이미 소진했으면 기대혜택 0원 처리"
+  },
+  {
+    "scenario_id": "S004",
+    "name": "전월실적 미달",
+    "payment": {
+      "merchant_name": "CGV 강남",
+      "amount": 15000,
+      "category": "영화/문화"
+    },
+    "user_state": {
+      "previous_month_spend": 100000,
+      "benefit_usage_this_month": {}
+    },
+    "expected_rule": "카드/혜택 실적조건 미달이면 혜택 적용 제외"
+  },
+  {
+    "scenario_id": "S005",
+    "name": "선택형 혜택 합산 금지",
+    "payment": {
+      "merchant_name": "쿠팡",
+      "amount": 50000,
+      "category": "온라인쇼핑"
+    },
+    "user_state": {
+      "previous_month_spend": 700000,
+      "selected_option_group": "사용자선택옵션"
+    },
+    "expected_rule": "옵션그룹이 같은 혜택은 전부 더하지 말고 선택된 옵션 또는 최대 1개만 계산"
+  }
+]

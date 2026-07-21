@@ -1,0 +1,32 @@
+# 파이썬 캐시 파일 제외
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 가상환경 폴더 제외 (혹시 쓰신다면)
+venv/
+.venv/
+env/
+
+# 에디터 설정 파일 제외
+.vscode/
+.idea/
+
+# Secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+
+# IDE
+**/.vscode/
+**/.idea/
+
+# Local/generated data
+picka-backend/data/*.json
+picka-backend/data/*.csv
