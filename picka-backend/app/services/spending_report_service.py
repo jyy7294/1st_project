@@ -4,10 +4,10 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Card, Transaction, User
+from app.models import Card, Transaction, TransactionReward, User
 from app.services.category_normalization import normalize_payment_category
 
 
@@ -96,6 +96,25 @@ def build_monthly_spending_report(
     previous_total = sum(row.original_payment_amount for row, _ in previous_rows)
     current_benefit = sum(row.saved_amount for row, _ in current_rows)
     previous_benefit = sum(row.saved_amount for row, _ in previous_rows)
+    reward_rows = db.execute(
+        select(
+            TransactionReward.reward_type,
+            TransactionReward.reward_program,
+            TransactionReward.reward_unit,
+            func.sum(TransactionReward.reward_amount),
+        )
+        .join(Transaction, Transaction.id == TransactionReward.transaction_id)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.usage_month == usage_month,
+            Transaction.status == "APPROVED",
+        )
+        .group_by(
+            TransactionReward.reward_type,
+            TransactionReward.reward_program,
+            TransactionReward.reward_unit,
+        )
+    ).all()
 
     category_amounts: dict[str, int] = defaultdict(int)
     card_benefits: dict[int, dict[str, Any]] = {}
@@ -132,6 +151,15 @@ def build_monthly_spending_report(
         "totalBenefit": current_benefit,
         "previousMonthBenefit": previous_benefit,
         "benefitDifference": current_benefit - previous_benefit,
+        "rewards": [
+            {
+                "type": reward_type,
+                "program": program,
+                "unit": unit,
+                "amount": float(amount),
+            }
+            for reward_type, program, unit, amount in reward_rows
+        ],
         "cardBenefits": sorted(
             card_benefits.values(), key=lambda item: item["benefit"], reverse=True
         ),

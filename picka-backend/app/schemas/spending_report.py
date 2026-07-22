@@ -20,6 +20,13 @@ class CategorySpendingReport(BaseModel):
     ratio: float
 
 
+class RewardSummary(BaseModel):
+    type: str
+    program: str
+    amount: float
+    unit: str
+
+
 class MonthlySpendingReportResponse(BaseModel):
     month: str
     totalSpending: int
@@ -31,5 +38,6 @@ class MonthlySpendingReportResponse(BaseModel):
     totalBenefit: int
     previousMonthBenefit: int
     benefitDifference: int
+    rewards: list[RewardSummary]
     cardBenefits: list[CardBenefitReport]
     categories: list[CategorySpendingReport]

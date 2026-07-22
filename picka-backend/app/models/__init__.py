@@ -7,6 +7,7 @@ from app.models.monthly_card_usage import MonthlyCardUsage
 from app.models.user import User
 from app.models.user_card import UserCard
 from app.models.transaction import Transaction
+from app.models.transaction_reward import TransactionReward
 from app.models.social_account import SocialAccount
 from app.models.virtual_card_credential import VirtualCardCredential
 
@@ -20,6 +21,7 @@ __all__ = [
     "User",
     "UserCard",
     "Transaction",
+    "TransactionReward",
     "SocialAccount",
     "VirtualCardCredential",
 ]

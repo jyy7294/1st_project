@@ -17,6 +17,7 @@ from app.models import (
     Card,
     MonthlyCardUsage,
     Transaction,
+    TransactionReward,
     User,
     UserCard,
 )
@@ -59,6 +60,7 @@ from app.services.spending_pattern_recommendation_service import (
     recommend_new_cards_by_spending,
 )
 from app.services.category_normalization import normalize_payment_category
+from app.services.reward_service import calculate_transaction_rewards
 
 
 app = FastAPI(
@@ -177,6 +179,7 @@ class TransactionCreateResponse(BaseModel):
     card: TransactionCardResponse
     payment: TransactionPaymentResponse
     applied_benefit: AppliedBenefitResponse
+    rewards: list[dict]
 
 
 class TransactionHistoryItemResponse(BaseModel):
@@ -807,6 +810,18 @@ def create_transaction(
             approved_at=approved_at,
         )
         db.add(transaction)
+        db.flush()
+
+        rewards = calculate_transaction_rewards(
+            selected_card,
+            payment_category=payment_category,
+            payment_amount=request.payment_amount,
+        )
+        for reward in rewards:
+            db.add(TransactionReward(
+                transaction_id=transaction.id,
+                **reward,
+            ))
 
         monthly_usage = db.scalar(
             select(MonthlyCardUsage).where(
@@ -895,6 +910,7 @@ def create_transaction(
                 ),
                 "applied": applied,
             },
+            "rewards": rewards,
         }
     except UserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
