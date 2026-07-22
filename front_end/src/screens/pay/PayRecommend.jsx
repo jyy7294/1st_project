@@ -23,6 +23,13 @@ export default function PayRecommend() {
   // 404(보유카드 없음) 뿐 아니라, 200이지만 모든 카드가 eligible=false 인 경우도
   // "이 업종에 해당하는 혜택 카드가 없어요" 안내를 보여줍니다. -0원 추천은 띄우지 않습니다.
   const noBenefitAnywhere = noEligibleCard || hasNoEligibleCard(ranked)
+  const performancePrompt = result?.performance_prompt || null
+
+  function selectPerformanceCard() {
+    if (!performancePrompt) return
+    const index = ranked.findIndex((card) => card.card_id === performancePrompt.card_id)
+    if (index >= 0) dispatch({ type: A.SELECT_PAY_CARD, index })
+  }
 
   // '다른 카드로 결제하기' 시트를 잡아 내리면 뒤의 할인 혜택·최종 승인 금액이 보입니다.
   const sheetRef = useRef(null)
@@ -88,6 +95,17 @@ export default function PayRecommend() {
               <br />
               원하시는 카드로 결제하세요.
             </div>
+          </div>
+        )}
+
+        {performancePrompt && !error && (
+          <div className={styles.notice}>
+            <div className={styles.noticeIcon}>🎯</div>
+            <div className={styles.noticeTitle}>실적 달성 가능 카드</div>
+            <div className={styles.noticeBody}>{performancePrompt.message}</div>
+            <button type="button" className={styles.retry} onClick={selectPerformanceCard}>
+              {performancePrompt.action_label || '예'}
+            </button>
           </div>
         )}
 

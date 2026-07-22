@@ -45,6 +45,14 @@ from app.services.user_state_adapter import (
     build_user_card_states,
     resolve_merchant_category,
 )
+from app.schemas.recommendation import RecommendationResponse
+from app.schemas.spending_pattern_recommendation import (
+    SpendingPatternRecommendationResponse,
+)
+from app.services.spending_pattern_recommendation_service import (
+    SpendingRecommendationUserNotFoundError,
+    recommend_new_cards_by_spending,
+)
 
 
 app = FastAPI(
@@ -983,7 +991,34 @@ def get_card_transactions(
         ) from error
 
 
-@app.post("/api/v1/recommendations")
+@app.get(
+    "/api/v1/users/{user_id}/card-recommendations",
+    response_model=SpendingPatternRecommendationResponse,
+)
+def get_spending_pattern_card_recommendations(
+    user_id: Annotated[int, Path(ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    card_type: Annotated[
+        str,
+        Query(alias="type", pattern="^(credit|check)$"),
+    ] = "credit",
+    limit: Annotated[int, Query(ge=1, le=20)] = 3,
+):
+    try:
+        return recommend_new_cards_by_spending(
+            db,
+            user_id=user_id,
+            card_type=card_type,
+            limit=limit,
+        )
+    except SpendingRecommendationUserNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/recommendations",
+    response_model=RecommendationResponse,
+)
 def create_recommendation(
     request: RecommendationRequest,
     db: Annotated[Session, Depends(get_db)],

@@ -1,7 +1,11 @@
+import logging
+
 from app.services.llm_service import (
     LLMServiceError,
     judge_ambiguous_benefit,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_BENEFIT_DETAIL = (
     "상세 유의사항은 카드사 공식 상품설명서를 확인해 주세요."
@@ -130,32 +134,24 @@ def get_scoring_grade(benefit: dict) -> str | None:
 
     return None
 
-LLM_REVIEW_KEYWORDS = {
-    "제외",
-    "제외됩니다",
-    "제외 대상",
+LLM_REVIEW_KEYWORDS = [
+    "일부 입점 매장",
     "일부 매장",
-    "일부 가맹점",
+    "입점 매장 제외",
     "제휴 가맹점",
     "지정 가맹점",
-    "입점 매장",
-    "백화점",
-    "대형마트",
-    "쇼핑몰",
+    "카드사 등록 가맹점",
+    "특정 가맹점",
+]
+
+ITEM_CAVEAT_KEYWORDS = [
     "상품권",
     "선불카드",
+    "기프트카드",
     "충전",
-    "온라인몰",
-    "공식몰",
-    "공식 앱",
-    "간편결제",
-    "현장결제",
-    "현장 결제",
-    "카드사 등록",
-    "카드사 지정",
-    "서비스 제공처",
-    "가맹점 분류 기준",
-}
+]
+
+ITEM_CAVEAT_MESSAGE = "상품권·선불카드·충전 등 일부 품목은 혜택에서 제외될 수 있습니다."
 
 
 def get_benefit_rule_text(
@@ -222,6 +218,13 @@ def should_use_llm(
         keyword in rule_text
         for keyword in LLM_REVIEW_KEYWORDS
     )
+
+
+def get_item_caveat(benefit: dict | object) -> str | None:
+    rule_text = get_benefit_rule_text(benefit)
+    if any(keyword in rule_text for keyword in ITEM_CAVEAT_KEYWORDS):
+        return ITEM_CAVEAT_MESSAGE
+    return None
 
 
 def get_option_field(
@@ -1139,6 +1142,12 @@ def calculate_card_benefit(
 
     for benefit in card["benefits"]:
 
+        is_conditional = False
+        caveats = []
+        item_caveat = get_item_caveat(benefit)
+        if item_caveat:
+            caveats.append(item_caveat)
+
         option_metadata = get_option_metadata(benefit)
 
         if should_exclude_from_calculation(benefit):
@@ -1210,23 +1219,29 @@ def calculate_card_benefit(
                     benefit_rule=get_benefit_rule_text(benefit),
                 )
 
-            except LLMServiceError as error:
-                failure_reasons.append(
-                    f"LLM 판단 오류: {error}"
+            except LLMServiceError:
+                logger.exception(
+                    "LLM benefit judgment failed",
+                    extra={
+                        "benefit_id": benefit_id,
+                        "merchant_name": merchant_name,
+                    },
                 )
-                continue
+                is_conditional = True
+                caveats.append(
+                    "AI 판단 오류로 세부 적용 여부 확인이 필요합니다."
+                )
 
-            if judgment.needs_human_review:
-                failure_reasons.append(
-                    f"혜택 적용 여부 확인 필요: {judgment.reason}"
-                )
-                continue
+            else:
+                if judgment.needs_human_review:
+                    is_conditional = True
+                    caveats.append(judgment.caveat or judgment.reason)
 
-            if not judgment.applicable:
-                failure_reasons.append(
-                    f"혜택 적용 불가: {judgment.reason}"
-                )
-                continue
+                if not judgment.applicable and not judgment.needs_human_review:
+                    failure_reasons.append(
+                        f"혜택 적용 불가: {judgment.reason}"
+                    )
+                    continue
 
         calculation = calculate_scored_benefit(
             card=card,
@@ -1261,6 +1276,9 @@ def calculate_card_benefit(
                 "혜택값",
                 "benefit_value",
             ),
+            "eligible": True,
+            "is_conditional": is_conditional,
+            "caveat": " ".join(dict.fromkeys(caveats)) or None,
             **display_fields,
             **option_metadata,
             **{
@@ -1316,8 +1334,11 @@ def calculate_card_benefit(
             "card_name": card["card_name"],
             "card_company": card["card_company"],
             "card_image": card["card_image"],
+            "last_four": card.get("card_number_last4"),
             "expected_benefit": 0,
             "eligible": False,
+            "is_conditional": False,
+            "caveat": None,
             "reason": reason,
             "reason_details": [reason, "예상 혜택 0원"],
             "scoring_grade": calculation_fields[
@@ -1372,7 +1393,10 @@ def calculate_card_benefit(
 
     best_benefit = max(
         applicable_benefits,
-        key=lambda item: item["expected_benefit"]
+        key=lambda item: (
+            not item.get("is_conditional", False),
+            item["expected_benefit"],
+        ),
     )
 
     reason, reason_details = build_recommendation_reason(
@@ -1389,16 +1413,23 @@ def calculate_card_benefit(
         benefit_rate=best_benefit["benefit_rate"],
         expected_benefit=best_benefit["expected_benefit"]
     )
+    if best_benefit["is_conditional"]:
+        reason_details.append("적용 여부 확인 필요")
+        if best_benefit["caveat"]:
+            reason_details.append(best_benefit["caveat"])
 
     return {
         "card_id": card["card_id"],
         "card_name": card["card_name"],
         "card_company": card["card_company"],
         "card_image": card["card_image"],
+        "last_four": card.get("card_number_last4"),
         "expected_benefit": best_benefit[
             "expected_benefit"
         ],
         "eligible": True,
+        "is_conditional": best_benefit["is_conditional"],
+        "caveat": best_benefit["caveat"],
         "benefit_rate": best_benefit["benefit_rate"],
         "reason": reason,
         "reason_details": reason_details,
@@ -1610,12 +1641,13 @@ def recommend_cards(
             "comparison": []
         }
 
-    # 2. 우선 예상 혜택이 큰 순서로 정렬
+    # 2. 확정 혜택을 우선하고, 같은 상태에서는 예상 혜택 순으로 정렬
     results.sort(
-        key=lambda item: item["expected_benefit"],
-        reverse=True
+        key=lambda item: (
+            item.get("is_conditional", False),
+            -item["expected_benefit"],
+        )
     )
-
     best_benefit_amount = results[0][
         "expected_benefit"
     ]
@@ -1668,7 +1700,11 @@ def recommend_cards(
         same_benefit_cards = [
             card
             for card in results
-            if card["expected_benefit"] == best_benefit_amount
+            if (
+                card["expected_benefit"] == best_benefit_amount
+                and card.get("is_conditional", False)
+                == results[0].get("is_conditional", False)
+            )
         ]
 
         if len(same_benefit_cards) >= 2:
@@ -1812,6 +1848,8 @@ def recommend_cards(
                 f"예상 혜택 "
                 f"{card['expected_benefit']:,}원"
             )
+            if card.get("is_conditional", False):
+                card["ranking_reason"] += " · 적용 여부 확인 필요"
 
         elif card.get(
             "needs_performance",

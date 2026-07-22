@@ -12,11 +12,15 @@ def card_result(
     reaches_target: bool,
     transaction_count: int = 0,
     current_month_spending: int = 0,
+    is_conditional: bool = False,
 ) -> dict:
     return {
         "card_id": card_id,
         "card_name": f"카드 {card_id}",
         "expected_benefit": benefit,
+        "eligible": benefit > 0,
+        "is_conditional": is_conditional,
+        "caveat": "적용 여부 확인 필요" if is_conditional else None,
         "reason": "혜택 계산 결과",
         "reason_details": [],
         "needs_performance": remaining_before > 0,
@@ -53,6 +57,23 @@ class RecommendationPolicyTest(unittest.TestCase):
 
         self.assertEqual(result["recommended_card"]["card_id"], 1)
         self.assertEqual(result["recommendation_basis"], "benefit")
+
+    def test_confirmed_benefit_ranks_before_larger_conditional_benefit(self):
+        result = self.recommend(
+            [
+                card_result(1, 4_000, remaining_before=0, reaches_target=False),
+                card_result(
+                    2,
+                    5_000,
+                    remaining_before=0,
+                    reaches_target=False,
+                    is_conditional=True,
+                ),
+            ]
+        )
+
+        self.assertEqual(result["recommended_card"]["card_id"], 1)
+        self.assertFalse(result["recommended_card"]["is_conditional"])
 
     def test_equal_benefits_use_performance_as_tiebreaker(self):
         result = self.recommend(
