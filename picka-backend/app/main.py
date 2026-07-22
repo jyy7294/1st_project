@@ -49,10 +49,16 @@ from app.schemas.recommendation import RecommendationResponse
 from app.schemas.spending_pattern_recommendation import (
     SpendingPatternRecommendationResponse,
 )
+from app.schemas.spending_report import MonthlySpendingReportResponse
+from app.services.spending_report_service import (
+    SpendingReportUserNotFoundError,
+    build_monthly_spending_report,
+)
 from app.services.spending_pattern_recommendation_service import (
     SpendingRecommendationUserNotFoundError,
     recommend_new_cards_by_spending,
 )
+from app.services.category_normalization import normalize_payment_category
 
 
 app = FastAPI(
@@ -729,6 +735,10 @@ def create_transaction(
             request.payment_category
             or resolve_merchant_category(db, request.merchant_name)
         )
+        payment_category = (
+            normalize_payment_category(payment_category)
+            or payment_category
+        )
         user_card_states = build_user_card_states(
             db=db,
             user_id=request.user_id,
@@ -1012,6 +1022,28 @@ def get_spending_pattern_card_recommendations(
             limit=limit,
         )
     except SpendingRecommendationUserNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/users/{user_id}/spending-report",
+    response_model=MonthlySpendingReportResponse,
+)
+def get_monthly_spending_report(
+    user_id: Annotated[int, Path(ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    month: Annotated[
+        str,
+        Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    ],
+):
+    try:
+        return build_monthly_spending_report(
+            db,
+            user_id=user_id,
+            usage_month=month,
+        )
+    except SpendingReportUserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 

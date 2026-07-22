@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -133,13 +133,24 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
     def test_recommends_only_unowned_cards_of_requested_type(self):
         with self.Session() as db:
             result = recommend_new_cards_by_spending(
-                db, user_id=1, card_type="credit", limit=3
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=3,
+                reference_date=date(2026, 6, 8),
             )
 
-        self.assertEqual([card["id"] for card in result["cards"]], [2, 3])
-        self.assertEqual(result["cards"][0]["benefitName"], "마트 10% 할인")
-        self.assertEqual(result["cards"][0]["total"], 110_000)
-        self.assertEqual(result["cards"][0]["fee"], 10_000)
+        self.assertEqual([card["id"] for card in result["cards"]], [3, 2])
+        self.assertEqual(result["cards"][0]["benefitName"], "마트 5% 할인")
+        self.assertEqual(result["cards"][0]["total"], 120_000)
+        self.assertEqual(result["cards"][0]["fee"], 0)
+        self.assertEqual(result["cards"][1]["total"], 110_000)
+        self.assertEqual(result["analysisStartDate"], "2026-06-01")
+        self.assertEqual(result["analysisEndDate"], "2026-06-07")
+        self.assertEqual(result["updateCycle"], "daily 00:00 Asia/Seoul")
+        self.assertEqual(result["topCategory"], "마트/쇼핑")
+        self.assertEqual(result["topCategorySpend"], 200_000)
+        self.assertIn("최근 7일간 마트/쇼핑", result["cards"][0]["recommendationMessage"])
 
     def test_api_contract_and_query_validation(self):
         response = self.client.get(
@@ -151,7 +162,11 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(len(response.json()["cards"]), 1)
         self.assertEqual(
             set(response.json()["cards"][0]),
-            {"id", "name", "issuer", "benefitName", "rate", "total", "fee", "url", "image_url"},
+            {
+                "id", "name", "issuer", "benefitName", "rate", "total",
+                "fee", "url", "image_url", "benefitCategory", "monthlySpend",
+                "recommendationMessage", "matchedMerchants",
+            },
         )
         self.assertEqual(
             self.client.get(
@@ -166,6 +181,43 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             ).status_code,
             404,
         )
+
+    def test_specific_merchant_benefit_is_found_outside_transaction_category(self):
+        with self.Session() as db:
+            card = Card(
+                id=5,
+                card_name="특정 마트 카드",
+                issuer="C카드",
+                card_type="신용카드",
+                annual_fee=0,
+                previous_spending=0,
+                is_active=True,
+            )
+            db.add(card)
+            db.flush()
+            db.add(CardBenefit(
+                card_id=5,
+                source_benefit_id="5-1",
+                benefit_name="테스트 마트 20% 할인",
+                category="생활",
+                benefit_type="할인",
+                benefit_unit="%",
+                benefit_value=20,
+                additional_conditions={"scoring_grade": "A_확정계산"},
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        specific = next(card for card in result["cards"] if card["id"] == 5)
+        self.assertIn("테스트 마트", specific["matchedMerchants"])
+        self.assertEqual(specific["benefitName"], "테스트 마트 20% 할인")
 
 
 if __name__ == "__main__":

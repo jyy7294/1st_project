@@ -1,5 +1,6 @@
 import logging
 
+from app.services.category_normalization import normalize_payment_category
 from app.services.llm_service import (
     LLMServiceError,
     judge_ambiguous_benefit,
@@ -490,7 +491,9 @@ def is_category_matched(
         return True
 
     # 기본 카테고리
-    if category == payment_category:
+    if normalize_payment_category(category) == normalize_payment_category(
+        payment_category
+    ):
         return True
 
     # 카테고리목록 확인
@@ -507,7 +510,9 @@ def is_category_matched(
             for item in category_list.split("|")
         ]
 
-        if payment_category in categories:
+        if normalize_payment_category(payment_category) in {
+            normalize_payment_category(item) for item in categories
+        }:
             return True
 
     return False

@@ -366,12 +366,56 @@ class UserStateRecommendationApiTest(unittest.TestCase):
                 db.scalar(select(func.count()).select_from(Transaction)),
                 1,
             )
+            transaction = db.scalar(select(Transaction))
+            self.assertEqual(transaction.payment_category, "병원/약국")
+
+    def test_create_transaction_normalizes_english_payment_category(self):
+        response = self._transaction_request(payment_category="MART")
+
+        self.assertEqual(response.status_code, 201)
+        with self.Session() as db:
+            transaction = db.scalar(select(Transaction))
+            self.assertEqual(transaction.payment_category, "마트/쇼핑")
 
     def test_create_transaction_validates_request(self):
         self.assertEqual(
             self._transaction_request(payment_amount=0).status_code,
             400,
         )
+
+    def test_monthly_spending_report_aggregates_categories_and_benefits(self):
+        self._transaction_request(
+            payment_category="RESTAURANT",
+            payment_amount=20_000,
+            usage_month="2026-07",
+        )
+        self._transaction_request(
+            payment_category="TELECOM",
+            payment_amount=30_000,
+            usage_month="2026-07",
+        )
+        self._transaction_request(
+            payment_category="TRANSIT",
+            payment_amount=10_000,
+            usage_month="2026-06",
+        )
+
+        response = self.client.get(
+            "/api/v1/users/2/spending-report",
+            params={"month": "2026-07"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["totalSpending"], 50_000)
+        self.assertEqual(body["previousMonthSpending"], 10_000)
+        self.assertEqual(body["spendingDifference"], 40_000)
+        categories = {
+            item["category"]: item["amount"] for item in body["categories"]
+        }
+        self.assertEqual(categories["식비"], 20_000)
+        self.assertEqual(categories["생활비"], 30_000)
+        self.assertEqual(len(body["categories"]), 6)
 
     def test_card_transaction_history_is_filtered_and_newest_first(self):
         first = self._transaction_request(
