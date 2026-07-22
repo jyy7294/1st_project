@@ -8,7 +8,14 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Card, MerchantAlias, Transaction, User, UserCard
+from app.models import (
+    Card,
+    CardRecommendationSnapshot,
+    MerchantAlias,
+    Transaction,
+    User,
+    UserCard,
+)
 from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
@@ -457,3 +464,60 @@ def recommend_new_cards_by_spending(
         ],
         "cards": results[:limit],
     }
+
+
+def get_daily_card_recommendations(
+    db: Session,
+    *,
+    user_id: int,
+    card_type: str,
+    limit: int,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    analysis_date = datetime.now(ZoneInfo("Asia/Seoul")).date()
+    snapshot = db.scalar(
+        select(CardRecommendationSnapshot).where(
+            CardRecommendationSnapshot.user_id == user_id,
+            CardRecommendationSnapshot.analysis_date == analysis_date,
+        )
+    )
+    if snapshot is None or force_refresh:
+        credit_result = recommend_new_cards_by_spending(
+            db,
+            user_id=user_id,
+            card_type="credit",
+            limit=20,
+            reference_date=analysis_date,
+        )
+        check_result = recommend_new_cards_by_spending(
+            db,
+            user_id=user_id,
+            card_type="check",
+            limit=20,
+            reference_date=analysis_date,
+        )
+        if snapshot is None:
+            snapshot = CardRecommendationSnapshot(
+                user_id=user_id,
+                analysis_date=analysis_date,
+                credit_result=credit_result,
+                check_result=check_result,
+            )
+            db.add(snapshot)
+        else:
+            snapshot.credit_result = credit_result
+            snapshot.check_result = check_result
+            snapshot.generated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(snapshot)
+        cached = False
+    else:
+        cached = True
+
+    payload = dict(
+        snapshot.credit_result if card_type == "credit" else snapshot.check_result
+    )
+    payload["cards"] = payload.get("cards", [])[:limit]
+    payload["cached"] = cached
+    payload["generatedAt"] = snapshot.generated_at.isoformat()
+    return payload

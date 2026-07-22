@@ -159,6 +159,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["cached"])
         self.assertEqual(len(response.json()["cards"]), 1)
         self.assertEqual(
             set(response.json()["cards"][0]),
@@ -180,6 +181,15 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 "/api/v1/users/999/card-recommendations"
             ).status_code,
             404,
+        )
+        cached_response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "limit": 1},
+        )
+        self.assertTrue(cached_response.json()["cached"])
+        self.assertEqual(
+            cached_response.json()["generatedAt"],
+            response.json()["generatedAt"],
         )
 
     def test_specific_merchant_benefit_is_found_outside_transaction_category(self):

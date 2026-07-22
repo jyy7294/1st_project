@@ -1,4 +1,5 @@
 from app.models.card import Card
+from app.models.card_recommendation_snapshot import CardRecommendationSnapshot
 from app.models.card_benefit import CardBenefit
 from app.models.merchant_alias import MerchantAlias
 from app.models.benefit_tier import BenefitTier
@@ -13,6 +14,7 @@ from app.models.virtual_card_credential import VirtualCardCredential
 
 __all__ = [
     "Card",
+    "CardRecommendationSnapshot",
     "CardBenefit",
     "MerchantAlias",
     "BenefitTier",

@@ -31,3 +31,5 @@ class SpendingPatternRecommendationResponse(BaseModel):
     topCategorySpend: int
     topMerchants: list[SpendingPatternMerchantResponse]
     cards: list[SpendingPatternCardResponse]
+    cached: bool
+    generatedAt: str

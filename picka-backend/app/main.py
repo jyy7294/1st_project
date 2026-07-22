@@ -57,6 +57,7 @@ from app.services.spending_report_service import (
 )
 from app.services.spending_pattern_recommendation_service import (
     SpendingRecommendationUserNotFoundError,
+    get_daily_card_recommendations,
     recommend_new_cards_by_spending,
 )
 from app.services.category_normalization import normalize_payment_category
@@ -1031,7 +1032,7 @@ def get_spending_pattern_card_recommendations(
     limit: Annotated[int, Query(ge=1, le=20)] = 3,
 ):
     try:
-        return recommend_new_cards_by_spending(
+        return get_daily_card_recommendations(
             db,
             user_id=user_id,
             card_type=card_type,
