@@ -20,6 +20,7 @@ from app.models import (
     UserEligibility,
     UserPersonaProfile,
 )
+from app.services.category_normalization import normalize_payment_category
 
 
 SEED_PATH = (
@@ -72,10 +73,13 @@ def _serialize(value: object) -> str:
 
 
 def _rows_by_persona(tables: dict, table_name: str, persona_id: str) -> list:
-    return [
+    rows = [
         row for row in tables.get(table_name, [])
         if row.get("persona_id") == persona_id
     ]
+    if table_name == "transactions":
+        return [row for row in rows if row.get("user_card_id")]
+    return rows
 
 
 def _source_payload(
@@ -276,9 +280,20 @@ def main() -> None:
                 )
                 counts["benefit_usage"] += 1
 
-            for source in _rows_by_persona(
+            monthly_sources = _rows_by_persona(
                 tables, "monthly_card_usage", persona_id
-            ):
+            )
+            monthly_keys = {
+                (source["user_card_id"], source["usage_month"])
+                for source in monthly_sources
+            }
+            transaction_totals = defaultdict(int)
+            for source in _rows_by_persona(tables, "transactions", persona_id):
+                transaction_totals[
+                    (source["user_card_id"], source["approved_at"][:7])
+                ] += int(source["amount"])
+
+            for source in monthly_sources:
                 card = cards_by_source[source["card_id"]]
                 db.add(MonthlyCardUsage(
                     user_id=user_id,
@@ -296,6 +311,33 @@ def main() -> None:
                 ))
                 counts["monthly_card_usage"] += 1
 
+            # 원본에 거래는 있지만 월 합계 행이 빠진 월(현재 2025-07)을
+            # 카드별 거래 합계로 보완합니다.
+            for (source_user_card_id, usage_month), amount in sorted(
+                transaction_totals.items()
+            ):
+                if (source_user_card_id, usage_month) in monthly_keys:
+                    continue
+                user_card = user_cards_by_source[source_user_card_id]
+                year, month = map(int, usage_month.split("-"))
+                previous_month = (
+                    f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
+                )
+                db.add(MonthlyCardUsage(
+                    user_id=user_id,
+                    card_id=user_card.card_id,
+                    usage_month=usage_month,
+                    previous_month_spending=transaction_totals.get(
+                        (source_user_card_id, previous_month), 0
+                    ),
+                    current_month_spending=amount,
+                    card_monthly_benefit_used=benefit_totals[
+                        (user_card.card_id, usage_month)
+                    ],
+                ))
+                counts["monthly_card_usage"] += 1
+                counts["backfilled_monthly_card_usage"] += 1
+
             for source in _rows_by_persona(tables, "transactions", persona_id):
                 source_user_card_id = source.get("user_card_id")
                 if not source_user_card_id:
@@ -311,7 +353,10 @@ def main() -> None:
                     user_card_id=user_card.id,
                     card_id=user_card.card_id,
                     merchant_name=source["merchant_name"],
-                    payment_category=source.get("normalized_code"),
+                    payment_category=(
+                        normalize_payment_category(source.get("normalized_code"))
+                        or source.get("normalized_code")
+                    ),
                     original_payment_amount=amount,
                     saved_amount=0,
                     final_approved_amount=amount,
@@ -319,6 +364,7 @@ def main() -> None:
                     status="APPROVED",
                     usage_month=approved_at.strftime("%Y-%m"),
                     approved_at=approved_at,
+                    data_source="SEED",
                 ))
                 counts["transactions"] += 1
 

@@ -255,6 +255,37 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(excluded["status"], "EXCLUDED")
         self.assertEqual(excluded["eligibilityType"], "MILITARY_SERVICE")
 
+    def test_child_count_rule_requires_at_least_two_children(self):
+        with self.Session() as db:
+            db.add(Card(
+                id=8,
+                card_name="다둥이 행복카드",
+                card_type="신용카드",
+                is_active=True,
+            ))
+            db.add(CardEligibilityRule(
+                card_id=8,
+                eligibility_type="CHILDREN_COUNT",
+                required_value="2",
+                comparison_operator="GTE",
+            ))
+            db.add(UserEligibility(
+                user_id=1,
+                eligibility_type="CHILDREN_COUNT",
+                eligibility_value="1",
+                verification_status="VERIFIED",
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db, user_id=1, card_type="credit", limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertNotIn(8, [card["id"] for card in result["cards"]])
+        excluded = next(card for card in result["excludedCards"] if card["cardId"] == 8)
+        self.assertEqual(excluded["eligibilityType"], "CHILDREN_COUNT")
+
     def test_api_contract_and_query_validation(self):
         response = self.client.get(
             "/api/v1/users/1/card-recommendations",
@@ -350,6 +381,26 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             result["benefitConfirmationRequired"][0]["eligibilityType"],
             "MEMBERSHIPS",
         )
+
+        with self.Session() as db:
+            db.add(UserEligibility(
+                user_id=1,
+                eligibility_type="MEMBERSHIPS",
+                eligibility_value="[]",
+                verification_status="VERIFIED",
+            ))
+            db.commit()
+            confirmed_result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        restricted = next(card for card in confirmed_result["cards"] if card["id"] == 7)
+        self.assertEqual(restricted["total"], 0)
+        self.assertFalse(confirmed_result["benefitConfirmationRequired"])
 
     def test_specific_merchant_benefit_is_found_outside_transaction_category(self):
         with self.Session() as db:

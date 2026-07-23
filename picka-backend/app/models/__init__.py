@@ -15,6 +15,8 @@ from app.models.user_eligibility import UserEligibility
 from app.models.card_eligibility_rule import CardEligibilityRule
 from app.models.card_benefit_eligibility_rule import CardBenefitEligibilityRule
 from app.models.user_persona_profile import UserPersonaProfile
+from app.models.demo_payment_session import DemoPaymentSession
+from app.models.transaction_benefit_outcome import TransactionBenefitOutcome
 
 __all__ = [
     "Card",
@@ -34,4 +36,6 @@ __all__ = [
     "CardEligibilityRule",
     "CardBenefitEligibilityRule",
     "UserPersonaProfile",
+    "DemoPaymentSession",
+    "TransactionBenefitOutcome",
 ]

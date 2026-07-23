@@ -17,6 +17,7 @@ from app.models import (
     Card,
     CardEligibilityRule,
     CardRecommendationSnapshot,
+    DemoPaymentSession,
     MonthlyCardUsage,
     Transaction,
     TransactionReward,
@@ -249,6 +250,8 @@ class TransactionCreateResponse(BaseModel):
     approved_at: str
     user_id: int
     usage_month: str
+    data_source: str
+    demo_session_id: int | None
     merchant: TransactionMerchantResponse
     card: TransactionCardResponse
     payment: TransactionPaymentResponse
@@ -268,6 +271,8 @@ class TransactionHistoryItemResponse(BaseModel):
     status: str
     usage_month: str
     approved_at: datetime
+    data_source: str
+    demo_session_id: int | None
 
 
 class TransactionHistoryListResponse(BaseModel):
@@ -380,6 +385,8 @@ def transaction_history_item(transaction: Transaction) -> dict:
         "status": transaction.status,
         "usage_month": transaction.usage_month,
         "approved_at": transaction.approved_at,
+        "data_source": transaction.data_source,
+        "demo_session_id": transaction.demo_session_id,
     }
 
 
@@ -985,6 +992,21 @@ def create_transaction(
 
         approval_number = f"PICKA-{uuid4().hex[:12].upper()}"
         approved_at = datetime.now(timezone.utc)
+        demo_session = db.scalar(
+            select(DemoPaymentSession)
+            .where(
+                DemoPaymentSession.user_id == request.user_id,
+                DemoPaymentSession.status == "ACTIVE",
+            )
+            .order_by(DemoPaymentSession.started_at.desc())
+        )
+        if demo_session is None:
+            demo_session = DemoPaymentSession(
+                user_id=request.user_id,
+                status="ACTIVE",
+            )
+            db.add(demo_session)
+            db.flush()
         final_approved_amount = request.payment_amount - saved_amount
         transaction = Transaction(
             user_id=request.user_id,
@@ -1003,6 +1025,8 @@ def create_transaction(
             status="APPROVED",
             usage_month=usage_month,
             approved_at=approved_at,
+            data_source="DEMO",
+            demo_session_id=demo_session.id,
         )
         db.add(transaction)
         db.flush()
@@ -1073,6 +1097,8 @@ def create_transaction(
             "approved_at": transaction.approved_at.isoformat(),
             "user_id": request.user_id,
             "usage_month": usage_month,
+            "data_source": transaction.data_source,
+            "demo_session_id": transaction.demo_session_id,
             "merchant": {
                 "merchant_name": request.merchant_name,
                 "payment_category": payment_category,

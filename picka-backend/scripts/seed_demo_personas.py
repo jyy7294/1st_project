@@ -276,6 +276,7 @@ def seed(apply: bool) -> dict[str, int]:
                         status="APPROVED",
                         usage_month=approved_at.strftime("%Y-%m"),
                         approved_at=approved_at,
+                        data_source="SEED",
                     )
                 )
                 counts["transactions"] += 1

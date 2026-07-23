@@ -28,7 +28,7 @@ class UserPersonaProfile(Base):
     residence: Mapped[str | None] = mapped_column(String(200), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     monthly_budget: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    period: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    period: Mapped[str | None] = mapped_column(String(30), nullable=True)
     preferred_benefits: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     source_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
