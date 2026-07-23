@@ -650,7 +650,7 @@ def calculate_performance_status(
 ) -> dict:
     """
     이번 결제를 해당 카드로 했을 때
-    전월 실적 달성 상태를 계산합니다.
+    이번 달 실적 달성 상태를 계산합니다.
     """
 
     required = int(
@@ -663,7 +663,7 @@ def calculate_performance_status(
         or 0
     )
 
-    current = int(get_previous_month_spending(card))
+    current = int(get_current_month_spending(card))
 
     after_payment = current + payment_amount
 
@@ -856,6 +856,21 @@ def get_previous_month_spending(card: dict | object) -> float:
                 "previous_month_spending",
                 "previous_month_spend",
                 "전월실적사용액",
+                default=0,
+            )
+        )
+        or 0
+    )
+
+
+def get_current_month_spending(card: dict | object) -> float:
+    return (
+        to_non_negative_float(
+            get_field(
+                card,
+                "current_month_spending",
+                "current_month_spend",
+                "당월실적사용액",
                 default=0,
             )
         )
@@ -1404,6 +1419,7 @@ def calculate_card_benefit(
         ),
     )
 
+
     reason, reason_details = build_recommendation_reason(
         payment_category=payment_category,
         benefit_rate=best_benefit["benefit_rate"],
@@ -1791,7 +1807,7 @@ def recommend_cards(
             else:
                 recommended_card["reason"] = (
                     "현재 결제에서 적용 가능한 혜택이 없어, "
-                    "전월 실적 달성에 가장 유리한 "
+                    "이번 달 실적 달성에 가장 유리한 "
                     "카드를 추천합니다."
                 )
 
@@ -1816,7 +1832,7 @@ def recommend_cards(
 
             recommended_card["reason"] = (
                 "카드별 예상 혜택이 동일하여, "
-                "전월 실적 달성에 더 유리한 "
+                "이번 달 실적 달성에 더 유리한 "
                 "카드를 추천합니다."
             )
 
@@ -1910,13 +1926,13 @@ def recommend_cards(
     elif recommendation_basis == "performance_tiebreak":
         saving_message = (
             "예상 혜택이 동일하여 "
-            "전월 실적 달성에 유리한 카드를 추천했습니다."
+            "이번 달 실적 달성에 유리한 카드를 추천했습니다."
         )
 
     else:
         saving_message = (
             "적용 가능한 즉시 혜택이 없어 "
-            "전월 실적 달성에 유리한 카드를 추천했습니다."
+            "이번 달 실적 달성에 유리한 카드를 추천했습니다."
         )
 
     performance_candidates = [

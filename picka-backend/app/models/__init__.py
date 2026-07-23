@@ -11,6 +11,9 @@ from app.models.transaction import Transaction
 from app.models.transaction_reward import TransactionReward
 from app.models.social_account import SocialAccount
 from app.models.virtual_card_credential import VirtualCardCredential
+from app.models.user_eligibility import UserEligibility
+from app.models.card_eligibility_rule import CardEligibilityRule
+from app.models.card_benefit_eligibility_rule import CardBenefitEligibilityRule
 
 __all__ = [
     "Card",
@@ -26,4 +29,7 @@ __all__ = [
     "TransactionReward",
     "SocialAccount",
     "VirtualCardCredential",
+    "UserEligibility",
+    "CardEligibilityRule",
+    "CardBenefitEligibilityRule",
 ]

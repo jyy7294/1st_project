@@ -106,6 +106,10 @@ class Card(Base):
         back_populates="card",
         cascade="all, delete-orphan",
     )
+    eligibility_rules: Mapped[list["CardEligibilityRule"]] = relationship(
+        back_populates="card",
+        cascade="all, delete-orphan",
+    )
     monthly_card_usages: Mapped[list["MonthlyCardUsage"]] = relationship(
         back_populates="card",
         cascade="all, delete-orphan",

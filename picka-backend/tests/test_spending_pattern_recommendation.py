@@ -7,7 +7,16 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
-from app.models import Card, CardBenefit, Transaction, User, UserCard
+from app.models import (
+    Card,
+    CardBenefit,
+    CardBenefitEligibilityRule,
+    CardEligibilityRule,
+    Transaction,
+    User,
+    UserCard,
+    UserEligibility,
+)
 from app.services.spending_pattern_recommendation_service import (
     build_monthly_spending_profile,
     build_recent_spending_profile,
@@ -206,6 +215,18 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 card_type="체크카드",
                 is_active=True,
             ))
+            db.add(CardEligibilityRule(
+                card_id=6,
+                eligibility_type="MILITARY_SERVICE",
+                required_value="true",
+                comparison_operator="EQ",
+            ))
+            db.add(UserEligibility(
+                user_id=1,
+                eligibility_type="MILITARY_SERVICE",
+                eligibility_value="false",
+                verification_status="SELF_REPORTED",
+            ))
             db.commit()
 
             result = recommend_new_cards_by_spending(
@@ -220,6 +241,13 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             "IBK 나라사랑카드",
             [card["name"] for card in result["cards"]],
         )
+        excluded = next(
+            card
+            for card in result["excludedCards"]
+            if card["cardName"] == "IBK 나라사랑카드"
+        )
+        self.assertEqual(excluded["status"], "EXCLUDED")
+        self.assertEqual(excluded["eligibilityType"], "MILITARY_SERVICE")
 
     def test_api_contract_and_query_validation(self):
         response = self.client.get(
@@ -259,6 +287,52 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(
             cached_response.json()["generatedAt"],
             response.json()["generatedAt"],
+        )
+
+    def test_excludes_unconfirmed_membership_benefit_from_calculation(self):
+        with self.Session() as db:
+            card = Card(
+                id=7,
+                card_name="멤버십 전용 혜택 카드",
+                card_type="신용",
+                is_active=True,
+            )
+            db.add(card)
+            db.flush()
+            benefit = CardBenefit(
+                card_id=7,
+                source_benefit_id="7-1",
+                benefit_name="마트 50% 할인",
+                category="마트/쇼핑",
+                benefit_type="할인",
+                benefit_unit="%",
+                benefit_value=50,
+            )
+            db.add(benefit)
+            db.flush()
+            db.add(CardBenefitEligibilityRule(
+                card_benefit_id=benefit.id,
+                eligibility_type="MEMBERSHIPS",
+                required_value="TEST_MEMBERSHIP",
+                comparison_operator="CONTAINS",
+                description="테스트 멤버십 가입 필요",
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        restricted = next(card for card in result["cards"] if card["id"] == 7)
+        self.assertEqual(restricted["total"], 0)
+        self.assertGreater(result["excludedBenefitCount"], 0)
+        self.assertEqual(
+            result["benefitConfirmationRequired"][0]["eligibilityType"],
+            "MEMBERSHIPS",
         )
 
     def test_specific_merchant_benefit_is_found_outside_transaction_category(self):

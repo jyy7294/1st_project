@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import patch
 
-from app.services.recommendation_service import recommend_cards
+from app.services.recommendation_service import (
+    calculate_performance_status,
+    performance_priority_key,
+    recommend_cards,
+)
 
 
 def card_result(
@@ -35,6 +39,43 @@ def card_result(
 
 
 class RecommendationPolicyTest(unittest.TestCase):
+    def test_performance_status_uses_current_month_spending(self):
+        status = calculate_performance_status(
+            {
+                "required_spending": 300_000,
+                "previous_month_spending": 216_000,
+                "current_month_spending": 150_000,
+            },
+            payment_amount=22_000,
+        )
+
+        self.assertEqual(status["performance_current"], 150_000)
+        self.assertEqual(status["performance_after_payment"], 172_000)
+        self.assertEqual(status["performance_remaining_before"], 150_000)
+        self.assertEqual(status["performance_remaining_after"], 128_000)
+
+    def test_performance_ranking_ignores_previous_month_spending(self):
+        cards = []
+        for card_id, previous, current in (
+            (1, 290_000, 100_000),
+            (2, 10_000, 160_000),
+        ):
+            card = {
+                "card_id": card_id,
+                "required_spending": 300_000,
+                "previous_month_spending": previous,
+                "current_month_spending": current,
+                "monthly_transaction_count": 0,
+                "expected_benefit": 0,
+            }
+            cards.append({
+                **card,
+                **calculate_performance_status(card, payment_amount=22_000),
+            })
+
+        ranked = sorted(cards, key=performance_priority_key)
+        self.assertEqual(ranked[0]["card_id"], 2)
+
     def recommend(self, results: list[dict]) -> dict:
         with patch(
             "app.services.recommendation_service.calculate_card_benefit",

@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -15,11 +15,14 @@ from app.core.database import get_db
 from app.models import (
     BenefitUsage,
     Card,
+    CardEligibilityRule,
+    CardRecommendationSnapshot,
     MonthlyCardUsage,
     Transaction,
     TransactionReward,
     User,
     UserCard,
+    UserEligibility,
 )
 from app.services.card_registration_service import register_virtual_card
 from app.services.auth_service import (
@@ -80,6 +83,76 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+VERIFICATION_STATUSES = {
+    "VERIFIED",
+    "SELF_REPORTED",
+    "INFERRED",
+    "UNVERIFIED",
+}
+COMPARISON_OPERATORS = {"EQ", "GTE", "LTE", "CONTAINS"}
+
+
+class UserEligibilityInput(BaseModel):
+    eligibility_type: str = Field(min_length=1, max_length=100)
+    eligibility_value: str = Field(min_length=1, max_length=255)
+    verification_status: str = "SELF_REPORTED"
+    verified_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    @field_validator("eligibility_type", "verification_status")
+    @classmethod
+    def normalize_uppercase(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("verification_status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in VERIFICATION_STATUSES:
+            raise ValueError("지원하지 않는 verification_status입니다.")
+        return value
+
+
+class UserEligibilityUpdateRequest(BaseModel):
+    eligibilities: list[UserEligibilityInput]
+
+    @model_validator(mode="after")
+    def validate_unique_types(self):
+        types = [item.eligibility_type for item in self.eligibilities]
+        if len(types) != len(set(types)):
+            raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
+
+
+class CardEligibilityRuleInput(BaseModel):
+    eligibility_type: str = Field(min_length=1, max_length=100)
+    required_value: str = Field(min_length=1, max_length=255)
+    comparison_operator: str = "EQ"
+    description: str | None = None
+
+    @field_validator("eligibility_type", "comparison_operator")
+    @classmethod
+    def normalize_uppercase(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("comparison_operator")
+    @classmethod
+    def validate_operator(cls, value: str) -> str:
+        if value not in COMPARISON_OPERATORS:
+            raise ValueError("지원하지 않는 comparison_operator입니다.")
+        return value
+
+
+class CardEligibilityRuleUpdateRequest(BaseModel):
+    rules: list[CardEligibilityRuleInput]
+
+    @model_validator(mode="after")
+    def validate_unique_types(self):
+        types = [item.eligibility_type for item in self.rules]
+        if len(types) != len(set(types)):
+            raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
 
 
 class RecommendationRequest(BaseModel):
@@ -466,6 +539,127 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+def _user_eligibility_payload(item: UserEligibility) -> dict:
+    return {
+        "id": item.id,
+        "user_id": item.user_id,
+        "eligibility_type": item.eligibility_type,
+        "eligibility_value": item.eligibility_value,
+        "verification_status": item.verification_status,
+        "verified_at": item.verified_at,
+        "expires_at": item.expires_at,
+    }
+
+
+@app.get("/api/v1/users/{user_id}/eligibilities")
+def get_user_eligibilities(
+    user_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    rows = db.scalars(
+        select(UserEligibility)
+        .where(UserEligibility.user_id == user_id)
+        .order_by(UserEligibility.eligibility_type)
+    ).all()
+    return {
+        "user_id": user_id,
+        "eligibilities": [_user_eligibility_payload(row) for row in rows],
+    }
+
+
+@app.put("/api/v1/users/{user_id}/eligibilities")
+def update_user_eligibilities(
+    user_id: Annotated[int, Path(gt=0)],
+    request: UserEligibilityUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+):
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    existing = {
+        row.eligibility_type: row
+        for row in db.scalars(
+            select(UserEligibility).where(UserEligibility.user_id == user_id)
+        ).all()
+    }
+    now = datetime.now(timezone.utc)
+    for item in request.eligibilities:
+        row = existing.get(item.eligibility_type)
+        if row is None:
+            row = UserEligibility(
+                user_id=user_id,
+                eligibility_type=item.eligibility_type,
+                eligibility_value=item.eligibility_value,
+                verification_status=item.verification_status,
+            )
+            db.add(row)
+        else:
+            row.eligibility_value = item.eligibility_value
+            row.verification_status = item.verification_status
+        row.verified_at = (
+            None
+            if item.verification_status == "UNVERIFIED"
+            else item.verified_at or now
+        )
+        row.expires_at = item.expires_at
+
+    db.execute(
+        delete(CardRecommendationSnapshot).where(
+            CardRecommendationSnapshot.user_id == user_id
+        )
+    )
+    db.commit()
+    return get_user_eligibilities(user_id, db)
+
+
+def _card_rule_payload(item: CardEligibilityRule) -> dict:
+    return {
+        "id": item.id,
+        "card_id": item.card_id,
+        "eligibility_type": item.eligibility_type,
+        "comparison_operator": item.comparison_operator,
+        "required_value": item.required_value,
+        "description": item.description,
+    }
+
+
+@app.get("/api/v1/cards/{card_id}/eligibility-rules")
+def get_card_eligibility_rules(
+    card_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    if db.get(Card, card_id) is None:
+        raise HTTPException(status_code=404, detail="카드를 찾을 수 없습니다.")
+    rows = db.scalars(
+        select(CardEligibilityRule)
+        .where(CardEligibilityRule.card_id == card_id)
+        .order_by(CardEligibilityRule.eligibility_type)
+    ).all()
+    return {"card_id": card_id, "rules": [_card_rule_payload(row) for row in rows]}
+
+
+@app.put("/api/v1/cards/{card_id}/eligibility-rules")
+def replace_card_eligibility_rules(
+    card_id: Annotated[int, Path(gt=0)],
+    request: CardEligibilityRuleUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+):
+    if db.get(Card, card_id) is None:
+        raise HTTPException(status_code=404, detail="카드를 찾을 수 없습니다.")
+    db.execute(
+        delete(CardEligibilityRule).where(CardEligibilityRule.card_id == card_id)
+    )
+    db.add_all([
+        CardEligibilityRule(card_id=card_id, **item.model_dump())
+        for item in request.rules
+    ])
+    db.execute(delete(CardRecommendationSnapshot))
+    db.commit()
+    return get_card_eligibility_rules(card_id, db)
 
 
 @app.get(

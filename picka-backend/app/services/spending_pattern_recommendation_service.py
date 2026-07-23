@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
+import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -10,11 +11,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     Card,
+    CardBenefit,
     CardRecommendationSnapshot,
     MerchantAlias,
     Transaction,
     User,
     UserCard,
+    UserEligibility,
 )
 from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
@@ -300,15 +303,118 @@ def _candidate_state(card: Card, monthly_spending: int) -> dict[str, Any]:
     }
 
 
-NON_MILITARY_SERVICE_USER_IDS = frozenset({1, 3, 4, 5})
-MILITARY_SERVICE_CARD_NAME = "나라사랑"
+def _load_user_eligibilities(
+    db: Session,
+    user_id: int,
+) -> dict[str, UserEligibility]:
+    now = datetime.now(timezone.utc)
+    rows = db.scalars(
+        select(UserEligibility).where(UserEligibility.user_id == user_id)
+    ).all()
+    return {
+        row.eligibility_type: row
+        for row in rows
+        if row.expires_at is None or row.expires_at > now
+    }
 
 
-def _is_new_card_eligible_for_user(*, user_id: int, card_name: str) -> bool:
-    return not (
-        user_id in NON_MILITARY_SERVICE_USER_IDS
-        and MILITARY_SERVICE_CARD_NAME in card_name
-    )
+def _eligibility_value_matches(
+    actual: str,
+    operator: str,
+    required: str,
+) -> bool:
+    if actual.strip().lower() == "unknown":
+        return False
+    if operator == "EQ":
+        return actual.strip().lower() == required.strip().lower()
+    if operator == "CONTAINS":
+        try:
+            values = json.loads(actual)
+        except (json.JSONDecodeError, TypeError):
+            values = [item.strip() for item in actual.split(",") if item.strip()]
+        return any(
+            str(value).strip().lower() == required.strip().lower()
+            for value in values
+        )
+    try:
+        actual_number = float(actual)
+        required_number = float(required)
+    except ValueError:
+        return False
+    if operator == "GTE":
+        return actual_number >= required_number
+    if operator == "LTE":
+        return actual_number <= required_number
+    return False
+
+
+def _is_card_eligible(
+    card: Card,
+    user_eligibilities: dict[str, UserEligibility],
+) -> bool:
+    return _card_eligibility_failure(card, user_eligibilities) is None
+
+
+def _card_eligibility_failure(
+    card: Card,
+    user_eligibilities: dict[str, UserEligibility],
+) -> dict[str, Any] | None:
+    for rule in card.eligibility_rules:
+        eligibility = user_eligibilities.get(rule.eligibility_type)
+        if eligibility is None or eligibility.verification_status == "UNVERIFIED":
+            return {
+                "status": "REQUIRE_CONFIRMATION",
+                "eligibilityType": rule.eligibility_type,
+                "reason": (
+                    f"{rule.description or rule.eligibility_type}: "
+                    "사용자 자격 확인이 필요합니다."
+                ),
+            }
+        if not _eligibility_value_matches(
+            eligibility.eligibility_value,
+            rule.comparison_operator,
+            rule.required_value,
+        ):
+            return {
+                "status": "EXCLUDED",
+                "eligibilityType": rule.eligibility_type,
+                "reason": (
+                    f"{rule.description or rule.eligibility_type}: "
+                    "현재 사용자 자격과 일치하지 않습니다."
+                ),
+            }
+    return None
+
+
+def _benefit_eligibility_failure(
+    benefit: CardBenefit,
+    user_eligibilities: dict[str, UserEligibility],
+) -> dict[str, Any] | None:
+    for rule in benefit.eligibility_rules:
+        eligibility = user_eligibilities.get(rule.eligibility_type)
+        if eligibility is None or eligibility.verification_status == "UNVERIFIED":
+            return {
+                "status": "REQUIRE_CONFIRMATION",
+                "eligibilityType": rule.eligibility_type,
+                "reason": (
+                    f"{rule.description or rule.eligibility_type}: "
+                    "혜택 적용 자격 확인이 필요합니다."
+                ),
+            }
+        if not _eligibility_value_matches(
+            eligibility.eligibility_value,
+            rule.comparison_operator,
+            rule.required_value,
+        ):
+            return {
+                "status": "EXCLUDED",
+                "eligibilityType": rule.eligibility_type,
+                "reason": (
+                    f"{rule.description or rule.eligibility_type}: "
+                    "현재 사용자 정보로는 이 혜택을 계산할 수 없습니다."
+                ),
+            }
+    return None
 
 
 def recommend_new_cards_by_spending(
@@ -339,9 +445,15 @@ def recommend_new_cards_by_spending(
     top_category = primary_category
     top_category_spend = profile.get(primary_category, 0) if primary_category else 0
     owned_card_ids = select(UserCard.card_id).where(UserCard.user_id == user_id)
+    user_eligibilities = _load_user_eligibilities(db, user_id)
     cards = db.scalars(
         select(Card)
-        .options(selectinload(Card.benefits))
+        .options(
+            selectinload(Card.benefits).selectinload(
+                CardBenefit.eligibility_rules
+            ),
+            selectinload(Card.eligibility_rules),
+        )
         .where(
             Card.is_active.is_(True),
             Card.id.not_in(owned_card_ids),
@@ -349,16 +461,62 @@ def recommend_new_cards_by_spending(
     ).all()
 
     results = []
+    excluded_cards: list[dict[str, Any]] = []
+    confirmation_by_type: dict[str, dict[str, Any]] = {}
+    benefit_confirmation_by_type: dict[str, dict[str, Any]] = {}
+    excluded_benefit_count = 0
     for card in cards:
-        if not _is_new_card_eligible_for_user(
-            user_id=user_id,
-            card_name=card.card_name,
-        ):
-            continue
         if not _matches_card_type(card.card_type, card_type):
             continue
+        eligibility_failure = _card_eligibility_failure(
+            card,
+            user_eligibilities,
+        )
+        if eligibility_failure is not None:
+            excluded_cards.append({
+                "cardId": card.id,
+                "cardName": card.card_name,
+                **eligibility_failure,
+            })
+            if eligibility_failure["status"] == "REQUIRE_CONFIRMATION":
+                eligibility_type = eligibility_failure["eligibilityType"]
+                bucket = confirmation_by_type.setdefault(
+                    eligibility_type,
+                    {
+                        "eligibilityType": eligibility_type,
+                        "reason": eligibility_failure["reason"],
+                        "cardIds": [],
+                    },
+                )
+                bucket["cardIds"].append(card.id)
+            continue
 
-        state = _candidate_state(card, monthly_spending)
+        eligible_benefits = []
+        for benefit_item in card.benefits:
+            benefit_failure = _benefit_eligibility_failure(
+                benefit_item,
+                user_eligibilities,
+            )
+            if benefit_failure is None:
+                eligible_benefits.append(benefit_item)
+                continue
+            excluded_benefit_count += 1
+            if benefit_failure["status"] == "REQUIRE_CONFIRMATION":
+                eligibility_type = benefit_failure["eligibilityType"]
+                bucket = benefit_confirmation_by_type.setdefault(
+                    eligibility_type,
+                    {
+                        "eligibilityType": eligibility_type,
+                        "reason": benefit_failure["reason"],
+                        "cardBenefitIds": [],
+                    },
+                )
+                bucket["cardBenefitIds"].append(benefit_item.id)
+
+        state = {
+            **_candidate_state(card, monthly_spending),
+            "benefits": eligible_benefits,
+        }
         benefit_totals: dict[str, dict[str, int | None]] = {}
         best_category_result = None
         matched_merchants: set[str] = set()
@@ -397,7 +555,7 @@ def recommend_new_cards_by_spending(
                     "monthly_spend": amount,
                 }
 
-        for benefit_item in card.benefits:
+        for benefit_item in eligible_benefits:
             searchable = _benefit_search_text(benefit_item)
             if not searchable:
                 continue
@@ -511,6 +669,12 @@ def recommend_new_cards_by_spending(
             for item in merchant_profile
         ],
         "cards": results[:limit],
+        "excludedCards": excluded_cards,
+        "confirmationRequired": list(confirmation_by_type.values()),
+        "excludedBenefitCount": excluded_benefit_count,
+        "benefitConfirmationRequired": list(
+            benefit_confirmation_by_type.values()
+        ),
     }
 
 
@@ -565,13 +729,24 @@ def get_daily_card_recommendations(
     payload = dict(
         snapshot.credit_result if card_type == "credit" else snapshot.check_result
     )
+    cached_cards = payload.get("cards", [])
+    cached_card_ids = {
+        int(card["id"])
+        for card in cached_cards
+        if card.get("id") is not None
+    }
+    user_eligibilities = _load_user_eligibilities(db, user_id)
+    eligible_card_ids = {
+        card.id
+        for card in db.scalars(
+            select(Card)
+            .options(selectinload(Card.eligibility_rules))
+            .where(Card.id.in_(cached_card_ids))
+        ).all()
+        if _is_card_eligible(card, user_eligibilities)
+    }
     payload["cards"] = [
-        card
-        for card in payload.get("cards", [])
-        if _is_new_card_eligible_for_user(
-            user_id=user_id,
-            card_name=str(card.get("name") or ""),
-        )
+        card for card in cached_cards if card.get("id") in eligible_card_ids
     ][:limit]
     payload["cached"] = cached
     payload["generatedAt"] = snapshot.generated_at.isoformat()

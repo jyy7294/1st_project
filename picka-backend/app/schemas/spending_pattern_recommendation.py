@@ -23,6 +23,26 @@ class SpendingPatternMerchantResponse(BaseModel):
     amount: int
 
 
+class EligibilityExcludedCardResponse(BaseModel):
+    cardId: int
+    cardName: str
+    status: str
+    eligibilityType: str
+    reason: str
+
+
+class EligibilityConfirmationResponse(BaseModel):
+    eligibilityType: str
+    reason: str
+    cardIds: list[int]
+
+
+class BenefitEligibilityConfirmationResponse(BaseModel):
+    eligibilityType: str
+    reason: str
+    cardBenefitIds: list[int]
+
+
 class SpendingPatternRecommendationResponse(BaseModel):
     analysisStartDate: str
     analysisEndDate: str
@@ -31,5 +51,9 @@ class SpendingPatternRecommendationResponse(BaseModel):
     topCategorySpend: int
     topMerchants: list[SpendingPatternMerchantResponse]
     cards: list[SpendingPatternCardResponse]
+    excludedCards: list[EligibilityExcludedCardResponse]
+    confirmationRequired: list[EligibilityConfirmationResponse]
+    excludedBenefitCount: int
+    benefitConfirmationRequired: list[BenefitEligibilityConfirmationResponse]
     cached: bool
     generatedAt: str
