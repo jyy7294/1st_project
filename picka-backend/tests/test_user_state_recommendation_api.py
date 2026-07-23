@@ -395,6 +395,28 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
         self.assertEqual(report_card["benefit"], 1_000)
 
+    def test_payment_clamps_discount_to_card_monthly_total_limit(self):
+        with self.Session() as db:
+            card = db.get(Card, 2)
+            card.monthly_total_limit = 1_800
+            db.commit()
+
+        first = self._transaction_request().json()
+        second = self._transaction_request().json()
+
+        self.assertEqual(first["payment"]["saved_amount"], 1_000)
+        self.assertEqual(second["payment"]["saved_amount"], 800)
+        with self.Session() as db:
+            saved_total = db.scalar(
+                select(func.sum(Transaction.saved_amount)).where(
+                    Transaction.user_id == 2,
+                    Transaction.card_id == 2,
+                    Transaction.usage_month == "2026-07",
+                    Transaction.status == "APPROVED",
+                )
+            )
+            self.assertEqual(saved_total, 1_800)
+
     def test_create_transaction_rejects_unowned_card(self):
         response = self._transaction_request(card_id=999)
         self.assertEqual(response.status_code, 404)

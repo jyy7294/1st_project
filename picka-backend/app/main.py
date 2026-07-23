@@ -67,6 +67,7 @@ from app.services.spending_pattern_recommendation_service import (
 from app.services.category_normalization import normalize_payment_category
 from app.services.reward_service import calculate_transaction_rewards
 from app.services.recommendation_audit_service import save_recommendation_audit
+from app.services.benefit_total_service import confirmed_benefit_totals_by_card
 
 
 app = FastAPI(
@@ -964,6 +965,29 @@ def create_transaction(
                 detail="사용자의 보유 카드가 아닙니다.",
             )
 
+        # 같은 카드의 동시 결제가 월 통합한도를 함께 통과하지 못하도록
+        # 월 집계 행을 잠근 뒤 저장 직전의 확정 혜택 합계로 다시 검사한다.
+        monthly_usage = db.scalar(
+            select(MonthlyCardUsage)
+            .where(
+                MonthlyCardUsage.user_id == request.user_id,
+                MonthlyCardUsage.card_id == request.card_id,
+                MonthlyCardUsage.usage_month == usage_month,
+            )
+            .with_for_update()
+        )
+        if monthly_usage is None:
+            monthly_usage = MonthlyCardUsage(
+                user_id=request.user_id,
+                card_id=request.card_id,
+                usage_month=usage_month,
+                previous_month_spending=0,
+                current_month_spending=0,
+                card_monthly_benefit_used=0,
+            )
+            db.add(monthly_usage)
+            db.flush()
+
         calculation = calculate_card_benefit(
             card=selected_card,
             merchant_name=request.merchant_name,
@@ -980,6 +1004,17 @@ def create_transaction(
         saved_amount = int(
             min(max(raw_benefit, 0), request.payment_amount)
         )
+        monthly_total_limit = selected_card.get("monthly_total_limit")
+        if monthly_total_limit is not None:
+            confirmed_used = confirmed_benefit_totals_by_card(
+                db,
+                user_id=request.user_id,
+                usage_month=usage_month,
+            ).get(request.card_id, 0)
+            saved_amount = min(
+                saved_amount,
+                max(int(monthly_total_limit) - confirmed_used, 0),
+            )
         applied = saved_amount > 0 and bool(calculation.get("eligible"))
         benefit_name = calculation.get("benefit_name") if applied else None
         benefit = next(
@@ -1043,23 +1078,6 @@ def create_transaction(
                 **reward,
             ))
 
-        monthly_usage = db.scalar(
-            select(MonthlyCardUsage).where(
-                MonthlyCardUsage.user_id == request.user_id,
-                MonthlyCardUsage.card_id == request.card_id,
-                MonthlyCardUsage.usage_month == usage_month,
-            )
-        )
-        if monthly_usage is None:
-            monthly_usage = MonthlyCardUsage(
-                user_id=request.user_id,
-                card_id=request.card_id,
-                usage_month=usage_month,
-                previous_month_spending=0,
-                current_month_spending=0,
-                card_monthly_benefit_used=0,
-            )
-            db.add(monthly_usage)
         monthly_usage.current_month_spending += request.payment_amount
         monthly_usage.card_monthly_benefit_used += saved_amount
 

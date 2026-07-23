@@ -23,6 +23,9 @@ from app.models import (
     UserPersonaProfile,
 )
 from app.services.category_normalization import normalize_payment_category
+from app.services.monthly_benefit_limit_service import (
+    enforce_monthly_card_benefit_limits,
+)
 
 
 CSV_PATH = Path(__file__).resolve().parents[1] / "PICKA_persona_all_in_one_v8_11.csv"
@@ -343,6 +346,15 @@ def main() -> None:
         db.flush()
 
         # v8.11의 실제 할인 수령분으로 해당 3개월 혜택 사용량을 다시 만듭니다.
+        counts["clamped_monthly_total_limit_transactions"] = (
+            enforce_monthly_card_benefit_limits(
+                db,
+                user_ids=list(PERSONA_USER_IDS.values()),
+                usage_months=sorted(AFFECTED_MONTHS),
+            )
+        )
+        db.flush()
+
         db.execute(
             delete(BenefitUsage).where(
                 BenefitUsage.user_id.in_(PERSONA_USER_IDS.values()),
@@ -352,15 +364,25 @@ def main() -> None:
         benefit_groups: dict[tuple[int, int, int, str], list[int]] = defaultdict(
             lambda: [0, 0]
         )
-        for row in rows:
-            saved_amount = _int(row["saved_amount"])
-            if saved_amount <= 0 or not row["card_benefit_source_id"]:
+        corrected_transactions = db.scalars(
+            select(Transaction).where(
+                Transaction.user_id.in_(PERSONA_USER_IDS.values()),
+                Transaction.usage_month.in_(AFFECTED_MONTHS),
+                Transaction.status == "APPROVED",
+                Transaction.saved_amount > 0,
+            )
+        ).all()
+        for transaction in corrected_transactions:
+            outcome = transaction.benefit_outcome
+            if outcome is None or outcome.card_benefit_id is None:
                 continue
-            user_id = PERSONA_USER_IDS[row["persona_id"]]
-            card = cards_by_source[_int(row["actual_card_id"])]
-            benefit = benefits_by_source[row["card_benefit_source_id"]]
-            bucket = benefit_groups[(user_id, card.id, benefit.id, row["usage_month"])]
-            bucket[0] += saved_amount
+            bucket = benefit_groups[(
+                transaction.user_id,
+                transaction.card_id,
+                outcome.card_benefit_id,
+                transaction.usage_month,
+            )]
+            bucket[0] += transaction.saved_amount
             bucket[1] += 1
         for (user_id, card_id, benefit_id, month), (amount, count) in benefit_groups.items():
             db.add(BenefitUsage(
