@@ -1224,6 +1224,7 @@ def get_spending_pattern_card_recommendations(
         Query(alias="type", pattern="^(credit|check)$"),
     ] = "credit",
     limit: Annotated[int, Query(ge=1, le=20)] = 3,
+    refresh: Annotated[bool, Query()] = False,
 ):
     try:
         return get_daily_card_recommendations(
@@ -1231,6 +1232,7 @@ def get_spending_pattern_card_recommendations(
             user_id=user_id,
             card_type=card_type,
             limit=limit,
+            force_refresh=refresh,
         )
     except SpendingRecommendationUserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

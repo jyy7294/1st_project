@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, JSON, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -20,4 +20,9 @@ class CardRecommendationSnapshot(Base):
     analysis_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     credit_result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     check_result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    policy_version: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="legacy",
+    )
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

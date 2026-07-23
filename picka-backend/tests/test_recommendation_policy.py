@@ -1,4 +1,6 @@
 import unittest
+
+from app.services.recommendation_service import build_success_reason
 from unittest.mock import patch
 
 from app.services.recommendation_service import (
@@ -39,6 +41,18 @@ def card_result(
 
 
 class RecommendationPolicyTest(unittest.TestCase):
+    def test_fixed_amount_benefit_reason_does_not_append_percent(self):
+        reason, details = build_success_reason(
+            payment_category="배달앱",
+            benefit_rate=1_000,
+            expected_benefit=1_000,
+            benefit_unit="원",
+        )
+
+        self.assertIn("1,000원 할인", reason)
+        self.assertNotIn("1000%", reason)
+        self.assertIn("예상 혜택 1,000원", details)
+
     def test_performance_status_uses_current_month_spending(self):
         status = calculate_performance_status(
             {

@@ -15,6 +15,22 @@ class SpendingPatternCardResponse(BaseModel):
     monthlySpend: int
     recommendationMessage: str
     matchedMerchants: list[str]
+    benefits: list["SpendingPatternBenefitResponse"]
+
+
+class SpendingPatternBenefitResponse(BaseModel):
+    id: int
+    name: str | None
+    category: str | None
+    benefitType: str | None
+    value: float | None
+    unit: str | None
+    perTransactionLimit: int | None
+    monthlyLimit: int | None
+    requiredSpending: int | None
+    conditionText: str | None
+    summary: str | None
+    detail: str | None
 
 
 class SpendingPatternMerchantResponse(BaseModel):
@@ -57,3 +73,4 @@ class SpendingPatternRecommendationResponse(BaseModel):
     benefitConfirmationRequired: list[BenefitEligibilityConfirmationResponse]
     cached: bool
     generatedAt: str
+    policyVersion: str

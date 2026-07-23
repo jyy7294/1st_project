@@ -23,6 +23,9 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
 
+RECOMMENDATION_POLICY_VERSION = "spending-v2-90d-weighted-eligibility-benefits"
+
+
 CATEGORY_NORMALIZATION = {
     "DELIVERY": "배달앱",
     "배달": "배달앱",
@@ -286,6 +289,23 @@ def _benefit_search_text(benefit: Any) -> str:
         conditions.get("category_list"),
     ]
     return _normalize_search_text(" ".join(str(value) for value in values if value))
+
+
+def _benefit_response(benefit: CardBenefit) -> dict[str, Any]:
+    return {
+        "id": benefit.id,
+        "name": benefit.benefit_name,
+        "category": benefit.category,
+        "benefitType": benefit.benefit_type,
+        "value": benefit.benefit_value,
+        "unit": benefit.benefit_unit,
+        "perTransactionLimit": benefit.per_transaction_limit,
+        "monthlyLimit": benefit.monthly_benefit_limit,
+        "requiredSpending": benefit.required_spending,
+        "conditionText": benefit.condition_text,
+        "summary": benefit.source_summary,
+        "detail": benefit.source_detail,
+    }
 
 
 def _candidate_state(card: Card, monthly_spending: int) -> dict[str, Any]:
@@ -646,6 +666,10 @@ def recommend_new_cards_by_spending(
             "monthlySpend": int(best["monthly_spend"]),
             "recommendationMessage": recommendation_message,
             "matchedMerchants": sorted(matched_merchants),
+            "benefits": [
+                _benefit_response(benefit)
+                for benefit in eligible_benefits
+            ],
         })
 
     results.sort(key=lambda item: (
@@ -693,7 +717,11 @@ def get_daily_card_recommendations(
             CardRecommendationSnapshot.analysis_date == analysis_date,
         )
     )
-    if snapshot is None or force_refresh:
+    policy_changed = (
+        snapshot is not None
+        and snapshot.policy_version != RECOMMENDATION_POLICY_VERSION
+    )
+    if snapshot is None or force_refresh or policy_changed:
         credit_result = recommend_new_cards_by_spending(
             db,
             user_id=user_id,
@@ -714,11 +742,13 @@ def get_daily_card_recommendations(
                 analysis_date=analysis_date,
                 credit_result=credit_result,
                 check_result=check_result,
+                policy_version=RECOMMENDATION_POLICY_VERSION,
             )
             db.add(snapshot)
         else:
             snapshot.credit_result = credit_result
             snapshot.check_result = check_result
+            snapshot.policy_version = RECOMMENDATION_POLICY_VERSION
             snapshot.generated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(snapshot)
@@ -750,4 +780,5 @@ def get_daily_card_recommendations(
     ][:limit]
     payload["cached"] = cached
     payload["generatedAt"] = snapshot.generated_at.isoformat()
+    payload["policyVersion"] = snapshot.policy_version
     return payload

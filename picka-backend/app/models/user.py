@@ -76,3 +76,8 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    persona_profile: Mapped["UserPersonaProfile | None"] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )

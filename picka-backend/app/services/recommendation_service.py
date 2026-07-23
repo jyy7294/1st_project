@@ -57,15 +57,20 @@ def format_number(value: int | float) -> str:
 def build_success_reason(
     payment_category: str,
     benefit_rate: int | float,
-    expected_benefit: int
+    expected_benefit: int,
+    benefit_unit: str | None = "%",
 ) -> tuple[str, list[str]]:
     """적용된 혜택을 사용자 친화적인 요약과 상세 항목으로 만듭니다."""
 
-    rate_text = format_number(benefit_rate)
+    benefit_text = (
+        f"{format_number(benefit_rate)}% 할인"
+        if benefit_unit == "%"
+        else f"{expected_benefit:,}원 할인"
+    )
     category_detail = f"{payment_category} 업종 할인 적용"
 
     reason = (
-        f"{payment_category} 업종에서 {rate_text}% 할인 혜택이 적용되며, "
+        f"{payment_category} 업종에서 {benefit_text} 혜택이 적용되며, "
         "전월 실적 조건을 충족했습니다."
     )
     reason_details = [
@@ -600,7 +605,8 @@ def build_recommendation_reason(
     benefit_rate: float,
     expected_benefit: int,
     required_spending: float | None,
-    previous_month_spending: int
+    previous_month_spending: int,
+    benefit_unit: str | None = "%",
 ) -> tuple[str, list[str]]:
     """
     프론트 화면에 표시할 추천 이유 문장과 상세 항목을 생성합니다.
@@ -609,9 +615,12 @@ def build_recommendation_reason(
     reason_details = []
 
     # 1. 업종 혜택
-    reason_details.append(
-        f"{payment_category} 업종에서 {benefit_rate:g}% 할인 적용"
+    benefit_text = (
+        f"{benefit_rate:g}% 할인"
+        if benefit_unit == "%"
+        else f"{expected_benefit:,}원 할인"
     )
+    reason_details.append(f"{payment_category} 업종에서 {benefit_text} 적용")
 
     # 2. 전월 실적
     if required_spending is None:
@@ -631,13 +640,13 @@ def build_recommendation_reason(
     if required_spending is None:
         reason = (
             f"{payment_category} 업종에서 "
-            f"{benefit_rate:g}% 할인 혜택이 적용됩니다. "
+            f"{benefit_text} 혜택이 적용됩니다. "
             f"예상 혜택은 {expected_benefit:,}원입니다."
         )
     else:
         reason = (
             f"{payment_category} 업종에서 "
-            f"{benefit_rate:g}% 할인 혜택이 적용되며, "
+            f"{benefit_text} 혜택이 적용되며, "
             f"전월 실적 조건을 충족했습니다. "
             f"예상 혜택은 {expected_benefit:,}원입니다."
         )
@@ -1296,6 +1305,7 @@ def calculate_card_benefit(
                 "혜택값",
                 "benefit_value",
             ),
+            "benefit_unit": benefit_unit,
             "eligible": True,
             "is_conditional": is_conditional,
             "caveat": " ".join(dict.fromkeys(caveats)) or None,
@@ -1427,12 +1437,14 @@ def calculate_card_benefit(
         required_spending=best_benefit["required_spending"],
         previous_month_spending=card[
             "previous_month_spending"
-        ]
+        ],
+        benefit_unit=best_benefit["benefit_unit"],
     )
     reason, reason_details = build_success_reason(
         payment_category=payment_category,
         benefit_rate=best_benefit["benefit_rate"],
-        expected_benefit=best_benefit["expected_benefit"]
+        expected_benefit=best_benefit["expected_benefit"],
+        benefit_unit=best_benefit["benefit_unit"],
     )
     if best_benefit["is_conditional"]:
         reason_details.append("적용 여부 확인 필요")

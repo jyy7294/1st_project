@@ -14,6 +14,7 @@ from app.models.virtual_card_credential import VirtualCardCredential
 from app.models.user_eligibility import UserEligibility
 from app.models.card_eligibility_rule import CardEligibilityRule
 from app.models.card_benefit_eligibility_rule import CardBenefitEligibilityRule
+from app.models.user_persona_profile import UserPersonaProfile
 
 __all__ = [
     "Card",
@@ -32,4 +33,5 @@ __all__ = [
     "UserEligibility",
     "CardEligibilityRule",
     "CardBenefitEligibilityRule",
+    "UserPersonaProfile",
 ]

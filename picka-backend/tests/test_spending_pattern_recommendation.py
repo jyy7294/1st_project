@@ -18,6 +18,7 @@ from app.models import (
     UserEligibility,
 )
 from app.services.spending_pattern_recommendation_service import (
+    RECOMMENDATION_POLICY_VERSION,
     build_monthly_spending_profile,
     build_recent_spending_profile,
     normalize_spending_category,
@@ -205,6 +206,11 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(result["topCategory"], "마트/쇼핑")
         self.assertEqual(result["topCategorySpend"], 130_000)
         self.assertIn("최근 3개월 소비에서 마트/쇼핑", result["cards"][0]["recommendationMessage"])
+        benefit = result["cards"][0]["benefits"][0]
+        self.assertEqual(benefit["category"], "마트/쇼핑")
+        self.assertEqual(benefit["value"], 10)
+        self.assertEqual(benefit["unit"], "%")
+        self.assertEqual(benefit["monthlyLimit"], 10_000)
 
     def test_excludes_military_service_cards_for_non_military_personas(self):
         with self.Session() as db:
@@ -264,7 +270,12 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 "id", "name", "issuer", "benefitName", "rate", "total",
                 "fee", "url", "image_url", "benefitCategory", "monthlySpend",
                 "recommendationMessage", "matchedMerchants",
+                "benefits",
             },
+        )
+        self.assertEqual(
+            response.json()["policyVersion"],
+            RECOMMENDATION_POLICY_VERSION,
         )
         self.assertEqual(
             self.client.get(
@@ -288,6 +299,11 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             cached_response.json()["generatedAt"],
             response.json()["generatedAt"],
         )
+        refreshed_response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "limit": 1, "refresh": True},
+        )
+        self.assertFalse(refreshed_response.json()["cached"])
 
     def test_excludes_unconfirmed_membership_benefit_from_calculation(self):
         with self.Session() as db:
