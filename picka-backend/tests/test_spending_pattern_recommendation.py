@@ -10,6 +10,7 @@ from app.main import app
 from app.models import Card, CardBenefit, Transaction, User, UserCard
 from app.services.spending_pattern_recommendation_service import (
     build_monthly_spending_profile,
+    build_recent_spending_profile,
     normalize_spending_category,
     recommend_new_cards_by_spending,
 )
@@ -130,6 +131,47 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             profile = build_monthly_spending_profile(db, 1)
         self.assertEqual(profile, {"마트/쇼핑": 150_000})
 
+    def test_frequency_wins_unless_counts_are_similar(self):
+        with self.Session() as db:
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            db.add_all([
+                Transaction(
+                    user_id=1, user_card_id=owned.id, card_id=1,
+                    merchant_name="올리브영", payment_category="BEAUTY",
+                    original_payment_amount=500_000, saved_amount=0,
+                    final_approved_amount=500_000, approval_number="EWMA-OLD",
+                    status="APPROVED", usage_month="2026-05",
+                    approved_at=datetime(2026, 5, 10, tzinfo=timezone.utc),
+                ),
+                Transaction(
+                    user_id=1, user_card_id=owned.id, card_id=1,
+                    merchant_name="CGV", payment_category="MOVIE",
+                    original_payment_amount=100_000, saved_amount=0,
+                    final_approved_amount=100_000, approval_number="EWMA-NEW",
+                    status="APPROVED", usage_month="2026-06",
+                    approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                ),
+                *[
+                    Transaction(
+                        user_id=1, user_card_id=owned.id, card_id=1,
+                        merchant_name="CGV", payment_category="MOVIE",
+                        original_payment_amount=100_000, saved_amount=0,
+                        final_approved_amount=100_000,
+                        approval_number=f"FREQ-{index}", status="APPROVED",
+                        usage_month="2026-06",
+                        approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                    )
+                    for index in range(3)
+                ],
+            ])
+            db.commit()
+            _, _, profile, _, primary = build_recent_spending_profile(
+                db, 1, reference_date=date(2026, 6, 8)
+            )
+
+        self.assertLess(profile["영화/문화"], profile["뷰티/피트니스"])
+        self.assertEqual(primary, "영화/문화")
+
     def test_recommends_only_unowned_cards_of_requested_type(self):
         with self.Session() as db:
             result = recommend_new_cards_by_spending(
@@ -140,17 +182,44 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 reference_date=date(2026, 6, 8),
             )
 
-        self.assertEqual([card["id"] for card in result["cards"]], [3, 2])
-        self.assertEqual(result["cards"][0]["benefitName"], "마트 5% 할인")
-        self.assertEqual(result["cards"][0]["total"], 120_000)
-        self.assertEqual(result["cards"][0]["fee"], 0)
-        self.assertEqual(result["cards"][1]["total"], 110_000)
-        self.assertEqual(result["analysisStartDate"], "2026-06-01")
+        self.assertEqual([card["id"] for card in result["cards"]], [2, 3])
+        self.assertEqual(result["cards"][0]["benefitName"], "마트 10% 할인")
+        self.assertEqual(result["cards"][0]["total"], 110_000)
+        self.assertEqual(result["cards"][0]["fee"], 10_000)
+        self.assertEqual(result["cards"][1]["total"], 78_000)
+        self.assertEqual(result["analysisStartDate"], "2026-03-10")
         self.assertEqual(result["analysisEndDate"], "2026-06-07")
-        self.assertEqual(result["updateCycle"], "daily 00:00 Asia/Seoul")
+        self.assertEqual(
+            result["updateCycle"],
+            "daily 00:00 Asia/Seoul · rolling 30d 50%/30d 30%/30d 20%",
+        )
         self.assertEqual(result["topCategory"], "마트/쇼핑")
-        self.assertEqual(result["topCategorySpend"], 200_000)
-        self.assertIn("최근 7일간 마트/쇼핑", result["cards"][0]["recommendationMessage"])
+        self.assertEqual(result["topCategorySpend"], 130_000)
+        self.assertIn("최근 3개월 소비에서 마트/쇼핑", result["cards"][0]["recommendationMessage"])
+
+    def test_excludes_military_service_cards_for_non_military_personas(self):
+        with self.Session() as db:
+            db.add(Card(
+                id=6,
+                card_name="IBK 나라사랑카드",
+                issuer="IBK기업은행",
+                card_type="체크카드",
+                is_active=True,
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="check",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertNotIn(
+            "IBK 나라사랑카드",
+            [card["name"] for card in result["cards"]],
+        )
 
     def test_api_contract_and_query_validation(self):
         response = self.client.get(

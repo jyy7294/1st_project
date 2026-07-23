@@ -163,8 +163,8 @@ def build_recent_spending_profile(
     user_id: int,
     *,
     reference_date: date | None = None,
-    days: int = 7,
-) -> tuple[date, date, dict[str, int], list[dict[str, Any]]]:
+    days: int = 90,
+) -> tuple[date, date, dict[str, int], list[dict[str, Any]], str | None]:
     korea = ZoneInfo("Asia/Seoul")
     today = reference_date or datetime.now(korea).date()
     end_local = datetime.combine(today, time.min, tzinfo=korea)
@@ -173,28 +173,10 @@ def build_recent_spending_profile(
     end_utc = end_local.astimezone(timezone.utc)
     rows = db.execute(
         select(
-            Transaction.payment_category,
-            func.sum(Transaction.original_payment_amount),
-        )
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.status == "APPROVED",
-            Transaction.approved_at >= start_utc,
-            Transaction.approved_at < end_utc,
-        )
-        .group_by(Transaction.payment_category)
-    ).all()
-
-    totals: dict[str, int] = defaultdict(int)
-    for category, amount in rows:
-        normalized = normalize_spending_category(category)
-        if normalized:
-            totals[normalized] += int(amount or 0)
-    merchant_rows = db.execute(
-        select(
             Transaction.merchant_name,
             Transaction.payment_category,
-            func.sum(Transaction.original_payment_amount),
+            Transaction.original_payment_amount,
+            Transaction.approved_at,
         )
         .where(
             Transaction.user_id == user_id,
@@ -202,11 +184,51 @@ def build_recent_spending_profile(
             Transaction.approved_at >= start_utc,
             Transaction.approved_at < end_utc,
         )
-        .group_by(Transaction.merchant_name, Transaction.payment_category)
     ).all()
+
+    category_scores: dict[str, float] = defaultdict(float)
+    category_counts: dict[str, float] = defaultdict(float)
+    merchant_scores: dict[tuple[str, str | None], float] = defaultdict(float)
+    for merchant_name, category, amount, approved_at in rows:
+        normalized = normalize_spending_category(category)
+        if not normalized:
+            continue
+        amount = int(amount or 0)
+        if approved_at.tzinfo is None:
+            approved_at = approved_at.replace(tzinfo=timezone.utc)
+        local_date = approved_at.astimezone(korea).date()
+        age_days = max((today - local_date).days - 1, 0)
+        weight = 0.5 if age_days < 30 else 0.3 if age_days < 60 else 0.2
+        weighted_amount = amount * weight
+        category_scores[normalized] += weighted_amount
+        category_counts[normalized] += weight
+        merchant_scores[(merchant_name, normalized)] += weighted_amount
+
+    totals = {
+        category: round(score)
+        for category, score in category_scores.items()
+    }
+    primary_category = None
+    if category_counts:
+        highest_count = max(category_counts.values())
+        tie_threshold = max(1.0, highest_count * 0.1)
+        similar = [
+            category
+            for category, count in category_counts.items()
+            if highest_count - count <= tie_threshold
+        ]
+        primary_category = max(
+            similar,
+            key=lambda category: (
+                category_scores[category],
+                category_counts[category],
+                category,
+            ),
+        )
+
     aliases = db.scalars(select(MerchantAlias)).all()
     merchants = []
-    for merchant_name, category, amount in merchant_rows:
+    for (merchant_name, category), score in merchant_scores.items():
         normalized_name = _normalize_search_text(merchant_name)
         matched_aliases = [
             alias
@@ -230,16 +252,18 @@ def build_recent_spending_profile(
         merchants.append({
             "merchant_name": merchant_name,
             "canonical_merchant": canonical,
-            "category": normalize_spending_category(category),
-            "amount": int(amount or 0),
+            "category": category,
+            "amount": round(score),
+            "weightedScore": round(score, 2),
             "search_terms": [term for term in search_terms if term],
         })
     merchants.sort(key=lambda item: item["amount"], reverse=True)
     return (
         start_local.date(),
         (end_local - timedelta(days=1)).date(),
-        dict(totals),
+        totals,
         merchants[:10],
+        primary_category,
     )
 
 
@@ -276,6 +300,17 @@ def _candidate_state(card: Card, monthly_spending: int) -> dict[str, Any]:
     }
 
 
+NON_MILITARY_SERVICE_USER_IDS = frozenset({1, 3, 4, 5})
+MILITARY_SERVICE_CARD_NAME = "나라사랑"
+
+
+def _is_new_card_eligible_for_user(*, user_id: int, card_name: str) -> bool:
+    return not (
+        user_id in NON_MILITARY_SERVICE_USER_IDS
+        and MILITARY_SERVICE_CARD_NAME in card_name
+    )
+
+
 def recommend_new_cards_by_spending(
     db: Session,
     *,
@@ -289,17 +324,20 @@ def recommend_new_cards_by_spending(
             f"사용자 ID {user_id}를 찾을 수 없습니다."
         )
 
-    analysis_start, analysis_end, profile, merchant_profile = build_recent_spending_profile(
+    (
+        analysis_start,
+        analysis_end,
+        profile,
+        merchant_profile,
+        primary_category,
+    ) = build_recent_spending_profile(
         db,
         user_id,
         reference_date=reference_date,
     )
     monthly_spending = sum(profile.values())
-    top_category, top_category_spend = (
-        max(profile.items(), key=lambda item: item[1])
-        if profile
-        else (None, 0)
-    )
+    top_category = primary_category
+    top_category_spend = profile.get(primary_category, 0) if primary_category else 0
     owned_card_ids = select(UserCard.card_id).where(UserCard.user_id == user_id)
     cards = db.scalars(
         select(Card)
@@ -312,6 +350,11 @@ def recommend_new_cards_by_spending(
 
     results = []
     for card in cards:
+        if not _is_new_card_eligible_for_user(
+            user_id=user_id,
+            card_name=card.card_name,
+        ):
+            continue
         if not _matches_card_type(card.card_type, card_type):
             continue
 
@@ -425,11 +468,11 @@ def recommend_new_cards_by_spending(
         }
         category_label = best["category"] or "주요 업종"
         recommendation_message = (
-            f"최근 7일간 {category_label}에서 {int(best['monthly_spend']):,}원을 사용했어요. "
+            f"최근 3개월 소비에서 {category_label} 이용 빈도가 높았어요. "
             f"이 카드를 쓰면 {best['name']} 혜택으로 "
             f"연간 약 {annual_total:,}원의 혜택을 받을 수 있어요."
             if annual_total > 0
-            else f"최근 7일 {category_label} 소비에 적용 가능한 계산형 혜택이 없습니다."
+            else f"최근 3개월 {category_label} 소비에 적용 가능한 계산형 혜택이 없습니다."
         )
         results.append({
             "id": card.id,
@@ -447,11 +490,16 @@ def recommend_new_cards_by_spending(
             "matchedMerchants": sorted(matched_merchants),
         })
 
-    results.sort(key=lambda item: (-item["total"], item["fee"], item["id"]))
+    results.sort(key=lambda item: (
+        item.get("benefitCategory") != primary_category,
+        -item["total"],
+        item["fee"],
+        item["id"],
+    ))
     return {
         "analysisStartDate": analysis_start.isoformat(),
         "analysisEndDate": analysis_end.isoformat(),
-        "updateCycle": "daily 00:00 Asia/Seoul",
+        "updateCycle": "daily 00:00 Asia/Seoul · rolling 30d 50%/30d 30%/30d 20%",
         "topCategory": top_category,
         "topCategorySpend": top_category_spend,
         "topMerchants": [
@@ -517,7 +565,14 @@ def get_daily_card_recommendations(
     payload = dict(
         snapshot.credit_result if card_type == "credit" else snapshot.check_result
     )
-    payload["cards"] = payload.get("cards", [])[:limit]
+    payload["cards"] = [
+        card
+        for card in payload.get("cards", [])
+        if _is_new_card_eligible_for_user(
+            user_id=user_id,
+            card_name=str(card.get("name") or ""),
+        )
+    ][:limit]
     payload["cached"] = cached
     payload["generatedAt"] = snapshot.generated_at.isoformat()
     return payload
