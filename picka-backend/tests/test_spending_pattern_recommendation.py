@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, datetime, timezone
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -16,6 +16,7 @@ from app.models import (
     User,
     UserCard,
     UserEligibility,
+    RecommendationAuditLog,
 )
 from app.services.spending_pattern_recommendation_service import (
     RECOMMENDATION_POLICY_VERSION,
@@ -295,6 +296,11 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["cached"])
         self.assertEqual(len(response.json()["cards"]), 1)
+        with self.Session() as db:
+            audit = db.scalar(select(RecommendationAuditLog))
+            self.assertEqual(audit.request_kind, "NEW_CARD_SPENDING_PATTERN")
+            self.assertFalse(audit.cache_hit)
+            self.assertEqual(audit.policy_version, RECOMMENDATION_POLICY_VERSION)
         self.assertEqual(
             set(response.json()["cards"][0]),
             {

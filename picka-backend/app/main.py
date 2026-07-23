@@ -66,6 +66,7 @@ from app.services.spending_pattern_recommendation_service import (
 )
 from app.services.category_normalization import normalize_payment_category
 from app.services.reward_service import calculate_transaction_rewards
+from app.services.recommendation_audit_service import save_recommendation_audit
 
 
 app = FastAPI(
@@ -1253,13 +1254,23 @@ def get_spending_pattern_card_recommendations(
     refresh: Annotated[bool, Query()] = False,
 ):
     try:
-        return get_daily_card_recommendations(
+        result = get_daily_card_recommendations(
             db,
             user_id=user_id,
             card_type=card_type,
             limit=limit,
             force_refresh=refresh,
         )
+        save_recommendation_audit(
+            db,
+            user_id=user_id,
+            request_kind="NEW_CARD_SPENDING_PATTERN",
+            input_payload={"card_type": card_type, "limit": limit, "refresh": refresh},
+            calculation_payload=result,
+            policy_version=result.get("policyVersion"),
+            cache_hit=bool(result.get("cached")),
+        )
+        return result
     except SpendingRecommendationUserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -1335,6 +1346,18 @@ def create_recommendation(
                 payment_category=payment_category,
                 payment_amount=request.payment_amount,
             )
+        save_recommendation_audit(
+            db,
+            user_id=request.user_id,
+            request_kind="PAYMENT_CARD_RECOMMENDATION",
+            usage_month=usage_month,
+            input_payload={
+                "merchant_name": request.merchant_name,
+                "payment_category": payment_category,
+                "payment_amount": request.payment_amount,
+            },
+            calculation_payload=response,
+        )
         return response
     except UserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
@@ -1410,7 +1433,7 @@ def select_recommended_card(
             payment_amount=request.payment_amount,
         )
 
-        return {
+        response = {
             "status": "CARD_SELECTED",
             "message": "결제에 사용할 카드가 선택되었습니다.",
             "user_id": request.user_id,
@@ -1428,6 +1451,24 @@ def select_recommended_card(
                 == request.selected_card_id
             ),
         }
+        save_recommendation_audit(
+            db,
+            user_id=request.user_id,
+            request_kind="PAYMENT_CARD_SELECTION",
+            usage_month=usage_month,
+            selected_card_id=request.selected_card_id,
+            input_payload={
+                "merchant_name": request.merchant_name,
+                "payment_category": payment_category,
+                "payment_amount": request.payment_amount,
+                "selected_card_id": request.selected_card_id,
+            },
+            calculation_payload={
+                "selection": response,
+                "original_recommendation": recommendation_result,
+            },
+        )
+        return response
 
     except UserNotFoundError as error:
         raise HTTPException(

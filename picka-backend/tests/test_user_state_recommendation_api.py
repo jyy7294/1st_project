@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -17,6 +18,7 @@ from app.models import (
     CardBenefit,
     MerchantAlias,
     MonthlyCardUsage,
+    RecommendationAuditLog,
     Transaction,
     SocialAccount,
     VirtualCardCredential,
@@ -252,12 +254,44 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
 
     def test_seed_user_returns_three_owned_cards_and_month(self):
+        with self.Session() as db:
+            db.add(RecommendationAuditLog(
+                user_id=2,
+                request_kind="EXPIRED_TEST",
+                input_payload={},
+                calculation_payload={},
+                created_at=datetime.now(timezone.utc) - timedelta(days=91),
+            ))
+            db.commit()
+
         response = self._request()
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["owned_card_count"], 3)
         self.assertEqual(body["usage_month"], "2026-07")
         self.assertEqual(body["user_state_source"], "database")
+
+        with self.Session() as db:
+            audit = db.scalar(select(RecommendationAuditLog))
+            self.assertIsNotNone(audit)
+            self.assertEqual(db.query(RecommendationAuditLog).count(), 1)
+            self.assertEqual(audit.user_id, 2)
+            self.assertEqual(audit.request_kind, "PAYMENT_CARD_RECOMMENDATION")
+            self.assertEqual(audit.input_payload["payment_amount"], 10_000)
+            self.assertEqual(
+                audit.calculation_payload["recommendation_basis"],
+                body["recommendation_basis"],
+            )
+
+    def test_card_selection_saves_original_calculation_audit(self):
+        response = self._select_request()
+        self.assertEqual(response.status_code, 200)
+
+        with self.Session() as db:
+            audit = db.scalar(select(RecommendationAuditLog))
+            self.assertEqual(audit.request_kind, "PAYMENT_CARD_SELECTION")
+            self.assertEqual(audit.selected_card_id, 2)
+            self.assertIn("original_recommendation", audit.calculation_payload)
 
     def test_get_user_cards_returns_active_database_cards(self):
         response = self._cards_request()
@@ -344,6 +378,22 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             )
             self.assertEqual(monthly.current_month_spending, 160_000)
             self.assertEqual(monthly.card_monthly_benefit_used, 4_000)
+
+            # 집계 캐시에는 기존 3,000원이 들어 있어도 API 계산 기준은
+            # 승인 거래의 실제 saved_amount(1,000원)여야 한다.
+            states = build_user_card_states(db, 2, "2026-07")
+            card_two = next(card for card in states if card["card_id"] == 2)
+            self.assertEqual(card_two["card_monthly_benefit_used"], 1_000)
+
+        report = self.client.get(
+            "/api/v1/users/2/spending-report",
+            params={"month": "2026-07"},
+        ).json()
+        self.assertEqual(report["totalBenefit"], 1_000)
+        report_card = next(
+            card for card in report["cardBenefits"] if card["cardId"] == 2
+        )
+        self.assertEqual(report_card["benefit"], 1_000)
 
     def test_create_transaction_rejects_unowned_card(self):
         response = self._transaction_request(card_id=999)

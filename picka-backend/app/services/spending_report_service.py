@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Card, Transaction, TransactionReward, User
 from app.services.category_normalization import normalize_payment_category
+from app.services.benefit_total_service import confirmed_benefit_totals_by_card
 
 
 REPORT_CATEGORY_MAP = {
@@ -94,8 +95,14 @@ def build_monthly_spending_report(
     previous_rows = _month_rows(db, user_id, previous_usage_month)
     current_total = sum(row.original_payment_amount for row, _ in current_rows)
     previous_total = sum(row.original_payment_amount for row, _ in previous_rows)
-    current_benefit = sum(row.saved_amount for row, _ in current_rows)
-    previous_benefit = sum(row.saved_amount for row, _ in previous_rows)
+    current_benefits_by_card = confirmed_benefit_totals_by_card(
+        db, user_id=user_id, usage_month=usage_month
+    )
+    previous_benefits_by_card = confirmed_benefit_totals_by_card(
+        db, user_id=user_id, usage_month=previous_usage_month
+    )
+    current_benefit = sum(current_benefits_by_card.values())
+    previous_benefit = sum(previous_benefits_by_card.values())
     reward_rows = db.execute(
         select(
             TransactionReward.reward_type,
@@ -129,7 +136,9 @@ def build_monthly_spending_report(
             "imageUrl": card.image_url,
             "benefit": 0,
         })
-        card_item["benefit"] += transaction.saved_amount
+    for card_id, benefit_amount in current_benefits_by_card.items():
+        if card_id in card_benefits:
+            card_benefits[card_id]["benefit"] = benefit_amount
 
     categories = []
     for category in REPORT_CATEGORY_ORDER:

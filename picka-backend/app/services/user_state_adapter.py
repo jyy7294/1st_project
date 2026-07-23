@@ -120,7 +120,16 @@ def build_user_card_states(
 
     card_ids = [user_card.card_id for user_card in user_cards]
     monthly_results = db.execute(
-        select(MonthlyCardUsage, func.count(Transaction.id))
+        select(
+            MonthlyCardUsage,
+            func.count(Transaction.id),
+            func.coalesce(
+                func.sum(Transaction.saved_amount).filter(
+                    Transaction.status == "APPROVED"
+                ),
+                0,
+            ),
+        )
         .outerjoin(
             Transaction,
             and_(
@@ -140,7 +149,11 @@ def build_user_card_states(
     monthly_by_card = {row.card_id: row for row in monthly_rows}
     transaction_counts = {
         monthly.card_id: count
-        for monthly, count in monthly_results
+        for monthly, count, _ in monthly_results
+    }
+    confirmed_benefits_by_card = {
+        monthly.card_id: int(amount or 0)
+        for monthly, _, amount in monthly_results
     }
 
     usage_rows = db.scalars(
@@ -168,7 +181,8 @@ def build_user_card_states(
                 "daily_used_count": usage.daily_used_count,
             }
 
-        card_used = monthly.card_monthly_benefit_used if monthly else 0
+        # 월 집계 캐시가 아니라 승인 거래의 실제 saved_amount를 단일 기준으로 사용한다.
+        card_used = confirmed_benefits_by_card.get(card.id, 0)
         states.append(
             {
                 "user_id": user_id,

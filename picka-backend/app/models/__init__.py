@@ -17,6 +17,7 @@ from app.models.card_benefit_eligibility_rule import CardBenefitEligibilityRule
 from app.models.user_persona_profile import UserPersonaProfile
 from app.models.demo_payment_session import DemoPaymentSession
 from app.models.transaction_benefit_outcome import TransactionBenefitOutcome
+from app.models.recommendation_audit_log import RecommendationAuditLog
 
 __all__ = [
     "Card",
@@ -38,4 +39,5 @@ __all__ = [
     "UserPersonaProfile",
     "DemoPaymentSession",
     "TransactionBenefitOutcome",
+    "RecommendationAuditLog",
 ]
