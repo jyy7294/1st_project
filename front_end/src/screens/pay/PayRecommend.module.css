@@ -12,6 +12,9 @@
   padding: 0 22px 340px;
 }
 
+/* 시트를 내리면 손잡이 높이만 비워 두면 됩니다. */
+.scrollLow { padding-bottom: 140px; }
+
 .badgeRow { text-align: center; margin-top: 8px; }
 
 .badge {
@@ -34,25 +37,12 @@
   font-size: 13px;
   color: rgba(255, 255, 255, .55);
   line-height: 1.5;
+  /* 한글이 단어 중간에서 끊기지 않고 어절(띄어쓰기) 단위로 줄바꿈됩니다. */
+  word-break: keep-all;
 }
 
-.bigCard {
-  margin-top: 20px;
-  height: 180px;
-  border-radius: 18px;
-  box-shadow: 0 22px 40px -18px rgba(10, 29, 79, .7);
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  color: #fff;
-}
-
-.bigCardHead { display: flex; justify-content: space-between; align-items: flex-start; }
-.bigCardCompany { font-size: 11px; color: rgba(255, 255, 255, .6); }
-.bigCardName { font-size: 16px; font-weight: 700; margin-top: 1px; }
-.bigCardBrand { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: rgba(255, 255, 255, .8); }
-.bigCardNumber { font-size: 16px; letter-spacing: 3px; color: rgba(255, 255, 255, .8); }
+/* 카드 앞면은 CardFace 가 그립니다. 여기서는 자리만 잡아 줍니다. */
+.bigCard { margin-top: 20px; }
 
 .stats { display: flex; gap: 10px; margin-top: 14px; }
 
@@ -65,10 +55,38 @@
 }
 
 .statLabel { font-size: 11px; color: rgba(255, 255, 255, .5); }
+/*
+ * 두 칸의 숫자가 서로 다른 뜻이라 색으로 구분합니다.
+ *   good  할인 혜택   — 초록 (내가 아낀 돈)
+ *   perf  남은 실적   — 파랑 (참고용 진행 상황)
+ *   plain 최종 승인   — 흰색 (실제로 결제될 금액, 가장 눈에 띄게)
+ */
 .statValue { font-size: 18px; font-weight: 800; margin-top: 4px; }
 .statValue.good { color: var(--green-pay); }
+.statValue.perf { color: var(--blue-light); }
 .statValue.plain { color: #fff; }
 .statNote { font-size: 10.5px; color: rgba(255, 255, 255, .4); margin-top: 2px; }
+
+/* 실적 관련 짧은 강조 문구 (목표 임박) */
+.perfHint {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(255, 206, 69, .12);
+  border: 1px solid rgba(255, 206, 69, .3);
+  color: var(--gold);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* 이번 결제로 목표를 채우는 경우 — 좋은 소식이라 초록으로 */
+.perfHintDone {
+  background: rgba(74, 222, 128, .12);
+  border-color: rgba(74, 222, 128, .35);
+  color: var(--green-pay);
+}
 
 .reason {
   margin-top: 12px;
@@ -81,6 +99,26 @@
 }
 
 .reasonText { font-size: 12px; color: rgba(255, 255, 255, .6); line-height: 1.5; }
+
+/* 시트를 내려둔 동안 본문에 나오는 버튼들 */
+.actions {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 내려둔 카드 목록을 다시 여는 버튼 */
+.pickOther {
+  width: 100%;
+  height: 52px;
+  border: 1px solid rgba(110, 166, 255, .45);
+  border-radius: 15px;
+  background: rgba(47, 107, 255, .12);
+  color: var(--blue-light);
+  font-size: 15px;
+  font-weight: 700;
+}
 
 /* 오류·혜택없음 안내 */
 .notice {
@@ -131,9 +169,9 @@
   max-height: 62%;
   display: flex;
   flex-direction: column;
-  background: rgba(16, 23, 44, .86);
+  background: rgba(26, 35, 62, .92);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .16);
   border-bottom: none;
   border-radius: 24px 24px 0 0;
   box-shadow: 0 -12px 40px -8px rgba(0, 0, 0, .55);
@@ -152,6 +190,10 @@
 }
 
 .sheetHead:active { cursor: grabbing; }
+
+/* 내려둔 상태에서는 탭해서 다시 올릴 수 있다는 걸 커서로 알립니다. */
+.sheetHeadRaise { cursor: pointer; }
+.sheetHeadRaise .grabber { background: rgba(255, 255, 255, .45); }
 
 .grabber {
   width: 40px;
@@ -180,16 +222,39 @@
   padding: 14px;
   border-radius: var(--r-btn);
   cursor: pointer;
-  background: rgba(255, 255, 255, .05);
-  border: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(255, 255, 255, .09);
+  border: 1px solid rgba(255, 255, 255, .14);
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
 
+/*
+ * 지금 결제에 쓸 카드.
+ *
+ * 어두운 화면에서 한눈에 찾을 수 있도록 배경을 확실히 올리고
+ * 테두리와 바깥 글로우로 한 겹 더 띄웁니다.
+ */
 .row.selected {
-  background: rgba(47, 107, 255, .16);
-  border-color: rgba(110, 166, 255, .6);
+  background: rgba(47, 107, 255, .34);
+  border-color: rgba(150, 190, 255, .9);
+  box-shadow: 0 0 0 1px rgba(150, 190, 255, .35),
+              0 10px 24px -10px rgba(47, 107, 255, .75);
 }
 
-.row.dim { opacity: .55; }
+.row.selected .rowName { color: #fff; }
+.row.selected .rowSub { color: rgba(255, 255, 255, .78); }
+.row.selected .rowAmount { color: #fff; }
+.row.selected .rowNote { color: rgba(255, 255, 255, .65); }
+
+.row.selected .rank {
+  background: #fff;
+  color: var(--navy);
+}
+
+/*
+ * 혜택이 없는 카드는 흐리게 둡니다. 다만 지금 고른 카드라면
+ * 흐려지지 않아야 어느 걸 골랐는지 보입니다.
+ */
+.row.dim:not(.selected) { opacity: .6; }
 
 .rank {
   width: 24px;
@@ -205,7 +270,15 @@
   justify-content: center;
 }
 
-.swatch { width: 42px; height: 28px; border-radius: 6px; flex: none; }
+/* 카드 사진이 들어가는 자리. 사진이 없으면 그라데이션만 남습니다. */
+.swatch {
+  position: relative;
+  width: 44px;
+  height: 28px;
+  border-radius: 6px;
+  flex: none;
+  overflow: hidden;
+}
 
 .rowMain { flex: 1; min-width: 0; }
 
@@ -218,10 +291,10 @@
   text-overflow: ellipsis;
 }
 
-.rowSub { font-size: 11.5px; color: rgba(255, 255, 255, .45); margin-top: 1px; }
+.rowSub { font-size: 11.5px; color: rgba(255, 255, 255, .58); margin-top: 1px; }
 .rowRight { text-align: right; flex: none; }
 .rowAmount { font-size: 15px; font-weight: 800; color: var(--blue-light); }
-.rowNote { font-size: 10px; color: rgba(255, 255, 255, .4); }
+.rowNote { font-size: 10px; color: rgba(255, 255, 255, .5); }
 
 .sheetFoot {
   flex: none;

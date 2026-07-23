@@ -2,7 +2,9 @@ import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
 import { orderedComparison } from '../../utils/compare.js'
 import { gradientForCard } from '../../data/cards.js'
-import { krw } from '../../utils/format.js'
+import { cardImage } from '../../data/cardImages.js'
+import CardArt from '../../components/CardArt.jsx'
+import { krw, krwMinus } from '../../utils/format.js'
 import ServiceNotice from './ServiceNotice.jsx'
 import shared from './payShared.module.css'
 import styles from './PayConfirm.module.css'
@@ -57,10 +59,9 @@ export default function PayConfirm() {
       <div className={styles.panelWrap}>
         <div className={shared.panel}>
           <div className={styles.cardRow}>
-            <div
-              className={styles.swatch}
-              style={{ background: gradientForCard(chosen) }}
-            />
+            <div className={styles.swatch} style={{ background: gradientForCard(chosen) }}>
+              <CardArt src={cardImage(chosen)} frame="landscape" />
+            </div>
             <div style={{ flex: 1 }}>
               <div className={styles.cardLabel}>선택된 카드</div>
               <div className={styles.cardName}>
@@ -77,7 +78,7 @@ export default function PayConfirm() {
 
           <div className={`${shared.rowBetween} ${styles.line}`}>
             <span className={shared.muted}>할인 혜택</span>
-            <span className={styles.lineGood}>-{krw(discount)}원</span>
+            <span className={styles.lineGood}>{krwMinus(discount)}원</span>
           </div>
 
           <div className={styles.total}>

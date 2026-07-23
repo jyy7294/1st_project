@@ -3,20 +3,27 @@ import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { gradientForCard } from '../data/cards.js'
 import { fetchCardDetail } from '../api/picka.js'
+import { selectRecoCard } from '../utils/recommend.js'
+import { benefitsForRecoCard } from '../data/recommendBenefits.js'
 import { benefitView } from '../utils/benefit.js'
 import styles from './CardBenefits.module.css'
 
 /** 카드가 가진 모든 혜택을 한도·실적·유의사항까지 펼쳐 보여줍니다. */
 export default function CardBenefits() {
   const { state, dispatch } = useApp()
-  const card = state.cards[state.active]
+  const fromReco = state.benefitsSource === 'reco'
+
+  // 추천 카드는 정적 스냅샷에서, 보유 카드는 백엔드에서 혜택을 가져옵니다.
+  const recoCard = fromReco ? selectRecoCard(state) : null
+  const ownedCard = state.cards[state.active]
+
   const [rows, setRows] = useState([])
 
   const userId = state.user?.userId
-  const cardId = card?.card_id
+  const cardId = ownedCard?.card_id
 
   useEffect(() => {
-    if (!userId || !cardId) return undefined
+    if (fromReco || !userId || !cardId) return undefined
     let cancelled = false
     fetchCardDetail(userId, cardId)
       .then((data) => {
@@ -28,11 +35,29 @@ export default function CardBenefits() {
     return () => {
       cancelled = true
     }
-  }, [userId, cardId])
+  }, [fromReco, userId, cardId])
 
-  if (!card) return null
+  if (fromReco && !recoCard) return null
+  if (!fromReco && !ownedCard) return null
 
-  const benefits = rows.map(benefitView)
+  // 화면 표기에 필요한 값만 두 소스에서 공통 모양으로 맞춥니다.
+  const view = fromReco
+    ? {
+        company: recoCard.issuer,
+        product: recoCard.name,
+        background: recoCard.grad || gradientForCard(recoCard),
+        rows: benefitsForRecoCard(recoCard.id),
+        back: 'recoDetail',
+      }
+    : {
+        company: ownedCard.card_company,
+        product: ownedCard.card_name,
+        background: gradientForCard(ownedCard),
+        rows,
+        back: 'detail',
+      }
+
+  const benefits = view.rows.map(benefitView)
 
   return (
     <div className={`${styles.screen} pk-screen`}>
@@ -41,7 +66,7 @@ export default function CardBenefits() {
           type="button"
           className={styles.iconBtn}
           aria-label="뒤로"
-          onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'detail' })}
+          onClick={() => dispatch({ type: A.SET_SCREEN, screen: view.back })}
         >
           ‹
         </button>
@@ -49,10 +74,10 @@ export default function CardBenefits() {
         <span className={styles.spacer} />
       </div>
 
-      <div className={styles.summary} style={{ background: gradientForCard(card) }}>
+      <div className={styles.summary} style={{ background: view.background }}>
         <div>
-          <div className={styles.summaryCompany}>{card.card_company}</div>
-          <div className={styles.summaryProduct}>{card.card_name}</div>
+          <div className={styles.summaryCompany}>{view.company}</div>
+          <div className={styles.summaryProduct}>{view.product}</div>
         </div>
       </div>
 

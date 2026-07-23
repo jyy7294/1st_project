@@ -1,3 +1,4 @@
+@import './styles/fonts.css';
 @import './styles/tokens.css';
 
 * {
@@ -18,10 +19,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-button {
+/* 폼 요소는 브라우저 기본 폰트를 쓰므로 본문 폰트를 물려받게 합니다. */
+button, input, textarea, select {
   font-family: inherit;
-  cursor: pointer;
 }
+
+button { cursor: pointer; }
 
 /* 디자인 원본과 동일하게 스크롤바를 숨긴다 */
 ::-webkit-scrollbar { width: 0; height: 0; }

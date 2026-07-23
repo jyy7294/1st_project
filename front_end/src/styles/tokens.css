@@ -41,7 +41,7 @@
   --naver: #03C75A;
 
   /* 라디우스 */
-  --r-card: 20px;
+  --r-card: 13px;
   --r-btn: 14px;
   --r-chip: 10px;
 
@@ -64,6 +64,11 @@
   12% { opacity: 1; }
   88% { opacity: 1; }
   100% { top: 84%; opacity: 0; }
+}
+/* QR 인식 연출: 스캔 라인이 위에서 아래로 한 번 훑고 끝납니다. */
+@keyframes pk-qrscan {
+  from { top: 6%; }
+  to { top: 94%; }
 }
 @keyframes pk-cardglow {
   0%, 100% { box-shadow: 0 0 0 1px rgba(76, 141, 255, .35); }
@@ -135,6 +140,8 @@
 }
 
 .pk-anim-scanbeam { animation: pk-scan 1.6s ease-in-out infinite; }
+/* 한 번만 내려가고 끝(forwards). 끝나는 시점에 다음 화면으로 넘어갑니다. */
+.pk-anim-qrscan { animation: pk-qrscan 1.2s ease-in-out forwards; }
 
 /* Face ID */
 .pk-anim-islandgrow { animation: pk-islandgrow .55s cubic-bezier(.34, 1.56, .64, 1); }

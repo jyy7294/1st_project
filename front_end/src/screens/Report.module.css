@@ -163,6 +163,142 @@
   text-align: center;
 }
 
+/* 3개월 지출 막대 그래프 — Y축 눈금선 위에 막대를 세웁니다. */
+.plot {
+  position: relative;
+  height: 168px;
+  margin-top: 8px;
+  /* 왼쪽은 Y축 값이 들어갈 자리 */
+  padding-left: 34px;
+}
+
+/* 가로 눈금선. bottom 을 %로 줘서 값 위치에 맞춥니다. */
+.gridLine {
+  position: absolute;
+  left: 34px;
+  right: 0;
+  height: 0;
+  border-top: 1px solid #f0f2f6;
+}
+
+/* 0 기준선(X축)은 조금 진하게 */
+.baseLine {
+  position: absolute;
+  left: 34px;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  border-top: 1.5px solid var(--line-strong);
+}
+
+/* 눈금선 왼쪽에 붙는 Y축 값 */
+.gridLabel {
+  position: absolute;
+  right: 100%;
+  margin-right: 6px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* 막대들이 놓이는 영역 — 눈금선과 같은 좌표계 */
+.barRow {
+  position: absolute;
+  left: 34px;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 14px;
+}
+
+.barCol {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  /* 두 번 탭할 때 글자가 선택되지 않도록 */
+  user-select: none;
+}
+
+.barAmount {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-3);
+}
+
+.barValue {
+  width: 100%;
+  max-width: 46px;
+  flex: none;
+  border-radius: 8px 8px 0 0;
+  background: var(--line-strong);
+  transition: height .45s cubic-bezier(.22, .61, .36, 1), background .2s ease;
+}
+
+/* X축 눈금 (달) — 막대와 같은 간격으로 정렬 */
+.xLabels {
+  display: flex;
+  justify-content: space-around;
+  gap: 14px;
+  margin: 8px 0 0 34px;
+}
+
+.xLabel {
+  flex: 1;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+/* 선택된 달만 진하게 — 한눈에 어느 달을 보고 있는지 */
+.barColOn .barValue { background: linear-gradient(180deg, #4ec97a, var(--green-chart)); }
+.barColOn .barAmount { color: var(--navy-text); font-size: 13px; }
+.xLabelOn { color: var(--navy-text); }
+
+.barHint {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--text-4);
+  text-align: center;
+}
+
+/* 선 그래프에서 막대 비교로 되돌아가는 버튼 */
+.backToBars {
+  margin-top: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+/* 리포트 전체 로딩·오류 안내 */
+.stateBox {
+  margin: 40px 22px;
+  padding: 28px 16px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--sh-card);
+  font-size: 14px;
+  color: var(--text-2);
+  text-align: center;
+}
+
 .cardItem {
   display: block;
   width: 100%;
@@ -191,7 +327,15 @@
   min-width: 0;
 }
 
-.cardSwatch { width: 20px; height: 13px; border-radius: 3px; flex: none; }
+/* 카드 사진이 통째로 들어가도록 (배경 crop 대신 CardArt 사용) */
+.cardSwatch {
+  position: relative;
+  width: 30px;
+  height: 19px;
+  border-radius: 3px;
+  flex: none;
+  overflow: hidden;
+}
 .cardRight { display: flex; align-items: center; gap: 8px; flex: none; }
 .cardBenefit { font-size: 13.5px; font-weight: 800; }
 .arrow { font-size: 9px; color: #b6bdcc; }
@@ -255,12 +399,23 @@
   position: absolute;
   inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
 
-.donutTopName { font-size: 11px; color: var(--text-3); }
+/*
+ * 글자 블록은 도넛 가운데에 두고, 그 안에서 세로로 쌓습니다.
+ * 블록 폭이 글자 폭이라 '1위'를 flex-start 로 두면 링이 아니라
+ * 글자 왼쪽 끝에 붙습니다.
+ */
+.donutCenterText {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.donutTopName { font-size: 14.5px; font-weight: 700; color: var(--text-2); }
 .donutTopPct { font-size: 22px; font-weight: 800; }
 
 .catList { margin-top: 14px; display: flex; flex-direction: column; }

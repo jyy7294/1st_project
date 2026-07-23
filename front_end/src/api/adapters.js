@@ -50,9 +50,13 @@ export function adaptCard(card) {
     benefit: krw(card.card_monthly_benefit_used || 0),
     // 백엔드 카드 상태에는 유효기간이 없어 비워 둡니다 (CardFace 가 알아서 감춥니다).
     expiry: '',
-    // 실적 표시에 쓰는 원본 값
+    // 실적·한도 막대에 쓰는 원본 숫자 (위 spent/benefit 은 포맷된 문자열입니다)
     required_spending: card.required_spending || 0,
     previous_month_spending: card.previous_month_spending || 0,
+    current_month_spending: card.current_month_spending || 0,
+    // 카드 한 장에 걸린 월 통합 혜택 한도와 이번 달 사용분
+    benefit_limit: card.monthly_total_limit || 0,
+    benefit_used: card.card_monthly_benefit_used || 0,
     benefits: Array.isArray(card.benefits) ? card.benefits.map(adaptBenefit) : [],
   }
 }
@@ -91,6 +95,45 @@ export function adaptTransaction(tx) {
     date: formatDate(tx.approved_at),
     amount: tx.original_payment_amount || 0,
     saved: tx.saved_amount ? `할인 ${krw(tx.saved_amount)}원` : '혜택 없음',
+  }
+}
+
+/**
+ * 월별 소비 리포트 응답 → 화면 모양.
+ *
+ * 백엔드가 총지출·전월비교·일별 누적·카테고리·카드별 혜택까지 다 주므로
+ * 여기서는 필드 이름만 화면 표기에 맞춥니다. (ratio 는 이미 퍼센트 단위)
+ * @param {object} r spending-report 응답
+ * @param {string} label 탭에 보여줄 달 이름 (예: '6월')
+ */
+export function adaptSpendingReport(r, label = '') {
+  return {
+    key: label || r.month,
+    month: r.month,
+    prevMonth: r.previousMonth || '',
+    spent: r.totalSpending || 0,
+    prevSpent: r.previousMonthSpending || 0,
+    spentDiff: r.spendingDifference || 0,
+    benefit: r.totalBenefit || 0,
+    prevBenefit: r.previousMonthBenefit || 0,
+    benefitDiff: r.benefitDifference || 0,
+    // 전월 데이터가 조금이라도 있으면 비교를 보여줍니다.
+    hasPrev: (r.previousMonthSpending || 0) > 0 || (r.previousDailyCumulative || []).length > 0,
+    daily: r.dailyCumulative || [],
+    prevDaily: r.previousDailyCumulative || [],
+    // buildDonut 이 쓰는 {name, amount} 로 맞춥니다.
+    // 도넛 중앙·범례가 큰 항목부터 나오도록 금액순 정렬하고, 0원 항목은 뺍니다.
+    categories: (r.categories || [])
+      .map((c) => ({ name: c.category, amount: c.amount || 0 }))
+      .filter((c) => c.amount > 0)
+      .sort((a, b) => b.amount - a.amount),
+    cards: (r.cardBenefits || []).map((c) => ({
+      cardId: c.cardId,
+      company: c.issuer,
+      name: c.cardName,
+      imageUrl: c.imageUrl || null,
+      benefit: c.benefit || 0,
+    })),
   }
 }
 

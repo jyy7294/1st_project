@@ -1,9 +1,11 @@
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { orderedComparison } from '../../utils/compare.js'
+import { orderedComparison, displayCategory } from '../../utils/compare.js'
 import { hasCategoryCards } from '../../utils/recommend.js'
 import { gradientForCard } from '../../data/cards.js'
-import { krw } from '../../utils/format.js'
+import { cardImage } from '../../data/cardImages.js'
+import CardArt from '../../components/CardArt.jsx'
+import { krw, krwMinus } from '../../utils/format.js'
 import styles from './PayDone.module.css'
 
 export default function PayDone() {
@@ -13,7 +15,8 @@ export default function PayDone() {
   const chosen = ranked[state.payIdx] || ranked[0]
   const amount = state.transaction?.payment_amount || 0
   const discount = chosen?.expected_benefit || 0
-  const category = state.transaction?.payment_category
+  // 카테고리 추천도 백엔드가 판정한 업종을 기준으로 걸어야 결과가 어긋나지 않습니다.
+  const category = displayCategory(state.result, state.transaction)
 
   if (!chosen) return null
 
@@ -35,10 +38,9 @@ export default function PayDone() {
 
       <div className={styles.panel}>
         <div className={styles.cardRow}>
-          <div
-            className={styles.swatch}
-            style={{ background: gradientForCard(chosen) }}
-          />
+          <div className={styles.swatch} style={{ background: gradientForCard(chosen) }}>
+            <CardArt src={cardImage(chosen)} frame="landscape" />
+          </div>
           <div style={{ flex: 1 }}>
             <div className={styles.cardName}>
               {chosen.card_company} {chosen.card_name}
@@ -56,7 +58,7 @@ export default function PayDone() {
 
         <div className={styles.row}>
           <span className={styles.rowLabel}>✦ 절약 혜택</span>
-          <span className={styles.rowGood}>-{krw(discount)}원</span>
+          <span className={styles.rowGood}>{krwMinus(discount)}원</span>
         </div>
 
         <div className={styles.total}>

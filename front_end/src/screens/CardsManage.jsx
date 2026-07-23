@@ -1,6 +1,8 @@
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
 import { gradientForCard } from '../data/cards.js'
+import { cardImage } from '../data/cardImages.js'
+import CardArt from '../components/CardArt.jsx'
 import { REPORT_MONTHS } from '../data/report.js'
 import { krw, parseKrw } from '../utils/format.js'
 import styles from './CardsManage.module.css'
@@ -84,10 +86,9 @@ export default function CardsManage() {
             className={styles.cardRow}
             onClick={() => dispatch({ type: A.OPEN_CARD, index: i, from: 'cards' })}
           >
-            <span
-              className={styles.swatch}
-              style={{ background: gradientForCard(card) }}
-            />
+            <span className={styles.swatch} style={{ background: gradientForCard(card) }}>
+              <CardArt src={cardImage(card)} frame="landscape" />
+            </span>
             <span className={styles.cardBody}>
               <span className={styles.cardCompany}>{card.card_company}</span>
               <span className={styles.cardName}>

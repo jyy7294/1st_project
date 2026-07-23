@@ -1,8 +1,14 @@
 import { gradientForCard } from '../data/cards.js'
+import { cardImage } from '../data/cardImages.js'
+import CardArt from './CardArt.jsx'
 import styles from './CardFace.module.css'
 
 /**
  * 카드 앞면.
+ *
+ * 카드사·카드명은 카드 사진에 이미 인쇄돼 있어 따로 얹지 않습니다.
+ * 위에 올리는 정보(카드번호·금액)는 흰 글자로 두고, 그 아래에만
+ * 옅은 어두운 막을 깔아 밝은 카드에서도 읽히게 합니다.
  *
  * @param {object} props
  * @param {object} props.card `{ card_id, card_company, card_name, last_four }`
@@ -21,41 +27,56 @@ export default function CardFace({
   showStats = true,
 }) {
   const background = gradientForCard(card)
+  const image = cardImage(card)
+
+  // 카드번호는 홈에서는 감추고 상세 화면에서만 좌측 하단에 보여줍니다.
+  const showNumber = variant === 'detail' && card.last_four
 
   return (
     <div
-      className={`${styles.card} ${styles[variant]} ${variant === 'detail' ? 'pk-anim-pop-ease' : ''}`}
+      className={[
+        styles.card,
+        styles[variant],
+        image ? styles.hasImage : '',
+        variant === 'detail' ? 'pk-anim-pop-ease' : '',
+      ].join(' ')}
       style={{ background }}
     >
-      <div className={styles.head}>
-        <div>
-          <div className={styles.company}>{card.card_company}</div>
-          <div className={styles.product}>{card.card_name}</div>
-        </div>
-      </div>
+      {image && <CardArt src={image} frame="landscape" />}
 
-      <div className={styles.number}>•••• •••• •••• {card.last_four}</div>
+      {/* 얹을 글자가 있을 때만 막을 깝니다. 아무것도 없으면 사진 그대로. */}
+      {(showStats || showNumber) && <span className={styles.scrim} aria-hidden="true" />}
 
       <div className={styles.foot}>
-        {/* OFF 로 두면 금액을 숨겨 카드 앞면만 깔끔하게 보여줍니다. */}
-        {showStats && (
-          <div className={styles.stats}>
-            <div>
-              <div className={styles.statLabel}>이번 달 사용</div>
-              <div className={styles.statValue}>
-                {spent}
-                <span className={styles.statUnit}>원</span>
+        <div className={styles.footLeft}>
+          {showNumber && (
+            <div className={styles.number}>
+              <span className={styles.dots}>••••</span>
+              {card.last_four}
+            </div>
+          )}
+
+          {/* OFF 로 두면 금액을 숨겨 카드 사진만 깔끔하게 보여줍니다. */}
+          {showStats && (
+            <div className={styles.stats}>
+              <div className={styles.stat}>
+                <div className={styles.statLabel}>이번 달 사용</div>
+                <div className={styles.statValue}>
+                  {spent}
+                  <span className={styles.statUnit}>원</span>
+                </div>
+              </div>
+              <div className={styles.stat}>
+                <div className={styles.statLabel}>받은 혜택</div>
+                <div className={styles.statValue}>
+                  {benefit}
+                  <span className={styles.statUnit}>원</span>
+                </div>
               </div>
             </div>
-            <div>
-              <div className={styles.statLabel}>받은 혜택</div>
-              <div className={`${styles.statValue} ${styles.gold}`}>
-                {benefit}
-                <span className={styles.statUnit}>원</span>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
+
         {expiry && <div className={styles.expiry}>EXP {expiry}</div>}
       </div>
     </div>

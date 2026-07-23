@@ -1,0 +1,33 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  /*
+   * 카드 사진은 장식이라 포인터를 받지 않습니다.
+   * 받게 두면 카드를 잡고 끌 때 브라우저의 기본 이미지 끌기가 시작되면서
+   * pointercancel 이 날아와 스와이프가 중간에 끊깁니다.
+   */
+  pointer-events: none;
+  user-select: none;
+}
+
+.art {
+  /* 사파리·크롬의 이미지 끌어가기(고스트 이미지)까지 막습니다. */
+  -webkit-user-drag: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  /* 비율이 같아 여백 없이 꽉 차고, 어긋나도 잘리지 않습니다. */
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+}
+
+/*
+ * 방향이 어긋난 이미지는 반시계로 90도 돌립니다. 크기는 컴포넌트가 바꿔 넣습니다.
+ * 반시계여야 카드 디자인이 바로 서고, IC칩이 가로형 카드와 같은 왼쪽에 놓입니다.
+ * (시계 방향으로 돌리면 디자인이 거꾸로 뒤집힙니다.)
+ */
+.rotated { transform: translate(-50%, -50%) rotate(-90deg); }

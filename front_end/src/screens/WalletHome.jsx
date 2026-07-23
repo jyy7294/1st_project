@@ -15,9 +15,10 @@ const COLLAPSE_SNAP = 0.45
 /** 이 거리 이상 움직이면 탭이 아니라 스와이프로 봅니다. */
 const DRAG_SLOP = 8
 
-const CARD_HEIGHT = 186
+// 카드 폭 360px(화면 404 − 좌우 여백 44)에 실물 카드 비율을 적용한 높이
+const CARD_HEIGHT = Math.round(360 / (85.6 / 54))
 const OFFSET_COLLAPSED = 54 // 접힌 카드 간격
-const OFFSET_EXPANDED = 176 // 펼친 카드 간격
+const OFFSET_EXPANDED = CARD_HEIGHT - 10 // 펼친 카드 간격 (10px 만 겹칩니다)
 
 export default function WalletHome() {
   const { state, dispatch } = useApp()
@@ -46,37 +47,70 @@ export default function WalletHome() {
   // 펼친 카드 뭉치를 위로 스와이프하면 접습니다. 아래 안내 문구 버튼은 그대로 둡니다.
   const drag = useRef(null)
   const swiped = useRef(false)
+  // 손을 댄 카드 index. 끌기 시작하면 이 카드가 '잡힌' 상태가 됩니다.
+  const pressed = useRef(-1)
   // 끌어올린 정도 0~1. 손을 따라 카드 간격이 좁아집니다. null 이면 드래그 중이 아님.
   const [progress, setProgress] = useState(null)
   // 잡고 있는 카드 index. 손을 대면 살짝 커져서 '잡혔다'는 게 보입니다.
   const [grabbed, setGrabbed] = useState(-1)
+  // 손을 뗄 때 참조할 최신 진행도. state 는 이벤트 핸들러에 늦게 반영됩니다.
+  const progressRef = useRef(0)
+
+  const dragging = progress !== null
 
   function onPointerDown(e) {
     if (!expanded) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     drag.current = { y: e.clientY }
     swiped.current = false
+    progressRef.current = 0
     setProgress(0)
   }
 
-  function onPointerMove(e) {
-    if (!drag.current) return
-    const up = drag.current.y - e.clientY
-    if (up > DRAG_SLOP) swiped.current = true
-    // 위로 끈 거리를 0~1 로 바꿔 카드 간격에 그대로 반영합니다.
-    setProgress(Math.max(0, Math.min(up / COLLAPSE_TRAVEL, 1)))
-  }
+  /*
+   * 끌기 중에는 window 에서 좌표를 받습니다.
+   *
+   * 카드 뭉치에만 핸들러를 두면 손이 뭉치 밖(위쪽 QR 바 등)으로 나가는 순간
+   * pointermove 가 끊겨 카드가 따라오다 멈추고, pointerup 도 밖에서 일어나
+   * 끌기 상태가 풀리지 않습니다. 위로 260px 을 끌어야 접히는 동작이라
+   * 뭉치를 벗어나는 일이 실제로 자주 생깁니다.
+   */
+  useEffect(() => {
+    if (!dragging) return undefined
 
-  function onPointerUp() {
-    setGrabbed(-1)
-    if (!drag.current) return
-    const reached = (progress ?? 0) >= COLLAPSE_SNAP
-    drag.current = null
-    setProgress(null)
-    if (reached) dispatch({ type: A.TOGGLE_EXPANDED })
-  }
+    function move(e) {
+      if (!drag.current) return
+      const up = drag.current.y - e.clientY
+      if (up > DRAG_SLOP) {
+        swiped.current = true
+        setGrabbed((current) => (current === pressed.current ? current : pressed.current))
+      }
+      // 위로 끈 거리를 0~1 로 바꿔 카드 간격에 그대로 반영합니다.
+      const next = Math.max(0, Math.min(up / COLLAPSE_TRAVEL, 1))
+      progressRef.current = next
+      setProgress(next)
+    }
 
-  const dragging = progress !== null
+    function end() {
+      setGrabbed(-1)
+      pressed.current = -1
+      if (!drag.current) return
+      const reached = progressRef.current >= COLLAPSE_SNAP
+      drag.current = null
+      setProgress(null)
+      if (reached) dispatch({ type: A.TOGGLE_EXPANDED })
+    }
+
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+    }
+  }, [dragging, dispatch])
+
   // 드래그 중에는 펼친 간격 → 접힌 간격 사이를 손 위치대로 오갑니다.
   const offset = expanded
     ? OFFSET_EXPANDED + (OFFSET_COLLAPSED - OFFSET_EXPANDED) * (progress ?? 0)
@@ -174,9 +208,6 @@ export default function WalletHome() {
         ].join(' ')}
         style={{ height: stackHeight }}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
       >
         {cards.map((card, i) => {
           const selected = expanded && i === active
@@ -189,8 +220,10 @@ export default function WalletHome() {
                 grabbed === i ? styles.grabbed : '',
               ].join(' ')}
               style={{ top: i * offset, zIndex: grabbed === i ? 30 : selected ? 20 : i }}
+              // 잡기 확대는 실제로 끌기 시작했을 때만 켭니다.
+              // 그냥 탭할 때까지 커졌다 작아지면 선택 애니메이션과 겹쳐 산만합니다.
               onPointerDown={() => {
-                if (expanded) setGrabbed(i)
+                if (expanded) pressed.current = i
               }}
               onClick={() => {
                 // 스와이프로 접은 직후에는 카드 선택이 따라오지 않게 막습니다.

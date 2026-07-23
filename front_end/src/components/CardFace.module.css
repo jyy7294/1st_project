@@ -1,69 +1,115 @@
 .card {
   position: relative;
+  /* 실물 카드 비율 85.6 : 54. 카드 이미지도 같은 비율이라 잘리는 부분이 없습니다. */
+  aspect-ratio: 85.6 / 54;
+  isolation: isolate;
   border-radius: var(--r-card);
   color: #fff;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   box-shadow: 0 14px 26px -12px rgba(10, 29, 79, .5);
   overflow: hidden;
 }
 
-.stack { height: 186px; }
+/* 사진 위 요소는 모두 사진보다 앞에 옵니다. */
+.card > *:not(span[aria-hidden]) { position: relative; z-index: 1; }
+
+.stack { width: 100%; }
 
 .detail {
-  height: 200px;
-  border-radius: 22px;
+  border-radius: 15px;
   padding: 22px 24px;
   box-shadow: 0 22px 40px -18px rgba(10, 29, 79, .6);
   --pk-dur: .35s;
 }
 
-.head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.company { font-size: 11px; color: rgba(255, 255, 255, .6); font-weight: 500; }
-.detail .company { font-size: 12px; }
-
-.product { font-size: 15.5px; font-weight: 700; letter-spacing: -.2px; margin-top: 1px; }
-.detail .product { font-size: 18px; margin-top: 2px; }
-
-.number {
-  font-size: 16px;
-  letter-spacing: 2.5px;
-  color: rgba(255, 255, 255, .82);
-  font-weight: 500;
-}
-
-.detail .number { font-size: 18px; letter-spacing: 3px; color: rgba(255, 255, 255, .85); }
-
 .foot {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  gap: 10px;
 }
 
-.stats { display: flex; gap: 18px; }
-.detail .stats { gap: 22px; }
+.footLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
 
-.statLabel { font-size: 10.5px; color: rgba(255, 255, 255, .55); }
+/*
+ * 금액·카드번호를 얹는 자리에만 까는 어두운 막.
+ *
+ * 밝은 카드 사진 위에서도 흰 글자가 읽히게 해 줍니다.
+ * 카드 디자인을 가리지 않도록 아래쪽에서만, 아주 옅게 깔립니다.
+ */
+.scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 62%;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 12, 28, 0) 0%,
+    rgba(6, 12, 28, .16) 52%,
+    rgba(6, 12, 28, .34) 100%
+  );
+  pointer-events: none;
+}
+
+/*
+ * 얹는 글자는 흰색. 막 위라 별도 외곽선 없이도 읽히고,
+ * 아주 옅은 그림자만 더해 사진의 밝은 부분에서도 경계가 살아납니다.
+ */
+.engrave {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(6, 12, 28, .45);
+}
+
+/* 카드번호 — 좌측 하단에 끝 4자리만 */
+.number {
+  composes: engrave;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.dots { letter-spacing: 2.5px; font-size: 13px; opacity: .9; }
+.detail .number { font-size: 16px; }
+
+.stats { display: flex; gap: 18px; }
+
+.stat { composes: engrave; }
+
+.statLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
 .detail .statLabel { font-size: 11px; }
 
 .statValue {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 900;
   letter-spacing: -.4px;
   margin-top: 1px;
 }
 
-.detail .statValue { font-size: 19px; }
-.statValue.gold { color: var(--gold); }
+.detail .statValue { font-size: 18px; }
+
 .statUnit { font-size: 11px; font-weight: 600; }
 .detail .statUnit { font-size: 12px; }
 
-.expiry { font-size: 11px; color: rgba(255, 255, 255, .7); }
+.expiry {
+  composes: engrave;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
+
 .detail .expiry { font-size: 12px; }

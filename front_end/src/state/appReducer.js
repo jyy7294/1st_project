@@ -1,7 +1,7 @@
 // 앱 전체 상태 전이. 순수 함수 — 타이머·fetch 같은 부수효과는 화면 컴포넌트가 가집니다.
 
 import { recommendedIndex } from '../utils/compare.js'
-import { LATEST_MONTH_INDEX } from '../data/report.js'
+import { REPORT_TAB_COUNT } from '../data/report.js'
 
 export const A = {
   SET_SCREEN: 'SET_SCREEN',
@@ -22,8 +22,14 @@ export const A = {
   START_RECO: 'START_RECO',
   SET_RECO_TYPE: 'SET_RECO_TYPE',
   OPEN_RECO_DETAIL: 'OPEN_RECO_DETAIL',
+  OPEN_BENEFITS: 'OPEN_BENEFITS',
+  SET_RECO_CARDS: 'SET_RECO_CARDS',
+  SET_RECO_STATUS: 'SET_RECO_STATUS',
   SET_REPORT_MONTH: 'SET_REPORT_MONTH',
   TOGGLE_REPORT_CARD: 'TOGGLE_REPORT_CARD',
+  SET_REPORT_DATA: 'SET_REPORT_DATA',
+  SET_REPORT_STATUS: 'SET_REPORT_STATUS',
+  SET_SPENDING_MIX: 'SET_SPENDING_MIX',
   START_ADD: 'START_ADD',
   SET_ADD_STEP: 'SET_ADD_STEP',
   SET_ADD_FORM: 'SET_ADD_FORM',
@@ -55,6 +61,8 @@ export const initialState = {
   expanded: false, // 홈 카드 스택 펼침 여부
   active: 0, // 홈에서 선택된 카드 index
   detailReturn: 'home', // 카드 상세에서 뒤로 갈 화면 ('home' | 'cards')
+  // 상세 혜택 화면이 어떤 카드 것인지. 'owned'(보유 카드) | 'reco'(추천 카드)
+  benefitsSource: 'owned',
   menuOpen: false, // 상세 화면 ⋯ 메뉴
   showCardStats: false, // 카드 앞면에 사용금액·받은 혜택을 표시할지. 기본은 숨김
   // 카드별 예외. { [card_id]: true|false } — 없으면 위 전체 설정을 따릅니다.
@@ -67,8 +75,17 @@ export const initialState = {
   recoSelId: null, // 분석 결과를 보고 있는 추천 카드 id. null 이면 1위
   // 결제 직후 '구경하러 가기'로 들어오면 그 결제 업종이 담깁니다. null 이면 일반 추천.
   recoCategory: null,
-  reportMonth: LATEST_MONTH_INDEX, // 리포트에서 보고 있는 달
+  // 소비패턴 기반(광고 배너) 추천을 백엔드에서 받아 탭별로 담아 둡니다. null = 미로딩.
+  recoCards: { credit: null, check: null },
+  recoMeta: null, // 분석 기간·상위 업종·상위 가맹점
+  recoStatus: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+  reportMonth: REPORT_TAB_COUNT - 1, // 리포트에서 보고 있는 달 (기본 = 이번 달)
   reportCardOpen: -1, // 리포트 '카드별 혜택'에서 펼친 카드 index. -1 이면 모두 접힘
+  // 월(YYYY-MM)별 소비 리포트를 백엔드에서 받아 캐시합니다.
+  reportData: {},
+  reportStatus: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+  // 최근 3개월 업종별 소비(빈도·금액). 추천 분석 화면의 원형 차트에 씁니다.
+  spendingMix: null,
   transaction: null, // QR로 읽은 결제정보
   payIdx: 0, // comparison 배열(백엔드 순서)에서 결제에 쓸 카드 index
   result: null, // 백엔드 추천 응답
@@ -174,6 +191,10 @@ export function appReducer(state, action) {
         recoType: 'credit',
         recoSelId: null,
         recoCategory: action.category || null,
+        // 새로 진입할 때마다 소비패턴 추천은 다시 받아옵니다.
+        recoCards: { credit: null, check: null },
+        recoMeta: null,
+        recoStatus: 'idle',
         // 결제 흐름에서 넘어온 경우 결제 화면을 닫습니다.
         payStep: 'none',
       }
@@ -185,6 +206,21 @@ export function appReducer(state, action) {
     case A.OPEN_RECO_DETAIL:
       return { ...state, screen: 'recoDetail', recoSelId: action.id }
 
+    case A.OPEN_BENEFITS:
+      // 보유 카드 상세와 추천 카드 분석에서 같은 '상세 혜택' 화면을 씁니다.
+      return { ...state, screen: 'benefits', benefitsSource: action.source || 'owned' }
+
+    case A.SET_RECO_CARDS:
+      return {
+        ...state,
+        recoCards: { ...state.recoCards, [action.cardType]: action.cards },
+        recoMeta: action.meta ?? state.recoMeta,
+        recoStatus: 'ready',
+      }
+
+    case A.SET_RECO_STATUS:
+      return { ...state, recoStatus: action.status }
+
     case A.SET_REPORT_MONTH:
       // 달을 바꾸면 펼쳐둔 카드는 접습니다 (다른 달 금액이 남아 보이지 않게).
       return { ...state, reportMonth: action.index, reportCardOpen: -1 }
@@ -194,6 +230,19 @@ export function appReducer(state, action) {
         ...state,
         reportCardOpen: state.reportCardOpen === action.index ? -1 : action.index,
       }
+
+    case A.SET_REPORT_DATA:
+      return {
+        ...state,
+        reportData: { ...state.reportData, [action.month]: action.report },
+        reportStatus: 'ready',
+      }
+
+    case A.SET_REPORT_STATUS:
+      return { ...state, reportStatus: action.status }
+
+    case A.SET_SPENDING_MIX:
+      return { ...state, spendingMix: action.mix }
 
     case A.START_ADD:
       return {

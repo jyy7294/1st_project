@@ -95,8 +95,8 @@
 }
 
 .stackItem.selected {
-  transform: scale(1.02) translateY(-3px);
-  filter: drop-shadow(0 14px 22px rgba(10, 29, 79, .34));
+  transform: scale(1.05) translateY(-6px);
+  filter: drop-shadow(0 22px 34px rgba(10, 29, 79, .5));
 }
 
 /* 손으로 잡고 있는 카드 — 조금 더 커지고 그림자가 깊어져 들린 느낌을 줍니다.

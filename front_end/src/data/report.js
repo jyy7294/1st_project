@@ -81,20 +81,94 @@ export const REPORT_MONTHS = [
   },
 ]
 
-/** 카테고리 도넛·범례 색. 없는 이름은 회색으로 떨어집니다. */
+/**
+ * 도넛·범례 색 팔레트.
+ *
+ * 색상환에서 최대한 떨어진 색을 골라 조각끼리 헷갈리지 않게 했고,
+ * 채도는 중간으로 낮춰 형광처럼 튀지 않게 했습니다. 흰 배경에서 모두 읽힙니다.
+ */
+export const PALETTE = [
+  '#3B82F6', // 파랑
+  '#F97316', // 오렌지
+  '#14B8A6', // 틸
+  '#EF4444', // 레드
+  '#8B5CF6', // 퍼플
+  '#22C55E', // 그린
+  '#EC4899', // 핑크
+  '#06B6D4', // 시안
+]
+
+/** '기타'처럼 묶음 항목은 눈에 덜 띄는 중립 회색으로 둡니다. */
+export const DEFAULT_CATEGORY_COLOR = '#9AA3B2'
+
+/** 자주 나오는 카테고리는 팔레트에서 고정 배정합니다. */
 export const CATEGORY_COLORS = {
-  식비: '#19D3C5',
-  생활비: '#2F6BFF',
-  교통: '#7B61FF',
-  여행: '#F26DB0',
-  '의료/건강': '#5BC0FF',
-  쇼핑: '#FFB020',
-  카페: '#F2884B',
-  문화: '#9B8CFF',
-  기타: '#C7CEDB',
+  식비: PALETTE[1], // 오렌지
+  생활비: PALETTE[0], // 파랑
+  교통: PALETTE[4], // 퍼플
+  여행: PALETTE[6], // 핑크
+  '의료/건강': PALETTE[7], // 시안
+  쇼핑: PALETTE[2], // 틸
+  카페: PALETTE[3], // 레드
+  문화: PALETTE[5], // 그린
+  기타: DEFAULT_CATEGORY_COLOR,
 }
 
-export const DEFAULT_CATEGORY_COLOR = '#C7CEDB'
+/**
+ * 카테고리 색. 이름이 같으면 언제나 같은 색이 나오므로
+ * 빈도·금액 차트 두 개에서 같은 업종이 같은 색으로 보입니다.
+ */
+export function colorForCategory(name) {
+  if (!name) return DEFAULT_CATEGORY_COLOR
+  if (name === '기타') return DEFAULT_CATEGORY_COLOR
+  if (CATEGORY_COLORS[name]) return CATEGORY_COLORS[name]
+  let hash = 0
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  }
+  return PALETTE[hash % PALETTE.length]
+}
+
+/**
+ * 한 차트 안에서 쓸 색들을 정합니다.
+ *
+ * 기본은 이름 기준 색(두 차트에서 같은 업종 = 같은 색)이지만,
+ * 그 색이 이미 쓰였으면 남은 팔레트 색으로 밀어 같은 차트 안에서는
+ * 절대 색이 겹치지 않게 합니다.
+ *
+ * @param {string[]} names 조각 이름들 (표시 순서)
+ * @returns {string[]} 같은 순서의 색 배열
+ */
+export function assignColors(names = []) {
+  const used = new Set()
+  return names.map((name) => {
+    let color = colorForCategory(name)
+    if (used.has(color)) {
+      color = PALETTE.find((c) => !used.has(c)) || color
+    }
+    used.add(color)
+    return color
+  })
+}
+
+/**
+ * 리포트 탭에 쓸 최근 n개월 (오늘 기준). 백엔드 spending-report 는 월(YYYY-MM)로 조회합니다.
+ * @returns {{key: string, label: string}[]} 예: [{key:'2026-05', label:'5월'}, ...]
+ */
+export function recentMonths(n = 3, today = new Date()) {
+  const out = []
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+    out.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: `${d.getMonth() + 1}월`,
+    })
+  }
+  return out
+}
+
+/** 리포트 탭에 보여줄 개월 수. 기본 진입은 마지막(이번 달)입니다. */
+export const REPORT_TAB_COUNT = 3
 
 /** 이번 달(마지막 원소)과 지난달. 지난달이 없으면 null. */
 export function monthAt(index) {

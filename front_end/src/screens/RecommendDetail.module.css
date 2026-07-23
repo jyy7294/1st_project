@@ -57,9 +57,10 @@
 }
 
 .cardArt {
+  position: relative;
   width: 172px;
   aspect-ratio: .63;
-  border-radius: 14px;
+  border-radius: 11px;
   box-shadow: 0 22px 44px -14px rgba(10, 29, 79, .5);
   padding: 18px;
   display: flex;
@@ -132,6 +133,188 @@
 .catName { flex: 1; font-size: 15px; font-weight: 700; color: var(--navy-text); }
 .catAmount { font-size: 16px; font-weight: 800; color: var(--teal-deep); }
 
+/* 추천 근거 — 줄글 대신 항목으로 */
+.factList {
+  margin-top: 14px;
+  background: var(--bg-app);
+  border-radius: 14px;
+  padding: 4px 14px;
+}
+
+.factRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid #e9ecf3;
+}
+
+.factRow:last-child { border-bottom: none; }
+
+.factLabel {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.factValue {
+  flex: 1;
+  text-align: right;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--navy-text);
+  word-break: keep-all;
+}
+
+.factSub { font-weight: 600; color: var(--text-2); }
+.factStrong { color: var(--teal-deep); font-size: 15px; font-weight: 800; }
+
+.factNote {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--text-4);
+}
+
+/* 소비 성향 원형 차트 2개 (빈도 / 금액) — 하나의 카드 안에 차트/토글/범례 순 */
+.mixCard {
+  margin-top: 14px;
+  background: var(--bg-app);
+  border-radius: 14px;
+  padding: 14px 12px 12px;
+}
+
+.mixWrap {
+  display: flex;
+  gap: 12px;
+}
+
+/* 차트와 범례 사이의 전체 보기 줄 */
+.mixToggleRow {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e9ecf3;
+}
+
+.mix {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.mixTitle {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--navy-text);
+}
+
+.mixDonut {
+  position: relative;
+  width: 122px;
+  height: 122px;
+  margin: 6px auto 0;
+}
+
+.mixSvg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+.mixCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 도넛 구멍 안에 놓이는 글자 블록. 가운데 정렬해야 링과 간격이 고릅니다. */
+.mixCenterText {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  /* 링에 닿지 않도록 폭을 제한합니다. */
+  max-width: 74px;
+}
+
+/* 차트 바로 위 가운데에 놓이는 1위 배지 */
+.mixRankBadge {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.mixCrown { font-size: 15px; line-height: 1; }
+
+/*
+ * 1위 배지 색.
+ * 이 앱에서 빨강은 '한도 초과·지출 증가' 경고에 쓰고 있어서, 1등 표시에 쓰면
+ * 뜻이 충돌합니다. 왕관과 어울리고 밝은 배경에서도 읽히는 진한 금색을 씁니다.
+ */
+.mixRank {
+  font-size: 12px;
+  font-weight: 800;
+  color: #b8860b;
+  letter-spacing: .3px;
+}
+
+/* 글자 크기는 이름 길이에 맞춰 컴포넌트에서 정합니다(nameFontSize). */
+.mixTopName {
+  font-weight: 800;
+  color: var(--text-2);
+  max-width: 76px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mixTopPct { font-size: 16px; font-weight: 800; }
+
+.mixLegend {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mixRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.mixDot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+
+.mixName {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  color: var(--navy-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mixValue { flex: none; color: var(--text-2); font-weight: 700; }
+
+/* '기타' 설명 */
+.mixFootNote {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e9ecf3;
+  font-size: 11px;
+  color: var(--text-4);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
 .notes {
   margin: 16px 0 0;
   padding-left: 18px;
@@ -172,3 +355,68 @@
 }
 
 .link:hover { color: #fff; }
+
+/* 주요 혜택 — 카드 상세 페이지와 같은 표기 */
+.benefitHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 섹션 제목 우측의 '전체 보기' */
+.moreInline {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.benefitList { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+
+.benefitRow {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.benefitIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+
+.benefitBody { flex: 1; min-width: 0; }
+
+.benefitHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.benefitTitle { font-size: 14px; font-weight: 700; color: var(--navy-text); }
+.benefitRate { font-size: 12.5px; font-weight: 700; color: var(--blue-hover); flex: none; }
+
+.benefitDesc {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* 안내·유의사항 — 맨 아래 섹션. 위 콘텐츠와 구분되게 선을 둡니다. */
+.notesSection {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-bottom: 40px;
+}

@@ -9,11 +9,14 @@ import styles from './QrScreen.module.css'
 const QR_LIFETIME_SEC = 180
 
 /**
- * QR이 리더기에 인식된 뒤 결제정보 화면으로 넘어가기까지의 시간.
- * 실제 결제서버를 붙일 때는 이 타이머 대신 "QR 인식됨" 이벤트(폴링·웹소켓) 응답으로
- * startRecognize() 안의 setRecognizing(true) → dispatch 흐름을 이어 주면 됩니다.
+ * 스캔 라인이 바닥에 닿으면 결제정보 화면으로 넘어갑니다(애니메이션 종료 이벤트).
+ * 이 값은 그 이벤트가 오지 않을 때를 대비한 안전장치입니다.
+ * (스캔 애니메이션 1.2초 + 여유)
+ *
+ * 실제 결제서버를 붙일 때는 "QR 인식됨" 이벤트(폴링·웹소켓) 응답으로
+ * recognize() 안의 setRecognizing(true) 흐름을 이어 주면 됩니다.
  */
-const RECOGNIZE_MS = 1700
+const RECOGNIZE_FALLBACK_MS = 2000
 
 /** 일회용 QR 토큰(표시용 숫자열)을 만듭니다. 실제로는 결제서버가 발급합니다. */
 function makeToken(seed) {
@@ -48,14 +51,20 @@ export default function QrScreen() {
     return () => clearInterval(timer)
   }, [])
 
-  // 인식 연출이 끝나면 기존과 동일하게 결제 플로우를 시작합니다.
+  // 스캔 라인이 끝까지 내려오면(또는 그 이벤트가 안 오면 안전장치로) 결제로 넘어갑니다.
+  const startedPay = useRef(false)
+  function finishScan() {
+    if (startedPay.current) return // 이벤트와 안전장치가 겹쳐도 한 번만
+    startedPay.current = true
+    dispatch({ type: A.START_PAY, transaction: pendingTx.current })
+  }
+
   useEffect(() => {
     if (!recognizing) return undefined
-    const timer = setTimeout(() => {
-      dispatch({ type: A.START_PAY, transaction: pendingTx.current })
-    }, RECOGNIZE_MS)
+    const timer = setTimeout(finishScan, RECOGNIZE_FALLBACK_MS)
     return () => clearTimeout(timer)
-  }, [recognizing, dispatch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recognizing])
 
   const expired = seconds <= 0
   const mm = Math.floor(seconds / 60)
@@ -95,19 +104,24 @@ export default function QrScreen() {
         여기서 카드명을 미리 보여주면 이미 선택된 것처럼 읽혀서 띄우지 않습니다.
       */}
       <div className={styles.qrWrap}>
+        {/*
+          QR이 인식되면 별도 연출 없이 잠깐(RECOGNIZE_MS) 뒤 결제정보 화면으로 넘어갑니다.
+          진행 상태는 스크린리더에만 알립니다.
+        */}
         <QrCode
           token={makeToken(seed)}
           expiresIn={seconds}
           expired={expired}
           onRefresh={refresh}
+          seq={seed}
+          scanning={recognizing}
+          onScanEnd={finishScan}
         />
 
-        {/* QR 인식 중: 문구 없이 회전 링과 퍼지는 원으로만 진행 상태를 보여줍니다. */}
         {recognizing && (
-          <div className={`${styles.recognizeVeil} pk-anim-fade`} role="status" aria-live="polite">
-            <span className={`${styles.recognizePulse} pk-anim-ring`} />
-            <span className={`${styles.recognizeRing} pk-anim-spin pk-reduced-loading`} />
-          </div>
+          <span className={styles.srOnly} role="status" aria-live="polite">
+            QR이 인식되었습니다
+          </span>
         )}
       </div>
 

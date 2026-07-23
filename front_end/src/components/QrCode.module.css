@@ -8,12 +8,33 @@
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .5);
 }
 
+/* QR 과 스캔 라인이 같은 좌표계를 쓰도록 감싸는 자리 */
+.scanner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 .image {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
   transition: opacity .3s ease;
+}
+
+/* 위아래로 오르내리는 빨간 스캔 라인 (애니메이션은 pk-anim-qrscan) */
+.scanLine {
+  position: absolute;
+  left: 8%;
+  top: 8%;
+  width: 84%;
+  height: 3px;
+  border-radius: 3px;
+  background: #ff4d5a;
+  box-shadow: 0 0 10px #ff4d5a;
+  pointer-events: none;
 }
 
 .expiredOverlay {

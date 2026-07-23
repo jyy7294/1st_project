@@ -1,6 +1,10 @@
 // 가상 QR 안에 담기는 "결제정보 데이터".
 // 실제 서비스라면 POS가 만들어 QR에 넣지만, 여기서는 프론트 상수로 시뮬레이션합니다.
-// payment_category 값은 백엔드 카드 혜택의 카테고리명과 정확히 일치해야 혜택이 계산됩니다.
+//
+// payment_category 는 결제정보 수신 화면에 보여줄 뿐, API 로 보내지 않습니다.
+// 혜택 계산에 쓰는 업종은 백엔드가 가맹점명으로 판정합니다(merchant_aliases).
+// 여기 값은 그 판정 결과와 같게 적어 두어 화면 앞뒤가 어긋나지 않게 합니다.
+// (교보문고는 '문구'가 아니라 카드사 기준으로 '영화/문화' 로 잡힙니다.)
 export const MERCHANTS = [
   {
     id: 'starbucks',
@@ -33,7 +37,7 @@ export const MERCHANTS = [
   {
     id: 'kyobo',
     merchant_name: '교보문고 문구',
-    payment_category: '문구',
+    payment_category: '영화/문화',
     payment_amount: 18000,
     emoji: '✏️',
   },

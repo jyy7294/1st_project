@@ -2,6 +2,7 @@
 
 import { RECO_CARDS } from '../data/recommend.js'
 import { CATEGORY_CARDS } from '../data/categoryRecommend.js'
+import { cardImage } from '../data/cardImages.js'
 
 /**
  * 이미 보유한 카드는 추천에서 뺍니다.
@@ -25,12 +26,63 @@ const CATEGORY_GRADIENTS = [
 function adaptCategoryCard(card, i) {
   return {
     ...card,
+    // 실물 카드 이미지 (없으면 그라데이션으로 대체)
+    image: cardImage({ card_id: card.id }),
     // 카드 앞면에 크게 넣을 짧은 이름 (긴 상품명은 잘라 씁니다)
     short: card.name.length > 16 ? `${card.name.slice(0, 16)}…` : card.name,
     grad: CATEGORY_GRADIENTS[i % CATEGORY_GRADIENTS.length],
     // 카테고리 추천은 신규 발급 캐시백 정보가 없어 비워 둡니다.
     cashback: null,
   }
+}
+
+/**
+ * 백엔드 소비패턴 추천 카드(card-recommendations 응답) → 화면 모양.
+ *
+ * total 은 연회비를 뺀 순혜택이라, '혜택'(연회비 전)은 total+fee 로 되돌립니다.
+ * 이미지가 응답에 없으면 우리 카드 이미지 맵으로 대체합니다.
+ */
+export function adaptApiRecoCard(card, i = 0) {
+  return {
+    id: card.id,
+    name: card.name,
+    issuer: card.issuer,
+    benefitName: card.benefitName,
+    rate: card.rate,
+    total: card.total,
+    fee: card.fee,
+    // 총 혜택(연회비 차감 전) = 순혜택 + 연회비
+    benefit: (card.total || 0) + (card.fee || 0),
+    url: card.url || null,
+    image: card.image_url || cardImage({ card_id: card.id }),
+    short: card.name.length > 16 ? `${card.name.slice(0, 16)}…` : card.name,
+    grad: CATEGORY_GRADIENTS[i % CATEGORY_GRADIENTS.length],
+    cashback: null,
+    // 소비패턴 추천에만 있는 값 (분석 결과 화면에서 씀)
+    benefitCategory: card.benefitCategory || null,
+    monthlySpend: card.monthlySpend || 0,
+    recommendationMessage: card.recommendationMessage || '',
+    matchedMerchants: card.matchedMerchants || [],
+  }
+}
+
+/**
+ * 지금 추천 화면이 보여줄 카드 목록.
+ *
+ * 결제 업종 기반(recoCategory 있음)은 정적 스냅샷을, 소비패턴 기반(광고 배너)은
+ * 백엔드에서 받아 state.recoCards 에 담아 둔 목록을 씁니다.
+ */
+export function selectRecoList(state) {
+  if (state.recoCategory) {
+    return rankedRecommendations(state.recoType, state.cards, state.recoCategory)
+  }
+  return state.recoCards?.[state.recoType] || []
+}
+
+/** 현재 선택된(또는 1위) 추천 카드. */
+export function selectRecoCard(state) {
+  const list = selectRecoList(state)
+  return list.find((card) => card.id === state.recoSelId) || list[0] || null
 }
 
 /**

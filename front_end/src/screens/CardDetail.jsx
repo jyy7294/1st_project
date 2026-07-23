@@ -4,7 +4,7 @@ import { A, cardStatsVisible } from '../state/appReducer.js'
 import CardFace from '../components/CardFace.jsx'
 import { fetchCardDetail, removeCard } from '../api/picka.js'
 import { benefitView } from '../utils/benefit.js'
-import { krw } from '../utils/format.js'
+import { krw, krwMinus } from '../utils/format.js'
 import styles from './CardDetail.module.css'
 
 /** 상세 상단에 요약으로 보여줄 주요 혜택 개수. 나머지는 전체 혜택 화면에서 봅니다. */
@@ -16,6 +16,106 @@ const MIN_TX_ROWS = 3
 /** 접힌 상태에서 보여줄 결제내역 개수. 나머지는 '전체보기'로 펼칩니다. */
 const TX_PREVIEW = 5
 
+/** 'YYYY.MM.DD' 문자열을 Date 로. 형식이 아니면 null. */
+function parseTxDate(text) {
+  const parts = String(text || '').split('.').map(Number)
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return null
+  return new Date(parts[0], parts[1] - 1, parts[2])
+}
+
+/** 기준일에서 한 달 뺀 날짜. */
+function oneMonthBefore(date) {
+  const d = new Date(date)
+  d.setMonth(d.getMonth() - 1)
+  return d
+}
+
+/**
+ * 전체보기에서 보여줄 '최근 1달' 결제내역.
+ *
+ * 가장 최근 결제일을 기준으로 한 달 전까지만 남깁니다. 데모 데이터가
+ * 과거 날짜라 '오늘' 기준으로 자르면 목록이 거의 비므로, 실제 데이터의
+ * 마지막 한 달을 기준으로 삼아 그보다 오래된 내역만 걸러냅니다.
+ *
+ * @param {Array} txList 최신순 결제내역
+ */
+function lastMonthTx(txList) {
+  if (txList.length === 0) return txList
+
+  const newest = parseTxDate(txList[0].date)
+  if (!newest) return txList // 날짜를 못 읽으면 그대로 둡니다.
+
+  const cutoff = oneMonthBefore(newest)
+  return txList.filter((t) => {
+    const d = parseTxDate(t.date)
+    return d ? d >= cutoff : true
+  })
+}
+
+/**
+ * 실적·한도 막대 한 줄.
+ *
+ * @param {object} props
+ * @param {string} props.label 줄 제목
+ * @param {number} props.value 현재 값
+ * @param {number} props.total 기준 값
+ * @param {boolean} [props.isLimit] 혜택 한도 줄인지. 다 차면 좋은 게 아니라 경고입니다.
+ */
+function QuotaRow({ label, value, total, isLimit = false, showRemaining = false }) {
+  const ratio = total > 0 ? Math.min(value / total, 1) : 0
+  const full = total > 0 && value >= total
+  const remaining = Math.max(0, total - value)
+
+  let status
+  let statusClass
+  let fillClass
+
+  if (isLimit) {
+    // 한도를 다 쓰면 더 받을 혜택이 없다는 뜻이라 다른 카드를 권합니다.
+    status = full ? '한도 달성' : `${krw(remaining)}원 남음`
+    statusClass = full ? styles.quotaOver : ''
+    fillClass = full ? styles.quotaFillOver : styles.quotaFillLimit
+  } else if (showRemaining) {
+    // 이번 달 실적 진행 — 목표까지 남은 금액을 안내합니다.
+    status = full ? '달성' : `${krw(remaining)}원 남음`
+    statusClass = full ? styles.quotaDone : ''
+    // 진행 막대는 초록으로 고정합니다.
+    fillClass = styles.quotaFillDone
+  } else {
+    // 전월 실적 — 달성 여부만 이진으로 보여 줍니다 (초록/빨강).
+    status = full ? '달성' : '미달성'
+    statusClass = full ? styles.quotaDone : styles.quotaMiss
+    fillClass = full
+      ? styles.quotaFillDone
+      : ratio >= 0.5
+        ? styles.quotaFillWarn
+        : styles.quotaFillDanger
+  }
+
+  return (
+    <div className={styles.quotaRow}>
+      <div className={styles.quotaHead}>
+        <span className={styles.quotaLabel}>{label}</span>
+        <span className={`${styles.quotaStatus} ${statusClass}`}>{status}</span>
+      </div>
+      <div className={styles.quotaTrack}>
+        <div
+          className={`${styles.quotaFill} ${fillClass}`}
+          style={{ width: `${ratio * 100}%` }}
+        />
+      </div>
+      <div className={styles.quotaNums}>
+        {/* 한도는 다 채우면 거기서 멈춥니다 (한도보다 큰 값이 찍히지 않게). */}
+        {krw(isLimit ? Math.min(value, total) : value)}원 / {krw(total)}원
+      </div>
+
+      {isLimit && full && (
+        <div className={styles.quotaHint}>💡 다른 카드 사용을 추천해요!</div>
+      )}
+    </div>
+  )
+}
+
 export default function CardDetail() {
   const { state, dispatch } = useApp()
   const card = state.cards[state.active]
@@ -24,7 +124,7 @@ export default function CardDetail() {
   const [removing, setRemoving] = useState(false)
   const [txOpen, setTxOpen] = useState(false)
   // 혜택·결제내역은 이 화면에 들어올 때 백엔드에서 받아옵니다.
-  const [detail, setDetail] = useState({ benefits: [], transactions: [] })
+  const [detail, setDetail] = useState({ card: null, benefits: [], transactions: [] })
 
   const userId = state.user?.userId
   const cardId = card?.card_id
@@ -36,11 +136,13 @@ export default function CardDetail() {
     let cancelled = false
     fetchCardDetail(userId, cardId)
       .then((data) => {
-        if (!cancelled) setDetail({ benefits: data.benefits, transactions: data.transactions })
+        if (!cancelled) {
+          setDetail({ card: data.card, benefits: data.benefits, transactions: data.transactions })
+        }
       })
       .catch(() => {
         // 상세를 못 받아도 카드 앞면은 그대로 보여 줍니다.
-        if (!cancelled) setDetail({ benefits: [], transactions: [] })
+        if (!cancelled) setDetail({ card: null, benefits: [], transactions: [] })
       })
     return () => {
       cancelled = true
@@ -50,10 +152,23 @@ export default function CardDetail() {
   // 카드를 지운 직후처럼 선택 index가 비면 홈으로 되돌립니다.
   if (!card) return null
 
+  // 실적·한도 숫자는 결제 직후 바뀌므로 상세 응답이 오면 그쪽을 씁니다.
+  const usage = detail.card || card
+  const required = usage.required_spending || 0
+  const benefitLimit = usage.benefit_limit || 0
+  const showQuota = required > 0 || benefitLimit > 0
+
   const benefits = detail.benefits
   const highlights = benefits.slice(0, HIGHLIGHT_COUNT).map(benefitView)
   const allTx = detail.transactions
-  const recent = txOpen ? allTx : allTx.slice(0, TX_PREVIEW)
+  // 전체보기는 최근 1달치만, 접힌 상태는 최신 5건만 보여줍니다.
+  const monthTx = lastMonthTx(allTx)
+  /*
+   * 펼쳤을 때 실제로 더 보여줄 게 있을 때만 토글을 답니다.
+   * (받아온 건수가 많아도 최근 1달치가 5건 이하면 눌러도 목록이 그대로입니다.)
+   */
+  const canExpand = monthTx.length > TX_PREVIEW
+  const recent = txOpen && canExpand ? monthTx : allTx.slice(0, TX_PREVIEW)
   // 내역이 3건보다 적으면 빈 줄로 채워 목록 높이를 유지합니다.
   const blanks = Math.max(0, MIN_TX_ROWS - recent.length)
 
@@ -146,13 +261,46 @@ export default function CardDetail() {
         />
       </div>
 
+      {showQuota && (
+        <div className={styles.quotaPanel}>
+          <div className={styles.quotaTitle}>실적 · 혜택 한도</div>
+
+          {required > 0 ? (
+            <>
+              <QuotaRow
+                label="전월 실적 달성"
+                value={usage.previous_month_spending || 0}
+                total={required}
+              />
+              <QuotaRow
+                label="이번 달 실적 진행"
+                value={usage.current_month_spending || 0}
+                total={required}
+                showRemaining
+              />
+            </>
+          ) : (
+            <div className={styles.quotaNote}>전월 실적 조건이 없는 카드예요.</div>
+          )}
+
+          {benefitLimit > 0 && (
+            <QuotaRow
+              label="월 혜택 한도"
+              value={usage.benefit_used || 0}
+              total={benefitLimit}
+              isLimit
+            />
+          )}
+        </div>
+      )}
+
       <div className={styles.sectionHead}>
         <span className={styles.sectionTitle}>주요 혜택</span>
         {benefits.length > 0 && (
           <button
             type="button"
             className={styles.moreBtn}
-            onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'benefits' })}
+            onClick={() => dispatch({ type: A.OPEN_BENEFITS, source: 'owned' })}
           >
             전체보기
           </button>
@@ -182,7 +330,7 @@ export default function CardDetail() {
 
       <div className={styles.sectionHead}>
         <span className={styles.sectionTitle}>최근 결제내역</span>
-        {allTx.length > TX_PREVIEW && (
+        {canExpand && (
           <button
             type="button"
             className={styles.moreBtn}
@@ -208,7 +356,7 @@ export default function CardDetail() {
               </div>
             </div>
             <div className={styles.txAmountBox}>
-              <div className={styles.txAmount}>-{krw(t.amount)}원</div>
+              <div className={styles.txAmount}>{krwMinus(t.amount)}원</div>
               <div className={styles.txSaved}>{t.saved}</div>
             </div>
           </div>

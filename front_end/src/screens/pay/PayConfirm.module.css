@@ -49,7 +49,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
 
-.swatch { width: 42px; height: 28px; border-radius: 6px; flex: none; }
+.swatch { position: relative; width: 42px; height: 28px; border-radius: 6px; flex: none; overflow: hidden; }
 .cardLabel { font-size: 10.5px; color: rgba(255, 255, 255, .45); }
 .cardName { font-size: 14.5px; font-weight: 700; color: #fff; }
 .check { color: var(--green-pay); font-size: 16px; }

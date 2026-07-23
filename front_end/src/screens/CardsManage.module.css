@@ -119,7 +119,14 @@
 
 .cardRow:active { transform: scale(.99); }
 
-.swatch { width: 56px; height: 36px; border-radius: 8px; flex: none; }
+.swatch {
+  position: relative;
+  width: 56px;
+  height: 36px;
+  border-radius: 5px;
+  flex: none;
+  overflow: hidden;
+}
 
 .cardBody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .cardCompany { font-size: 14.5px; font-weight: 700; color: var(--navy-text); }

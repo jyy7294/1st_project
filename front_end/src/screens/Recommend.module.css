@@ -46,6 +46,9 @@
   font-weight: 800;
   color: var(--navy-text);
   letter-spacing: -.5px;
+  /* 업종명이 길어도 단어 중간에서 끊기지 않게 */
+  word-break: keep-all;
+  line-height: 1.35;
 }
 
 .title + .title { margin-top: 6px; }
@@ -85,9 +88,10 @@
 .cardArtWrap { width: 118px; flex: none; }
 
 .cardArt {
+  position: relative;
   width: 100%;
   aspect-ratio: .63;
-  border-radius: 12px;
+  border-radius: 9px;
   box-shadow: 0 14px 28px -10px rgba(10, 29, 79, .5);
   padding: 14px;
   display: flex;
@@ -167,9 +171,10 @@
 .cardArtWrapSm { width: 96px; flex: none; }
 
 .cardArtSm {
+  position: relative;
   width: 100%;
   aspect-ratio: .63;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 10px 22px -10px rgba(10, 29, 79, .45);
   padding: 12px;
   display: flex;
