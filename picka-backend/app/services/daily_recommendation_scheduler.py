@@ -16,6 +16,7 @@ from app.services.privacy_audit_service import delete_expired_privacy_audits
 from app.services.recommendation_audit_service import (
     delete_expired_recommendation_audits,
 )
+from app.services.auth_service import delete_stale_refresh_tokens
 
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ def refresh_all_daily_recommendations() -> None:
         try:
             deleted_privacy_logs = delete_expired_privacy_audits(db)
             deleted_recommendation_logs = delete_expired_recommendation_audits(db)
+            deleted_refresh_tokens = delete_stale_refresh_tokens(db)
             db.commit()
             user_ids = db.scalars(select(User.id).order_by(User.id)).all()
             for user_id in user_ids:
@@ -62,6 +64,10 @@ def refresh_all_daily_recommendations() -> None:
                 "Expired audit logs deleted: privacy=%d recommendation=%d",
                 deleted_privacy_logs,
                 deleted_recommendation_logs,
+            )
+            logger.info(
+                "Expired or stale revoked refresh tokens deleted: %d",
+                deleted_refresh_tokens,
             )
         except Exception:
             logger.exception("Failed to refresh daily card recommendations")

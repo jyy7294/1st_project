@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -107,36 +107,25 @@ def stop_daily_recommendation_scheduler() -> None:
     daily_recommendation_scheduler.stop()
 
 
-VERIFICATION_STATUSES = {
-    "VERIFIED",
-    "SELF_REPORTED",
-    "INFERRED",
-    "UNVERIFIED",
-}
 COMPARISON_OPERATORS = {"EQ", "GTE", "LTE", "CONTAINS"}
 
 
-class UserEligibilityInput(BaseModel):
+class StrictRequestModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class UserEligibilityInput(StrictRequestModel):
     eligibility_type: str = Field(min_length=1, max_length=100)
     eligibility_value: str = Field(min_length=1, max_length=255)
-    verification_status: str = "SELF_REPORTED"
-    verified_at: datetime | None = None
     expires_at: datetime | None = None
 
-    @field_validator("eligibility_type", "verification_status")
+    @field_validator("eligibility_type")
     @classmethod
     def normalize_uppercase(cls, value: str) -> str:
         return value.strip().upper()
 
-    @field_validator("verification_status")
-    @classmethod
-    def validate_status(cls, value: str) -> str:
-        if value not in VERIFICATION_STATUSES:
-            raise ValueError("지원하지 않는 verification_status입니다.")
-        return value
 
-
-class UserEligibilityUpdateRequest(BaseModel):
+class UserEligibilityUpdateRequest(StrictRequestModel):
     eligibilities: list[UserEligibilityInput]
 
     @model_validator(mode="after")
@@ -147,7 +136,7 @@ class UserEligibilityUpdateRequest(BaseModel):
         return self
 
 
-class PersonalProfileUpdateRequest(BaseModel):
+class PersonalProfileUpdateRequest(StrictRequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     birth_date: date | None = None
     phone_number: str | None = Field(default=None, max_length=30)
@@ -188,7 +177,7 @@ class PersonalProfileUpdateRequest(BaseModel):
         return self
 
 
-class CardEligibilityRuleInput(BaseModel):
+class CardEligibilityRuleInput(StrictRequestModel):
     eligibility_type: str = Field(min_length=1, max_length=100)
     required_value: str = Field(min_length=1, max_length=255)
     comparison_operator: str = "EQ"
@@ -207,7 +196,7 @@ class CardEligibilityRuleInput(BaseModel):
         return value
 
 
-class CardEligibilityRuleUpdateRequest(BaseModel):
+class CardEligibilityRuleUpdateRequest(StrictRequestModel):
     rules: list[CardEligibilityRuleInput]
 
     @model_validator(mode="after")
@@ -218,7 +207,7 @@ class CardEligibilityRuleUpdateRequest(BaseModel):
         return self
 
 
-class RecommendationRequest(BaseModel):
+class RecommendationRequest(StrictRequestModel):
     user_id: int = Field(..., gt=0, examples=[2])
     merchant_name: str = Field(..., min_length=1, examples=["스타벅스 강남점"])
     payment_category: str | None = Field(default=None, examples=["카페/디저트"])
@@ -230,7 +219,7 @@ class RecommendationRequest(BaseModel):
     )
 
 
-class CardSelectionRequest(BaseModel):
+class CardSelectionRequest(StrictRequestModel):
     user_id: int = Field(..., gt=0, examples=[2])
     merchant_name: str = Field(
         ...,
@@ -258,7 +247,7 @@ class CardSelectionRequest(BaseModel):
     )
 
 
-class TransactionCreateRequest(BaseModel):
+class TransactionCreateRequest(StrictRequestModel):
     user_id: int = Field(..., examples=[2])
     card_id: int = Field(..., examples=[53])
     merchant_name: str = Field(
@@ -347,9 +336,13 @@ class TransactionHistoryListResponse(BaseModel):
     transactions: list[TransactionHistoryItemResponse]
 
 
-class LocalLoginRequest(BaseModel):
-    email: str = Field(..., min_length=1, examples=["test@example.com"])
-    password: str = Field(..., min_length=1, examples=["password123"])
+class LocalLoginRequest(StrictRequestModel):
+    email: str = Field(
+        ..., min_length=3, max_length=320, examples=["test@example.com"]
+    )
+    password: str = Field(
+        ..., min_length=1, max_length=256, examples=["password123"]
+    )
 
 
 class AuthUserResponse(BaseModel):
@@ -368,7 +361,7 @@ class LoginResponse(BaseModel):
     user: AuthUserResponse
 
 
-class RefreshTokenRequest(BaseModel):
+class RefreshTokenRequest(StrictRequestModel):
     refresh_token: str = Field(min_length=1)
 
 
@@ -384,7 +377,7 @@ class LogoutResponse(BaseModel):
     message: str
 
 
-class ManualCardRegistrationRequest(BaseModel):
+class ManualCardRegistrationRequest(StrictRequestModel):
     card_number: str = Field(
         ...,
         examples=["1111-2222-3333-4444"],
@@ -573,7 +566,6 @@ def _user_eligibility_payload(item: UserEligibility) -> dict:
             context=f"eligibility:{item.user_id}:{item.eligibility_type}",
         )
     return {
-        "id": item.id,
         "user_id": item.user_id,
         "eligibility_type": item.eligibility_type,
         "eligibility_value": value,
@@ -714,7 +706,7 @@ def update_personal_profile(
             row = existing.get(item.eligibility_type)
             values_changed = row is None or any((
                 row.eligibility_value != item.eligibility_value,
-                row.verification_status != item.verification_status,
+                row.verification_status != "SELF_REPORTED",
                 row.expires_at != item.expires_at,
             ))
             if row is None:
@@ -722,21 +714,17 @@ def update_personal_profile(
                     user_id=user_id,
                     eligibility_type=item.eligibility_type,
                     eligibility_value=item.eligibility_value,
-                    verification_status=item.verification_status,
+                    verification_status="SELF_REPORTED",
                 )
                 db.add(row)
             else:
                 row.eligibility_value = item.eligibility_value
-                row.verification_status = item.verification_status
+                row.verification_status = "SELF_REPORTED"
             row.eligibility_value_encrypted = encrypt_text(
                 item.eligibility_value,
                 context=f"eligibility:{user_id}:{item.eligibility_type}",
             )
-            row.verified_at = (
-                None
-                if item.verification_status == "UNVERIFIED"
-                else item.verified_at or now
-            )
+            row.verified_at = now
             row.expires_at = item.expires_at
             if values_changed:
                 changed_fields.append(f"eligibility.{item.eligibility_type}")
@@ -803,21 +791,17 @@ def update_user_eligibilities(
                 user_id=user_id,
                 eligibility_type=item.eligibility_type,
                 eligibility_value=item.eligibility_value,
-                verification_status=item.verification_status,
+                verification_status="SELF_REPORTED",
             )
             db.add(row)
         else:
             row.eligibility_value = item.eligibility_value
-            row.verification_status = item.verification_status
+            row.verification_status = "SELF_REPORTED"
         row.eligibility_value_encrypted = encrypt_text(
             item.eligibility_value,
             context=f"eligibility:{user_id}:{item.eligibility_type}",
         )
-        row.verified_at = (
-            None
-            if item.verification_status == "UNVERIFIED"
-            else item.verified_at or now
-        )
+        row.verified_at = now
         row.expires_at = item.expires_at
 
     db.execute(

@@ -115,7 +115,6 @@ class UserEligibilityModelTest(unittest.TestCase):
             json={"eligibilities": [{
                 "eligibility_type": "student",
                 "eligibility_value": "true",
-                "verification_status": "SELF_REPORTED",
             }]},
         )
 
@@ -124,8 +123,35 @@ class UserEligibilityModelTest(unittest.TestCase):
             response.json()["eligibilities"][0]["eligibility_type"],
             "STUDENT",
         )
+        self.assertEqual(
+            response.json()["eligibilities"][0]["verification_status"],
+            "SELF_REPORTED",
+        )
+        self.assertNotIn("id", response.json()["eligibilities"][0])
         with self.Session() as db:
             self.assertEqual(db.query(CardRecommendationSnapshot).count(), 0)
+
+    def test_user_cannot_self_assign_verified_eligibility(self):
+        with self.Session() as db:
+            user = User(id=1, email="verify@example.com", name="Verify User")
+            db.add(user)
+            db.commit()
+            token = create_access_token(user)
+
+        response = self.client.put(
+            "/api/v1/users/1/eligibilities",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"eligibilities": [{
+                "eligibility_type": "STUDENT",
+                "eligibility_value": "true",
+                "verification_status": "VERIFIED",
+                "verified_at": "2026-07-24T00:00:00Z",
+            }]},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        with self.Session() as db:
+            self.assertEqual(db.query(UserEligibility).count(), 0)
 
     def test_card_rule_api_replaces_rules(self):
         with self.Session() as db:

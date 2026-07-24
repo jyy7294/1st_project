@@ -11,7 +11,7 @@ from uuid import uuid4
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -23,6 +23,23 @@ SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
 bearer_scheme = HTTPBearer(auto_error=False)
+REVOKED_TOKEN_RETENTION_DAYS = 7
+
+
+def delete_stale_refresh_tokens(
+    db: Session,
+    *,
+    now: datetime | None = None,
+) -> int:
+    checked_at = now or datetime.now(timezone.utc)
+    revoked_cutoff = checked_at - timedelta(days=REVOKED_TOKEN_RETENTION_DAYS)
+    result = db.execute(
+        delete(AuthRefreshToken).where(or_(
+            AuthRefreshToken.expires_at <= checked_at,
+            AuthRefreshToken.revoked_at <= revoked_cutoff,
+        ))
+    )
+    return int(result.rowcount or 0)
 
 
 def hash_password(password: str) -> str:

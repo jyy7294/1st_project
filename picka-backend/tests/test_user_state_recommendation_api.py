@@ -21,7 +21,11 @@ from app.models import (
     UserCard,
 )
 from app.services.user_state_adapter import build_user_card_states
-from app.services.auth_service import create_access_token, hash_password
+from app.services.auth_service import (
+    create_access_token,
+    delete_stale_refresh_tokens,
+    hash_password,
+)
 
 
 class UserStateRecommendationApiTest(unittest.TestCase):
@@ -786,6 +790,44 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
         self.assertEqual(rejected.status_code, 401)
 
+    def test_stale_refresh_token_cleanup_preserves_active_sessions(self):
+        now = datetime.now(timezone.utc)
+        with self.Session() as db:
+            db.add_all([
+                AuthRefreshToken(
+                    user_id=2,
+                    jti="expired",
+                    token_hash="a" * 64,
+                    expires_at=now - timedelta(seconds=1),
+                ),
+                AuthRefreshToken(
+                    user_id=2,
+                    jti="old-revoked",
+                    token_hash="b" * 64,
+                    expires_at=now + timedelta(days=20),
+                    revoked_at=now - timedelta(days=8),
+                ),
+                AuthRefreshToken(
+                    user_id=2,
+                    jti="recent-revoked",
+                    token_hash="c" * 64,
+                    expires_at=now + timedelta(days=20),
+                    revoked_at=now - timedelta(days=1),
+                ),
+                AuthRefreshToken(
+                    user_id=2,
+                    jti="active",
+                    token_hash="d" * 64,
+                    expires_at=now + timedelta(days=20),
+                ),
+            ])
+            db.commit()
+            self.assertEqual(delete_stale_refresh_tokens(db, now=now), 2)
+            db.commit()
+            remaining = set(db.scalars(select(AuthRefreshToken.jti)).all())
+
+        self.assertEqual(remaining, {"recent-revoked", "active"})
+
     def test_local_login_hides_failure_reason(self):
         with self.Session() as db:
             user = db.get(User, 2)
@@ -811,6 +853,17 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         response = self.client.post(
             "/api/v1/auth/login",
             json={"email": "test@example.com", "password": ""},
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_sensitive_requests_reject_undefined_extra_fields(self):
+        response = self.client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "test@example.com",
+                "password": "password123",
+                "social_provider": "KAKAO",
+            },
         )
         self.assertEqual(response.status_code, 422)
 
