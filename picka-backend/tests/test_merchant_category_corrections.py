@@ -48,6 +48,19 @@ class MerchantCategoryCorrectionTest(unittest.TestCase):
             "생활비",
         )
 
+    def test_fuel_is_not_merged_into_transport(self):
+        fuel = Transaction(
+            merchant_name="GS칼텍스 강남점",
+            payment_category="주유",
+        )
+        transit = Transaction(
+            merchant_name="티머니",
+            payment_category="교통",
+        )
+
+        self.assertEqual(transaction_report_category(fuel, []), "주유")
+        self.assertEqual(transaction_report_category(transit, []), "교통")
+
 
 if __name__ == "__main__":
     unittest.main()

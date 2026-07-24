@@ -461,6 +461,12 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             usage_month="2026-07",
         )
         self._transaction_request(
+            merchant_name="NO_ALIAS_FUEL",
+            payment_category="FUEL",
+            payment_amount=40_000,
+            usage_month="2026-07",
+        )
+        self._transaction_request(
             merchant_name="NO_ALIAS_TRANSIT",
             payment_category="TRANSIT",
             payment_amount=10_000,
@@ -474,15 +480,17 @@ class UserStateRecommendationApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["totalSpending"], 50_000)
+        self.assertEqual(body["totalSpending"], 90_000)
         self.assertEqual(body["previousMonthSpending"], 10_000)
-        self.assertEqual(body["spendingDifference"], 40_000)
+        self.assertEqual(body["spendingDifference"], 80_000)
         categories = {
             item["category"]: item["amount"] for item in body["categories"]
         }
         self.assertEqual(categories["식비"], 20_000)
         self.assertEqual(categories["생활비"], 30_000)
-        self.assertEqual(len(body["categories"]), 6)
+        self.assertEqual(categories["교통"], 0)
+        self.assertEqual(categories["주유"], 40_000)
+        self.assertEqual(len(body["categories"]), 7)
 
     def test_card_transaction_history_is_filtered_and_newest_first(self):
         first = self._transaction_request(
