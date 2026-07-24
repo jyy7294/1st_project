@@ -238,11 +238,6 @@ export default function RecommendDetail() {
                     showAll={mixOpen}
                   />
                 </div>
-
-                {/* '기타'가 1위보다 커 보일 수 있어 왜 순위에서 빠졌는지 밝혀 둡니다. */}
-                <div className={styles.mixFootNote}>
-                  기타는 상위 5개 밖 업종을 모두 합친 값이라 순위에서 제외했어요
-                </div>
               </div>
             </section>
           )}

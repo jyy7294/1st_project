@@ -165,6 +165,30 @@ function topWithOther(list, n = 5) {
 }
 
 /**
+ * 세부 업종(payment_category) → 리포트 표시 카테고리.
+ * 백엔드 spending_report_service.py 의 REPORT_CATEGORY_MAP 과 같은 분류를 맞춥니다.
+ * (여기가 바뀌면 백엔드도 함께 맞춰 주세요.)
+ */
+const REPORT_BUCKET = {
+  '푸드/외식': '식비', '배달앱': '식비', '편의점': '식비',
+  '카페/디저트': '카페',
+  '마트/쇼핑': '쇼핑', '온라인쇼핑': '쇼핑', '백화점': '쇼핑', '문구': '쇼핑',
+  '뷰티/피트니스': '뷰티/피트니스',
+  '생활': '생활비', '공과금/생활요금': '생활비', '통신': '생활비', '보험': '생활비', '반려동물': '생활비',
+  '병원/약국': '의료/건강',
+  '교육/육아': '교육',
+  '교통': '교통', '자동차/정비': '교통',
+  '주유': '주유',
+  '영화/문화': '문화', '구독/멤버십': '문화', '테마파크/레저': '문화',
+  '여행/숙박': '여행', '항공/마일리지': '여행', '공항서비스': '여행',
+}
+
+/** 세부 업종을 리포트 카테고리로 묶습니다. 매핑에 없으면 '기타'. */
+export function reportBucket(paymentCategory) {
+  return REPORT_BUCKET[paymentCategory] || '기타'
+}
+
+/**
  * 최근 n개월 결제내역을 업종별로 집계합니다.
  *
  * 백엔드에 '빈도' 집계 API 가 없어서 카드별 거래내역을 모아 여기서 셉니다.
@@ -187,7 +211,9 @@ export function buildSpendingMix(transactions = [], monthsBack = 3, today = new 
     const at = tx.approved_at ? new Date(tx.approved_at) : null
     if (at && !Number.isNaN(at.getTime()) && at < cutoff) continue
 
-    const category = tx.payment_category || '기타'
+    // 리포트 도넛과 같은 분류로 묶습니다. (편의점·배달→식비, 병원→의료/건강 등)
+    // 그래야 '기타'에 상위 5개 밖 세부 업종이 뭉텅이로 쌓이지 않습니다.
+    const category = reportBucket(tx.payment_category)
     const amount = tx.original_payment_amount || 0
     counts.set(category, (counts.get(category) || 0) + 1)
     amounts.set(category, (amounts.get(category) || 0) + amount)
@@ -201,9 +227,11 @@ export function buildSpendingMix(transactions = [], monthsBack = 3, today = new 
       .filter((c) => c.amount > 0)
       .sort((a, b) => b.amount - a.amount)
 
+  // 이미 리포트 카테고리로 묶었으므로(최대 12종) 상위 N개로 또 자르지 않고
+  // 0원이 아닌 카테고리를 모두 보여줍니다. '기타'는 간편결제·해외결제 등 매핑 밖만 남습니다.
   return {
-    byCount: topWithOther(toList(counts)),
-    byAmount: topWithOther(toList(amounts)),
+    byCount: topWithOther(toList(counts), 12),
+    byAmount: topWithOther(toList(amounts), 12),
     totalCount,
     totalAmount,
   }

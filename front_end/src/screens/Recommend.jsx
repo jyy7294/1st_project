@@ -154,6 +154,7 @@ export default function Recommend() {
             <div className={styles.rankTop}>
               <span className={styles.crown}>👑</span>
               <span className={styles.rankTopText}>1위</span>
+              <span className={styles.rankTopName}>{top.name}</span>
             </div>
 
             <div className={styles.row}>
@@ -171,8 +172,6 @@ export default function Recommend() {
               </div>
 
               <div className={styles.info}>
-                <div className={styles.cardName}>{top.name}</div>
-
                 <div className={styles.totalRow}>
                   <span className={styles.totalLabel}>총 혜택</span>
                   <span className={styles.totalValue}>{krw(top.total)}원</span>

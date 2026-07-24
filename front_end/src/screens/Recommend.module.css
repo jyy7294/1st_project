@@ -83,9 +83,23 @@
 .crown { font-size: 20px; }
 .rankTopText { font-size: 19px; font-weight: 800; color: #7A5AF8; }
 
+/* 1위 순위 옆 카드 이름 (2·3위의 순위+이름 표기와 맞춥니다). */
+.rankTopName {
+  flex: 1;
+  min-width: 0;
+  margin-left: 3px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
 .row { display: flex; gap: 16px; align-items: center; }
 
-.cardArtWrap { width: 132px; flex: none; }
+.cardArtWrap { width: 112px; flex: none; }
 
 .cardArt {
   position: relative;
