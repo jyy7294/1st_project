@@ -9,7 +9,7 @@ import {
   RECO_CATEGORY_SPLIT,
   RECO_NOTICE,
 } from '../data/recommend.js'
-import { selectRecoCard } from '../utils/recommend.js'
+import { selectRecoCard, benefitText, findMainBenefit } from '../utils/recommend.js'
 import { benefitsForRecoCard } from '../data/recommendBenefits.js'
 import { benefitView } from '../utils/benefit.js'
 import { buildDonut, buildSpendingMix } from '../utils/report.js'
@@ -66,6 +66,9 @@ export default function RecommendDetail() {
   // 광고 배너(소비패턴) 추천은 백엔드 분석 결과를, 결제 업종 추천은 정적 데이터를 씁니다.
   const fromSpending = !state.recoCategory
   const meta = state.recoMeta
+
+  // 대표 혜택 문구 — 단위(%/원)를 보고 만들어 정액 혜택에 %가 붙지 않게 합니다.
+  const mainBenefitText = benefitText(findMainBenefit(card), card)
 
   // 카드 상세 페이지와 같은 포맷으로 상세 혜택을 표기합니다.
   const benefits = benefitsForRecoCard(card.id).map(benefitView)
@@ -153,8 +156,8 @@ export default function RecommendDetail() {
           </div>
         ) : (
           <div className={styles.figure}>
-            <span className={styles.figureLabel}>{state.recoCategory || '주요'} 할인율</span>
-            <span className={styles.figureCash}>{card.rate}%</span>
+            <span className={styles.figureLabel}>{state.recoCategory || '주요'} 혜택</span>
+            <span className={styles.figureCash}>{mainBenefitText}</span>
           </div>
         )}
       </div>
@@ -180,12 +183,10 @@ export default function RecommendDetail() {
                 <span className={styles.factLabel}>적용 혜택</span>
                 <span className={styles.factValue}>{card.benefitName}</span>
               </div>
-              {card.rate > 0 && (
-                <div className={styles.factRow}>
-                  <span className={styles.factLabel}>할인율</span>
-                  <span className={styles.factValue}>{card.rate}%</span>
-                </div>
-              )}
+              <div className={styles.factRow}>
+                <span className={styles.factLabel}>할인 조건</span>
+                <span className={styles.factValue}>{mainBenefitText}</span>
+              </div>
               <div className={styles.factRow}>
                 <span className={styles.factLabel}>예상 연혜택</span>
                 <span className={`${styles.factValue} ${styles.factStrong}`}>

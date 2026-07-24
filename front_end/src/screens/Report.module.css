@@ -441,3 +441,14 @@
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .catPct { color: var(--text-4); font-size: 12px; }
 .catAmount { font-size: 13.5px; font-weight: 700; color: var(--navy-text); }
+
+/* '기타'에 무엇이 묶이는지 알려주는 안내 */
+.catNote {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--text-4);
+  line-height: 1.5;
+  word-break: keep-all;
+}

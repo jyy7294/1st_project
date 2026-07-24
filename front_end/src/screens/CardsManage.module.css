@@ -54,12 +54,12 @@
   font-weight: 800;
   margin-top: 4px;
   letter-spacing: -.5px;
+  white-space: nowrap;
 }
 
 .summaryValue.gold { color: var(--gold); }
 .summaryUnit { font-size: 14px; font-weight: 600; }
 .divider { width: 1px; background: rgba(255, 255, 255, .12); }
-.summaryChevron { align-self: center; font-size: 16px; opacity: .5; }
 
 .insightBar {
   margin-top: 16px;
@@ -78,7 +78,23 @@
 }
 
 .insightText { flex: 1; }
-.insightChevron { color: rgba(255, 226, 154, .7); }
+
+/* '소비리포트 보기' — 이 카드에서 유일하게 눌러서 리포트로 들어가는 곳 */
+.summaryReportLink {
+  margin: 12px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .85);
+  letter-spacing: -.2px;
+}
+
+.summaryReportLink:active { opacity: .6; }
 
 .sectionTitle {
   margin: 22px 20px 10px;

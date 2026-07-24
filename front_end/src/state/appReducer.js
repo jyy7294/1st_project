@@ -6,10 +6,10 @@ import { REPORT_TAB_COUNT } from '../data/report.js'
 export const A = {
   SET_SCREEN: 'SET_SCREEN',
   LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  LOGOUT: 'LOGOUT',
   SET_CARDS_ERROR: 'SET_CARDS_ERROR',
   LOGIN_FAIL: 'LOGIN_FAIL',
   CLEAR_LOGIN_ERROR: 'CLEAR_LOGIN_ERROR',
-  SET_SOCIAL: 'SET_SOCIAL',
   SET_CARDS: 'SET_CARDS',
   TOGGLE_EXPANDED: 'TOGGLE_EXPANDED',
   SELECT_CARD: 'SELECT_CARD',
@@ -92,7 +92,6 @@ export const initialState = {
   error: null, // 추천 호출 실패 메시지
   noEligibleCard: false, // 404 — 이 업종에 혜택 카드가 없음
   loginError: '',
-  social: null, // 'kakao' | 'naver' | null
   // 로그인한 사용자. 백엔드에 인증 미들웨어가 없어 user_id 를 모든 요청에 실어 보냅니다.
   user: null, // { userId, email, name }
   cardsError: null, // 보유카드 조회 실패 메시지
@@ -109,7 +108,6 @@ export function appReducer(state, action) {
         ...state,
         screen: 'home',
         loginError: '',
-        social: null,
         user: action.user || state.user,
         cards: [],
         cardsLoaded: false,
@@ -117,14 +115,16 @@ export function appReducer(state, action) {
         active: 0,
       }
 
+    case A.LOGOUT:
+      // 로그인 상태는 이 리듀서에만 있고 서버 세션이 없어(auth.js 참고),
+      // 상태를 초기값으로 되돌리고 로그인 화면으로 보내면 로그아웃이 끝납니다.
+      return { ...initialState, screen: 'login' }
+
     case A.LOGIN_FAIL:
       return { ...state, loginError: action.message }
 
     case A.CLEAR_LOGIN_ERROR:
       return { ...state, loginError: '' }
-
-    case A.SET_SOCIAL:
-      return { ...state, social: action.provider }
 
     case A.SET_CARDS:
       return { ...state, cards: action.cards, cardsLoaded: true, cardsError: null }
@@ -191,7 +191,8 @@ export function appReducer(state, action) {
         recoType: 'credit',
         recoSelId: null,
         recoCategory: action.category || null,
-        // 새로 진입할 때마다 소비패턴 추천은 다시 받아옵니다.
+        // 진입할 때 상태를 비워 두면 Recommend 화면이 그날 로컬 캐시에서 즉시 복원하거나
+        // (캐시가 있으면 로딩 없음), 그날 최초면 백엔드에서 새로 받아옵니다.
         recoCards: { credit: null, check: null },
         recoMeta: null,
         recoStatus: 'idle',

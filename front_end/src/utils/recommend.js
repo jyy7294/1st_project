@@ -3,6 +3,7 @@
 import { RECO_CARDS } from '../data/recommend.js'
 import { CATEGORY_CARDS } from '../data/categoryRecommend.js'
 import { cardImage } from '../data/cardImages.js'
+import { krw, normalizeBenefitRate } from './format.js'
 
 /**
  * 이미 보유한 카드는 추천에서 뺍니다.
@@ -37,6 +38,40 @@ function adaptCategoryCard(card, i) {
 }
 
 /**
+ * 혜택 문구. 단위를 보고 만들기 때문에 정액 혜택에 %가 붙지 않습니다.
+ *
+ * 백엔드가 rate 한 값에 정률(%)과 정액(원)을 섞어 담아서, 거기에 무조건 '%'를
+ * 붙이면 '1000원 할인'이 '1000% 할인'으로 나옵니다. 그래서 benefits[] 에서
+ * 대표 혜택을 찾아 value/unit 으로 문구를 만듭니다.
+ *
+ * @param {{value:number, unit:string, name:string}|null} benefit 대표 혜택
+ * @param {object} card 추천 카드 (구버전 응답 대비 fallback 용)
+ */
+export function benefitText(benefit, card = {}) {
+  const rawValue = benefit?.value ?? null
+  // 정률(%)에 100 초과 값이 오면 정액(원)으로 정상화 (예: 1000% → 1,000원 할인)
+  const { value, unit } = normalizeBenefitRate(rawValue, benefit?.unit ?? null)
+
+  if (value !== null) {
+    if (unit === '%') return `${value}% 할인`
+    if (unit === '원' || unit === 'KRW') return `${krw(value)}원 할인`
+  }
+
+  // 단위를 모르면 혜택 이름을 그대로 씁니다 (적립·면제 등).
+  if (benefit?.name || card.benefitName) return benefit?.name || card.benefitName
+
+  // 구버전 응답: rate 만 있을 때. 100 이하일 때만 퍼센트로 봅니다.
+  if (card.rate > 0 && card.rate <= 100) return `${card.rate}% 할인`
+  return '혜택 있음'
+}
+
+/** 카드의 대표 혜택(benefitName 과 같은 항목)을 benefits[] 에서 찾습니다. */
+export function findMainBenefit(card) {
+  const list = Array.isArray(card?.benefits) ? card.benefits : []
+  return list.find((b) => b.name === card.benefitName) || null
+}
+
+/**
  * 백엔드 소비패턴 추천 카드(card-recommendations 응답) → 화면 모양.
  *
  * total 은 연회비를 뺀 순혜택이라, '혜택'(연회비 전)은 total+fee 로 되돌립니다.
@@ -58,6 +93,8 @@ export function adaptApiRecoCard(card, i = 0) {
     short: card.name.length > 16 ? `${card.name.slice(0, 16)}…` : card.name,
     grad: CATEGORY_GRADIENTS[i % CATEGORY_GRADIENTS.length],
     cashback: null,
+    // 혜택 목록 (value/unit 이 있어 문구를 정확히 만들 수 있습니다)
+    benefits: Array.isArray(card.benefits) ? card.benefits : [],
     // 소비패턴 추천에만 있는 값 (분석 결과 화면에서 씀)
     benefitCategory: card.benefitCategory || null,
     monthlySpend: card.monthlySpend || 0,

@@ -18,13 +18,14 @@ const QR_LIFETIME_SEC = 180
  */
 const RECOGNIZE_FALLBACK_MS = 2000
 
-/** 일회용 QR 토큰(표시용 숫자열)을 만듭니다. 실제로는 결제서버가 발급합니다. */
-function makeToken(seed) {
-  let x = seed * 9301 + 49297
+/**
+ * 일회용 QR 토큰(표시용 숫자열)을 만듭니다. 새로 발급할 때마다 매번 다른 값이 나오도록
+ * 난수로 24자리를 뽑아 4자리씩 끊어 보여줍니다. 실제로는 결제서버가 발급합니다.
+ */
+function makeToken() {
   let out = ''
   for (let i = 0; i < 24; i += 1) {
-    x = (x * 1103515245 + 12345) & 0x7fffffff
-    out += x % 10
+    out += Math.floor(Math.random() * 10)
     if (i % 4 === 3 && i < 23) out += ' '
   }
   return out
@@ -37,7 +38,9 @@ function pickMerchant() {
 export default function QrScreen() {
   const { dispatch } = useApp()
   const [seconds, setSeconds] = useState(QR_LIFETIME_SEC)
+  // seed: QR 이미지 번갈아 표시(1↔2)용. token: 표시용 인식번호(새로고침마다 랜덤).
   const [seed, setSeed] = useState(1)
+  const [token, setToken] = useState(makeToken)
   // QR 인식 상태. 결제정보 로딩(PayReceived) 직전의 짧은 구간입니다.
   const [recognizing, setRecognizing] = useState(false)
   // 인식 시점에 정해진 가맹점. 타이머가 끝난 뒤에도 같은 거래를 넘깁니다.
@@ -73,7 +76,8 @@ export default function QrScreen() {
   function refresh() {
     if (recognizing) return
     setSeconds(QR_LIFETIME_SEC)
-    setSeed((s) => s + 1)
+    setSeed((s) => s + 1) // QR 이미지를 다음 것으로 (1↔2 번갈아)
+    setToken(makeToken()) // 인식번호는 새 난수로
   }
 
   // 여러 번 눌러도 인식은 한 번만 시작됩니다.
@@ -103,44 +107,66 @@ export default function QrScreen() {
         결제할 카드는 QR 인식 뒤 추천 단계에서 정해집니다.
         여기서 카드명을 미리 보여주면 이미 선택된 것처럼 읽혀서 띄우지 않습니다.
       */}
-      <div className={styles.qrWrap}>
+      {/* 안내 문구 + QR + 유효시간·새로고침을 한 덩어리로 묶어 화면 세로 중앙에 둡니다. */}
+      <div className={styles.center}>
+        {/* 안내 문구를 QR 위로 */}
+        <div className={styles.leadNote}>QR을 매장 리더기에 인식시켜 주세요</div>
+
         {/*
-          QR이 인식되면 별도 연출 없이 잠깐(RECOGNIZE_MS) 뒤 결제정보 화면으로 넘어갑니다.
-          진행 상태는 스크린리더에만 알립니다.
+          QR을 탭/클릭하면 매장 인식 흐름이 시작돼 다음 화면으로 넘어갑니다.
+          (기존 '매장에서 QR 인식됨' 버튼을 대신합니다.)
         */}
-        <QrCode
-          token={makeToken(seed)}
-          expiresIn={seconds}
-          expired={expired}
-          onRefresh={refresh}
-          seq={seed}
-          scanning={recognizing}
-          onScanEnd={finishScan}
-        />
+        <div
+          className={styles.qrWrap}
+          role="button"
+          tabIndex={expired || recognizing ? -1 : 0}
+          aria-label="QR 인식하고 다음 단계로"
+          onClick={recognize}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              recognize()
+            }
+          }}
+        >
+          <QrCode
+            token={token}
+            expiresIn={seconds}
+            expired={expired}
+            onRefresh={refresh}
+            seq={seed}
+            scanning={recognizing}
+            onScanEnd={finishScan}
+          />
 
-        {recognizing && (
-          <span className={styles.srOnly} role="status" aria-live="polite">
-            QR이 인식되었습니다
-          </span>
-        )}
+          {recognizing && (
+            <span className={styles.srOnly} role="status" aria-live="polite">
+              QR이 인식되었습니다
+            </span>
+          )}
+        </div>
+
+        {/* QR 바로 아래: 유효시간 + 새로고침 버튼 */}
+        <div className={`${styles.timer} ${expired ? styles.expired : ''}`}>
+          <button
+            type="button"
+            className={styles.refreshBtn}
+            onClick={(e) => {
+              e.stopPropagation()
+              refresh()
+            }}
+            disabled={recognizing}
+            aria-label="QR 새로고침"
+            title="QR 새로고침"
+          >
+            ↻
+          </button>
+          {expired ? '유효시간 만료' : `QR 유효시간 ${mm}:${ss}`}
+        </div>
       </div>
 
-      <div className={styles.token}>{makeToken(seed)}</div>
-
-      <div className={`${styles.timer} ${expired ? styles.expired : ''}`}>
-        <span>⏱</span>
-        {expired ? '유효시간 만료' : `QR 유효시간 ${mm}:${ss}`}
-      </div>
-
-      <button
-        type="button"
-        className={`${styles.demoBtn} ${expired || recognizing ? styles.demoBtnOff : ''}`}
-        disabled={expired || recognizing}
-        onClick={recognize}
-      >
-        🏪 매장에서 QR 인식됨 (데모)
-      </button>
-      <div className={styles.footNote}>화면을 매장 리더기에 인식시켜 주세요</div>
+      {/* 일련번호(인식번호)는 맨 아래 유지 */}
+      <div className={styles.token}>{token}</div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 // 혜택 원본 데이터(data/benefits.js)를 화면에 쓸 문자열·아이콘으로 바꿉니다.
 // 카드 상세와 전체 혜택 화면이 같은 표기를 쓰도록 이 파일 하나만 씁니다.
 
-import { krw } from './format.js'
+import { krw, normalizeBenefitRate } from './format.js'
 
 // 배경 틴트 — 아이콘 색감에 맞춰 몇 가지만 돌려 씁니다.
 const BLUE = '#e6f0ff'
@@ -104,7 +104,9 @@ export function benefitView(benefit) {
    * 그대로 이어붙이면 '금융서비스 null 면제/우대' 가 되므로 숫자 부분을 통째로 뺍니다.
    */
   const hasValue = benefit.value !== null && benefit.value !== undefined && benefit.value !== ''
-  const rate = hasValue ? `${benefit.value}${benefit.unit || ''}` : ''
+  // 정률(%)에 100 초과 값이 오면 정액(원)으로 정상화해 '1000%' 표기를 막습니다.
+  const { value: rateValue, unit: rateUnit } = normalizeBenefitRate(benefit.value, benefit.unit)
+  const rate = hasValue ? `${rateValue}${rateUnit}` : ''
 
   // 제목은 있는 조각만 이어 붙입니다. 카테고리와 유형이 같으면(기타/기타) 한 번만 씁니다.
   const title = [where, rate, benefit.type !== where ? benefit.type : '']

@@ -99,7 +99,7 @@ export default function Report() {
           type="button"
           className={styles.iconBtn}
           aria-label="뒤로"
-          onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'cards' })}
+          onClick={() => dispatch({ type: A.GO_HOME })}
         >
           ‹
         </button>
@@ -417,6 +417,13 @@ export default function Report() {
                 </div>
               ))}
             </div>
+
+            {/* '기타'가 뭔지 몰라 헷갈리지 않도록 어떤 지출이 묶이는지 밝혀 둡니다. */}
+            {donut.items.some((item) => item.name === '기타') && (
+              <div className={styles.catNote}>
+                기타는 위 분류에 속하지 않는 지출이에요 · 간편결제, 해외결제, 멤버십·포인트 등
+              </div>
+            )}
           </section>
         </>
       )}

@@ -42,7 +42,7 @@ export default function CardsManage() {
       </div>
 
       <div className={styles.summary}>
-        <button type="button" className={styles.summaryTop} onClick={goReport}>
+        <div className={styles.summaryTop}>
           <div className={styles.summaryCell}>
             <div className={styles.summaryLabel}>이번 달 전체 사용</div>
             <div className={styles.summaryValue}>
@@ -58,17 +58,19 @@ export default function CardsManage() {
               <span className={styles.summaryUnit}>원</span>
             </div>
           </div>
-          <span className={styles.summaryChevron}>📊</span>
-        </button>
+        </div>
 
-        <button type="button" className={styles.insightBar} onClick={goReport}>
+        <div className={styles.insightBar}>
           <span>✨</span>
           <span className={styles.insightText}>
             {spentDiff <= 0
               ? `지난달보다 ${krw(Math.abs(spentDiff))}원 덜 썼어요!`
               : `지난달보다 ${krw(spentDiff)}원 더 썼어요.`}
           </span>
-          <span className={styles.insightChevron}>›</span>
+        </div>
+
+        <button type="button" className={styles.summaryReportLink} onClick={goReport}>
+          📊 소비리포트 보기 ›
         </button>
       </div>
 

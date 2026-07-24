@@ -24,6 +24,10 @@ export default function WalletHome() {
   const { state, dispatch } = useApp()
   const { cards, expanded, active, cardsLoaded, showCardStats, user } = state
 
+  // 헤더 ☰ 더보기 메뉴(카드 관리·로그아웃)와 로그아웃 확인 팝업.
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
+
   // 보유카드는 화면 진입 시 한 번만 불러옵니다.
   // (카드를 모두 지웠을 때 다시 불러오지 않도록 개수가 아니라 로드 여부로 판단합니다.)
   useEffect(() => {
@@ -134,16 +138,97 @@ export default function WalletHome() {
           >
             +
           </button>
-          <button
-            type="button"
-            className={`${styles.iconBtn} ${styles.light}`}
-            aria-label="결제수단 관리"
-            onClick={() => dispatch({ type: A.SET_SCREEN, screen: 'cards' })}
-          >
-            ☰
-          </button>
+          <div className={styles.menuWrap}>
+            <button
+              type="button"
+              className={`${styles.iconBtn} ${styles.light}`}
+              aria-label="더보기"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((v) => !v)}
+            >
+              ☰
+            </button>
+
+            {moreOpen && (
+              <>
+                {/* 메뉴 밖 아무 곳이나 누르면 닫히도록 화면 전체를 덮는 투명 레이어 */}
+                <div className={styles.menuBackdrop} onClick={() => setMoreOpen(false)} />
+                <div className={`${styles.menu} pk-anim-pop-ease`}>
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      dispatch({ type: A.SET_SCREEN, screen: 'cards' })
+                    }}
+                  >
+                    <span className={styles.menuIcon}>💳</span>
+                    카드 관리
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      dispatch({ type: A.SET_SCREEN, screen: 'report' })
+                    }}
+                  >
+                    <span className={styles.menuIcon}>📊</span>
+                    소비리포트 보기
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.menuItem} ${styles.danger}`}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      setConfirmLogout(true)
+                    }}
+                  >
+                    <span className={styles.menuIcon}>🚪</span>
+                    로그아웃
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {confirmLogout && (
+        <div className={styles.confirmDim} onClick={() => setConfirmLogout(false)}>
+          <div
+            className={`${styles.confirm} pk-anim-pop-ease`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="logout-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.confirmIcon}>👋</div>
+            <div className={styles.confirmTitle} id="logout-title">
+              로그아웃 하시겠어요?
+            </div>
+            <div className={styles.confirmSub}>
+              다시 이용하시려면 로그인이 필요해요.
+            </div>
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.confirmCancel}
+                onClick={() => setConfirmLogout(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.confirmLogout}
+                onClick={() => dispatch({ type: A.LOGOUT })}
+              >
+                로그아웃
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
         type="button"

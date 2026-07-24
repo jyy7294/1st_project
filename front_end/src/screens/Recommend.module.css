@@ -83,14 +83,15 @@
 .crown { font-size: 20px; }
 .rankTopText { font-size: 19px; font-weight: 800; color: #7A5AF8; }
 
-.row { display: flex; gap: 16px; }
+.row { display: flex; gap: 16px; align-items: center; }
 
-.cardArtWrap { width: 118px; flex: none; }
+.cardArtWrap { width: 132px; flex: none; }
 
 .cardArt {
   position: relative;
   width: 100%;
-  aspect-ratio: .63;
+  /* 실물 카드 비율(가로형). 카드 이미지가 회전 없이 원래 방향으로 꽉 차게 들어갑니다. */
+  aspect-ratio: 1.586;
   border-radius: 9px;
   box-shadow: 0 14px 28px -10px rgba(10, 29, 79, .5);
   padding: 14px;
@@ -161,6 +162,7 @@
 .restRow {
   display: flex;
   gap: 16px;
+  align-items: center;
   width: 100%;
   border: none;
   background: none;
@@ -168,12 +170,13 @@
   text-align: left;
 }
 
-.cardArtWrapSm { width: 96px; flex: none; }
+.cardArtWrapSm { width: 112px; flex: none; }
 
 .cardArtSm {
   position: relative;
   width: 100%;
-  aspect-ratio: .63;
+  /* 실물 카드 비율(가로형) — 회전 없이 원래 방향으로 꽉 차게. */
+  aspect-ratio: 1.586;
   border-radius: 8px;
   box-shadow: 0 10px 22px -10px rgba(10, 29, 79, .45);
   padding: 12px;

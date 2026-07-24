@@ -180,7 +180,9 @@ export default function PayRecommend() {
                   <>
                     {chosen.card_company}가 {category}에서
                     {' '}
-                    {chosen.benefit_rate ? `${chosen.benefit_rate}% 할인` : '가장 큰 혜택'}으로
+                    {/* 실제 할인액으로 말합니다. benefit_rate 는 정률·정액이 섞여 있어
+                        '%'를 붙이면 1,000원 할인이 '1000% 할인'이 됩니다. */}
+                    {discount > 0 ? `${krw(discount)}원 할인` : '가장 큰 혜택'}으로
                     <br />
                     혜택이 가장 좋아요. 이 카드로 결제할까요?
                   </>

@@ -8,12 +8,6 @@ import { API_BASE, request } from './client.js'
 
 export { API_BASE }
 
-/** 소셜 로그인 인가 URL을 백엔드에서 받아옵니다. */
-export async function fetchSocialAuthorizeUrl(provider) {
-  const data = await request(`/api/v1/auth/${provider}/authorize`)
-  return data?.authorization_url || null
-}
-
 /**
  * 아이디(이메일)·비밀번호로 로그인합니다.
  *

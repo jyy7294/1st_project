@@ -1,7 +1,7 @@
 // 백엔드 응답을 화면이 쓰는 모양으로 옮깁니다.
 // UI 컴포넌트는 그대로 두고, 필드 이름 차이는 전부 여기서 흡수합니다.
 
-import { krw } from '../utils/format.js'
+import { krw, normalizeBenefitRate } from '../utils/format.js'
 
 /** 카테고리별 표시 아이콘. 없는 카테고리는 카드 모양으로 떨어집니다. */
 const CATEGORY_ICON = {
@@ -66,13 +66,16 @@ export function adaptCard(card) {
  * 필드 이름만 바꾸고 값은 손대지 않습니다.
  */
 export function adaptBenefit(benefit) {
+  // 정률(%)·정액(원)이 한 필드에 섞여 오므로 여기서 단위를 정상화합니다.
+  // (예: 단위 '%' + 값 1000 → '원'으로 되돌려 '1000% 할인' 표기 방지)
+  const { value, unit } = normalizeBenefitRate(benefit.benefit_value, benefit.benefit_unit)
   return {
     id: String(benefit.card_benefit_id ?? benefit.source_benefit_id ?? benefit.benefit_name),
     category: benefit.category || '기타',
     detail: null,
     type: benefit.benefit_type || '혜택',
-    value: benefit.benefit_value,
-    unit: benefit.benefit_unit || '',
+    value,
+    unit,
     condition: benefit.required_spending || null,
     limitMonth: benefit.monthly_benefit_limit || null,
     limitPerUse: benefit.per_transaction_limit || null,

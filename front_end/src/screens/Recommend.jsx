@@ -1,9 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import CardArt from '../components/CardArt.jsx'
 import { A } from '../state/appReducer.js'
-import { rankedRecommendations, adaptApiRecoCard, selectRecoList } from '../utils/recommend.js'
+import {
+  rankedRecommendations,
+  adaptApiRecoCard,
+  selectRecoList,
+  benefitText,
+  findMainBenefit,
+} from '../utils/recommend.js'
 import { fetchCardRecommendations } from '../api/picka.js'
+import { readRecoCache, writeRecoCache } from '../utils/recoCache.js'
 import { krw, krwMinus, feeText } from '../utils/format.js'
 import styles from './Recommend.module.css'
 
@@ -22,22 +29,40 @@ export default function Recommend() {
   const { recoType, cards, recoCategory: category, recoStatus } = state
 
   const userId = state.user?.userId
-  // 소비패턴(광고) 추천은 아직 안 받은 탭만 백엔드에서 받아옵니다.
-  const needsFetch = !category && userId && state.recoCards[recoType] === null
+  const isPatternReco = !category && !!userId
+  // 이 탭을 아직 이번 세션 상태에 못 담았으면 데이터가 필요합니다.
+  const needsData = isPatternReco && state.recoCards[recoType] === null
+
+  // 백엔드는 KST 하루 1회만 실제 추천을 계산하므로, 프론트도 그날 결과를 로컬에
+  // 캐시해 둡니다. 캐시가 있으면 로그아웃 후 재방문에도 로딩·재요청 없이 그대로 씁니다.
+  const todayCache = useMemo(
+    () => (isPatternReco ? readRecoCache(userId, recoType) : null),
+    [isPatternReco, userId, recoType],
+  )
 
   useEffect(() => {
-    if (!needsFetch) return undefined
+    if (!needsData) return undefined
+
+    // 1) 오늘 이미 받아 둔 캐시가 있으면 즉시 반영 — 백엔드 호출도 로딩도 없습니다.
+    if (todayCache) {
+      dispatch({
+        type: A.SET_RECO_CARDS,
+        cardType: recoType,
+        cards: todayCache.cards,
+        meta: todayCache.meta,
+      })
+      return undefined
+    }
+
+    // 2) 그날 최초 진입 — 백엔드가 실제 추천을 계산합니다(로딩 표시). 성공 시 캐시에 저장.
     let cancelled = false
     dispatch({ type: A.SET_RECO_STATUS, status: 'loading' })
     fetchCardRecommendations(userId, recoType)
       .then(({ meta, cards: apiCards }) => {
         if (cancelled) return
-        dispatch({
-          type: A.SET_RECO_CARDS,
-          cardType: recoType,
-          cards: apiCards.map(adaptApiRecoCard),
-          meta,
-        })
+        const adapted = apiCards.map(adaptApiRecoCard)
+        dispatch({ type: A.SET_RECO_CARDS, cardType: recoType, cards: adapted, meta })
+        writeRecoCache(userId, recoType, { cards: adapted, meta })
       })
       .catch(() => {
         if (!cancelled) dispatch({ type: A.SET_RECO_STATUS, status: 'error' })
@@ -45,7 +70,7 @@ export default function Recommend() {
     return () => {
       cancelled = true
     }
-  }, [needsFetch, userId, recoType, dispatch])
+  }, [needsData, todayCache, userId, recoType, dispatch])
 
   const list = category
     ? rankedRecommendations(recoType, cards, category)
@@ -54,11 +79,14 @@ export default function Recommend() {
   const rest = list.slice(1)
 
   // 광고 추천은 로딩·오류 상태가 있습니다 (정적 카테고리 추천은 즉시 준비됨).
-  const loading = !category && (recoStatus === 'loading' || (needsFetch && recoStatus !== 'error'))
-  const errored = !category && recoStatus === 'error'
+  // 오늘자 캐시가 있으면(로그아웃 후 재방문 등) 로딩 없이 바로 반영되므로 스피너를 띄우지 않습니다.
+  const loading =
+    isPatternReco && !todayCache &&
+    (recoStatus === 'loading' || (needsData && recoStatus === 'idle'))
+  const errored = isPatternReco && recoStatus === 'error'
   // 최근 소비가 없으면 백엔드가 topCategory=null 과 0원 카드를 주므로 빈 상태로 봅니다.
   const noRecentSpending =
-    !category && recoStatus === 'ready' && !state.recoMeta?.topCategory
+    isPatternReco && recoStatus === 'ready' && !state.recoMeta?.topCategory
 
   const showRanking = !loading && !errored && !noRecentSpending && top
 
@@ -132,7 +160,7 @@ export default function Recommend() {
               <div className={styles.cardArtWrap}>
                 <div className={styles.cardArt} style={{ background: top.grad }}>
                   {top.image ? (
-                    <CardArt src={top.image} frame="portrait" />
+                    <CardArt src={top.image} frame="landscape" />
                   ) : (
                     <>
                       <span className={styles.cardShort}>{top.short}</span>
@@ -178,7 +206,7 @@ export default function Recommend() {
             <span className={styles.cardArtWrapSm}>
               <span className={styles.cardArtSm} style={{ background: card.grad }}>
                 {card.image ? (
-                  <CardArt src={card.image} frame="portrait" />
+                  <CardArt src={card.image} frame="landscape" />
                 ) : (
                   <>
                     <span className={styles.cardShortSm}>{card.short}</span>
@@ -233,8 +261,10 @@ function Figures({ card }) {
         </span>
       ) : (
         <span className={styles.figure}>
-          <span className={styles.figureLabel}>할인율</span>
-          <span className={styles.figureCash}>{card.rate}%</span>
+          <span className={styles.figureLabel}>주요 혜택</span>
+          <span className={styles.figureCash}>
+            {benefitText(findMainBenefit(card), card)}
+          </span>
         </span>
       )}
     </>

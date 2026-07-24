@@ -96,21 +96,30 @@ export const PALETTE = [
   '#22C55E', // 그린
   '#EC4899', // 핑크
   '#06B6D4', // 시안
+  '#EAB308', // 골드
+  '#84CC16', // 라임
+  '#C026D3', // 마젠타
 ]
 
 /** '기타'처럼 묶음 항목은 눈에 덜 띄는 중립 회색으로 둡니다. */
 export const DEFAULT_CATEGORY_COLOR = '#9AA3B2'
 
-/** 자주 나오는 카테고리는 팔레트에서 고정 배정합니다. */
+/**
+ * 리포트 카테고리별 고정 색. 11개 카테고리 모두 서로 다른 색을 갖도록
+ * 지정해, 해시로 색을 받던 교육·뷰티/피트니스가 의료/건강(시안)과 겹치지 않게 합니다.
+ */
 export const CATEGORY_COLORS = {
   식비: PALETTE[1], // 오렌지
-  생활비: PALETTE[0], // 파랑
-  교통: PALETTE[4], // 퍼플
-  여행: PALETTE[6], // 핑크
-  '의료/건강': PALETTE[7], // 시안
-  쇼핑: PALETTE[2], // 틸
   카페: PALETTE[3], // 레드
+  쇼핑: PALETTE[2], // 틸
+  '뷰티/피트니스': PALETTE[9], // 라임
+  생활비: PALETTE[0], // 파랑
+  '의료/건강': PALETTE[7], // 시안
+  교육: PALETTE[8], // 골드
+  교통: PALETTE[4], // 퍼플
+  주유: PALETTE[10], // 마젠타 (교통에서 분리, 카페 레드와 겹치지 않게)
   문화: PALETTE[5], // 그린
+  여행: PALETTE[6], // 핑크
   기타: DEFAULT_CATEGORY_COLOR,
 }
 
