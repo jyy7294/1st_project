@@ -125,6 +125,18 @@ class Transaction(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+    data_source: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="SEED",
+        server_default="SEED",
+        index=True,
+    )
+    demo_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("demo_payment_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -136,3 +148,11 @@ class Transaction(Base):
         back_populates="transactions"
     )
     card: Mapped["Card"] = relationship(back_populates="transactions")
+    demo_session: Mapped["DemoPaymentSession | None"] = relationship(
+        back_populates="transactions"
+    )
+    benefit_outcome: Mapped["TransactionBenefitOutcome | None"] = relationship(
+        back_populates="transaction",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )

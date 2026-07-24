@@ -20,18 +20,71 @@ from app.models import (
 from app.services.auth_service import hash_password
 
 
-DATA_PATH = Path(__file__).resolve().parents[1] / "picka_demo_personas.json"
+DATA_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "PICKA_supabase_seed_v6_with_history.json"
+)
 USER_IDS = {
     "persona1": 1,
-    "persona2": 3,
-    "persona3": 4,
-    "persona4": 5,
+    "persona2": 2,
+    "persona3": 3,
+    "persona4": 4,
 }
 KST = timezone(timedelta(hours=9))
 
 
 def load_data() -> dict:
-    return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    if "tables" not in data:
+        return data
+
+    tables = data["tables"]
+    cards_by_persona: dict[str, list[dict]] = {}
+    monthly_by_user_card = {
+        row["user_card_id"]: row for row in tables["monthly_card_usage"]
+    }
+    usage_by_user_card: dict[str, list[dict]] = {}
+    for row in tables["benefit_usage"]:
+        usage_by_user_card.setdefault(row["user_card_id"], []).append(row)
+
+    for row in tables["user_cards"]:
+        card = dict(row)
+        card["monthly_usage"] = monthly_by_user_card[row["user_card_id"]]
+        card["benefit_usage"] = usage_by_user_card.get(row["user_card_id"], [])
+        cards_by_persona.setdefault(row["persona_id"], []).append(card)
+
+    transactions_by_persona: dict[str, list[dict]] = {}
+    for row in tables["transactions"]:
+        transactions_by_persona.setdefault(row["persona_id"], []).append(row)
+
+    logs_by_persona: dict[str, list[dict]] = {}
+    for row in tables["recommendation_logs"]:
+        logs_by_persona.setdefault(row["persona_id"], []).append(row)
+
+    return {
+        "demo_accounts": [
+            {
+                "persona_id": profile["persona_id"],
+                "name": profile["name"],
+                "login_id": profile["email"],
+                "password": "picka1234",
+            }
+            for profile in tables["profiles"]
+        ],
+        "personas": [
+            {
+                "profile": profile,
+                "user_cards": cards_by_persona.get(profile["persona_id"], []),
+                "transactions": transactions_by_persona.get(
+                    profile["persona_id"], []
+                ),
+                "recommendation_logs": logs_by_persona.get(
+                    profile["persona_id"], []
+                ),
+            }
+            for profile in tables["profiles"]
+        ],
+    }
 
 
 def seed(apply: bool) -> dict[str, int]:
@@ -108,7 +161,6 @@ def seed(apply: bool) -> dict[str, int]:
                 counts["users"] += 1
             user.email = email
             user.name = account["name"]
-            user.provider = "LOCAL"
             user.password_hash = hash_password(account["password"])
             user.is_active = True
             db.flush()
@@ -223,6 +275,7 @@ def seed(apply: bool) -> dict[str, int]:
                         status="APPROVED",
                         usage_month=approved_at.strftime("%Y-%m"),
                         approved_at=approved_at,
+                        data_source="SEED",
                     )
                 )
                 counts["transactions"] += 1

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -59,17 +60,16 @@ class UserCard(Base):
         String(50),
         nullable=True,
     )
-    virtual_credential_id: Mapped[int | None] = mapped_column(
-        ForeignKey(
-            "virtual_card_credentials.id",
-            ondelete="SET NULL",
-        ),
-        nullable=True,
-        index=True,
-    )
     card_number_last4: Mapped[str | None] = mapped_column(
         String(4),
         nullable=True,
+    )
+    payment_token: Mapped[str] = mapped_column(
+        String(80),
+        nullable=False,
+        unique=True,
+        index=True,
+        default=lambda: f"picka_pg_{uuid4().hex}",
     )
     registration_method: Mapped[str | None] = mapped_column(
         String(20),
@@ -100,7 +100,4 @@ class UserCard(Base):
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="user_card",
         cascade="all, delete-orphan",
-    )
-    virtual_credential: Mapped["VirtualCardCredential | None"] = relationship(
-        back_populates="user_cards"
     )

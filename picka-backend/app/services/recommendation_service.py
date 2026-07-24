@@ -1,7 +1,12 @@
+import logging
+
+from app.services.category_normalization import normalize_payment_category
 from app.services.llm_service import (
     LLMServiceError,
     judge_ambiguous_benefit,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_BENEFIT_DETAIL = (
     "상세 유의사항은 카드사 공식 상품설명서를 확인해 주세요."
@@ -52,15 +57,20 @@ def format_number(value: int | float) -> str:
 def build_success_reason(
     payment_category: str,
     benefit_rate: int | float,
-    expected_benefit: int
+    expected_benefit: int,
+    benefit_unit: str | None = "%",
 ) -> tuple[str, list[str]]:
     """적용된 혜택을 사용자 친화적인 요약과 상세 항목으로 만듭니다."""
 
-    rate_text = format_number(benefit_rate)
+    benefit_text = (
+        f"{format_number(benefit_rate)}% 할인"
+        if benefit_unit == "%"
+        else f"{expected_benefit:,}원 할인"
+    )
     category_detail = f"{payment_category} 업종 할인 적용"
 
     reason = (
-        f"{payment_category} 업종에서 {rate_text}% 할인 혜택이 적용되며, "
+        f"{payment_category} 업종에서 {benefit_text} 혜택이 적용되며, "
         "전월 실적 조건을 충족했습니다."
     )
     reason_details = [
@@ -130,32 +140,24 @@ def get_scoring_grade(benefit: dict) -> str | None:
 
     return None
 
-LLM_REVIEW_KEYWORDS = {
-    "제외",
-    "제외됩니다",
-    "제외 대상",
+LLM_REVIEW_KEYWORDS = [
+    "일부 입점 매장",
     "일부 매장",
-    "일부 가맹점",
+    "입점 매장 제외",
     "제휴 가맹점",
     "지정 가맹점",
-    "입점 매장",
-    "백화점",
-    "대형마트",
-    "쇼핑몰",
+    "카드사 등록 가맹점",
+    "특정 가맹점",
+]
+
+ITEM_CAVEAT_KEYWORDS = [
     "상품권",
     "선불카드",
+    "기프트카드",
     "충전",
-    "온라인몰",
-    "공식몰",
-    "공식 앱",
-    "간편결제",
-    "현장결제",
-    "현장 결제",
-    "카드사 등록",
-    "카드사 지정",
-    "서비스 제공처",
-    "가맹점 분류 기준",
-}
+]
+
+ITEM_CAVEAT_MESSAGE = "상품권·선불카드·충전 등 일부 품목은 혜택에서 제외될 수 있습니다."
 
 
 def get_benefit_rule_text(
@@ -222,6 +224,13 @@ def should_use_llm(
         keyword in rule_text
         for keyword in LLM_REVIEW_KEYWORDS
     )
+
+
+def get_item_caveat(benefit: dict | object) -> str | None:
+    rule_text = get_benefit_rule_text(benefit)
+    if any(keyword in rule_text for keyword in ITEM_CAVEAT_KEYWORDS):
+        return ITEM_CAVEAT_MESSAGE
+    return None
 
 
 def get_option_field(
@@ -487,7 +496,9 @@ def is_category_matched(
         return True
 
     # 기본 카테고리
-    if category == payment_category:
+    if normalize_payment_category(category) == normalize_payment_category(
+        payment_category
+    ):
         return True
 
     # 카테고리목록 확인
@@ -504,7 +515,9 @@ def is_category_matched(
             for item in category_list.split("|")
         ]
 
-        if payment_category in categories:
+        if normalize_payment_category(payment_category) in {
+            normalize_payment_category(item) for item in categories
+        }:
             return True
 
     return False
@@ -592,7 +605,8 @@ def build_recommendation_reason(
     benefit_rate: float,
     expected_benefit: int,
     required_spending: float | None,
-    previous_month_spending: int
+    previous_month_spending: int,
+    benefit_unit: str | None = "%",
 ) -> tuple[str, list[str]]:
     """
     프론트 화면에 표시할 추천 이유 문장과 상세 항목을 생성합니다.
@@ -601,9 +615,12 @@ def build_recommendation_reason(
     reason_details = []
 
     # 1. 업종 혜택
-    reason_details.append(
-        f"{payment_category} 업종에서 {benefit_rate:g}% 할인 적용"
+    benefit_text = (
+        f"{benefit_rate:g}% 할인"
+        if benefit_unit == "%"
+        else f"{expected_benefit:,}원 할인"
     )
+    reason_details.append(f"{payment_category} 업종에서 {benefit_text} 적용")
 
     # 2. 전월 실적
     if required_spending is None:
@@ -623,13 +640,13 @@ def build_recommendation_reason(
     if required_spending is None:
         reason = (
             f"{payment_category} 업종에서 "
-            f"{benefit_rate:g}% 할인 혜택이 적용됩니다. "
+            f"{benefit_text} 혜택이 적용됩니다. "
             f"예상 혜택은 {expected_benefit:,}원입니다."
         )
     else:
         reason = (
             f"{payment_category} 업종에서 "
-            f"{benefit_rate:g}% 할인 혜택이 적용되며, "
+            f"{benefit_text} 혜택이 적용되며, "
             f"전월 실적 조건을 충족했습니다. "
             f"예상 혜택은 {expected_benefit:,}원입니다."
         )
@@ -642,7 +659,7 @@ def calculate_performance_status(
 ) -> dict:
     """
     이번 결제를 해당 카드로 했을 때
-    전월 실적 달성 상태를 계산합니다.
+    이번 달 실적 달성 상태를 계산합니다.
     """
 
     required = int(
@@ -655,7 +672,7 @@ def calculate_performance_status(
         or 0
     )
 
-    current = int(get_previous_month_spending(card))
+    current = int(get_current_month_spending(card))
 
     after_payment = current + payment_amount
 
@@ -835,7 +852,8 @@ def calculate_base_benefit(
         return max(payment_amount, 0) * benefit_value / 100
 
     if benefit_unit in {"원", "KRW"}:
-        return benefit_value
+        # A fixed discount cannot be larger than the transaction itself.
+        return min(max(payment_amount, 0), benefit_value)
 
     return 0
 
@@ -848,6 +866,21 @@ def get_previous_month_spending(card: dict | object) -> float:
                 "previous_month_spending",
                 "previous_month_spend",
                 "전월실적사용액",
+                default=0,
+            )
+        )
+        or 0
+    )
+
+
+def get_current_month_spending(card: dict | object) -> float:
+    return (
+        to_non_negative_float(
+            get_field(
+                card,
+                "current_month_spending",
+                "current_month_spend",
+                "당월실적사용액",
                 default=0,
             )
         )
@@ -1139,6 +1172,12 @@ def calculate_card_benefit(
 
     for benefit in card["benefits"]:
 
+        is_conditional = False
+        caveats = []
+        item_caveat = get_item_caveat(benefit)
+        if item_caveat:
+            caveats.append(item_caveat)
+
         option_metadata = get_option_metadata(benefit)
 
         if should_exclude_from_calculation(benefit):
@@ -1210,23 +1249,29 @@ def calculate_card_benefit(
                     benefit_rule=get_benefit_rule_text(benefit),
                 )
 
-            except LLMServiceError as error:
-                failure_reasons.append(
-                    f"LLM 판단 오류: {error}"
+            except LLMServiceError:
+                logger.exception(
+                    "LLM benefit judgment failed",
+                    extra={
+                        "benefit_id": benefit_id,
+                        "merchant_name": merchant_name,
+                    },
                 )
-                continue
+                is_conditional = True
+                caveats.append(
+                    "AI 판단 오류로 세부 적용 여부 확인이 필요합니다."
+                )
 
-            if judgment.needs_human_review:
-                failure_reasons.append(
-                    f"혜택 적용 여부 확인 필요: {judgment.reason}"
-                )
-                continue
+            else:
+                if judgment.needs_human_review:
+                    is_conditional = True
+                    caveats.append(judgment.caveat or judgment.reason)
 
-            if not judgment.applicable:
-                failure_reasons.append(
-                    f"혜택 적용 불가: {judgment.reason}"
-                )
-                continue
+                if not judgment.applicable and not judgment.needs_human_review:
+                    failure_reasons.append(
+                        f"혜택 적용 불가: {judgment.reason}"
+                    )
+                    continue
 
         calculation = calculate_scored_benefit(
             card=card,
@@ -1261,6 +1306,10 @@ def calculate_card_benefit(
                 "혜택값",
                 "benefit_value",
             ),
+            "benefit_unit": benefit_unit,
+            "eligible": True,
+            "is_conditional": is_conditional,
+            "caveat": " ".join(dict.fromkeys(caveats)) or None,
             **display_fields,
             **option_metadata,
             **{
@@ -1316,8 +1365,11 @@ def calculate_card_benefit(
             "card_name": card["card_name"],
             "card_company": card["card_company"],
             "card_image": card["card_image"],
+            "last_four": card.get("card_number_last4"),
             "expected_benefit": 0,
             "eligible": False,
+            "is_conditional": False,
+            "caveat": None,
             "reason": reason,
             "reason_details": [reason, "예상 혜택 0원"],
             "scoring_grade": calculation_fields[
@@ -1372,8 +1424,12 @@ def calculate_card_benefit(
 
     best_benefit = max(
         applicable_benefits,
-        key=lambda item: item["expected_benefit"]
+        key=lambda item: (
+            not item.get("is_conditional", False),
+            item["expected_benefit"],
+        ),
     )
+
 
     reason, reason_details = build_recommendation_reason(
         payment_category=payment_category,
@@ -1382,24 +1438,34 @@ def calculate_card_benefit(
         required_spending=best_benefit["required_spending"],
         previous_month_spending=card[
             "previous_month_spending"
-        ]
+        ],
+        benefit_unit=best_benefit["benefit_unit"],
     )
     reason, reason_details = build_success_reason(
         payment_category=payment_category,
         benefit_rate=best_benefit["benefit_rate"],
-        expected_benefit=best_benefit["expected_benefit"]
+        expected_benefit=best_benefit["expected_benefit"],
+        benefit_unit=best_benefit["benefit_unit"],
     )
+    if best_benefit["is_conditional"]:
+        reason_details.append("적용 여부 확인 필요")
+        if best_benefit["caveat"]:
+            reason_details.append(best_benefit["caveat"])
 
     return {
         "card_id": card["card_id"],
         "card_name": card["card_name"],
         "card_company": card["card_company"],
         "card_image": card["card_image"],
+        "last_four": card.get("card_number_last4"),
         "expected_benefit": best_benefit[
             "expected_benefit"
         ],
         "eligible": True,
+        "is_conditional": best_benefit["is_conditional"],
+        "caveat": best_benefit["caveat"],
         "benefit_rate": best_benefit["benefit_rate"],
+        "benefit_unit": best_benefit["benefit_unit"],
         "reason": reason,
         "reason_details": reason_details,
         "benefit_name": best_benefit["benefit_name"],
@@ -1610,12 +1676,13 @@ def recommend_cards(
             "comparison": []
         }
 
-    # 2. 우선 예상 혜택이 큰 순서로 정렬
+    # 2. 확정 혜택을 우선하고, 같은 상태에서는 예상 혜택 순으로 정렬
     results.sort(
-        key=lambda item: item["expected_benefit"],
-        reverse=True
+        key=lambda item: (
+            item.get("is_conditional", False),
+            -item["expected_benefit"],
+        )
     )
-
     best_benefit_amount = results[0][
         "expected_benefit"
     ]
@@ -1668,7 +1735,11 @@ def recommend_cards(
         same_benefit_cards = [
             card
             for card in results
-            if card["expected_benefit"] == best_benefit_amount
+            if (
+                card["expected_benefit"] == best_benefit_amount
+                and card.get("is_conditional", False)
+                == results[0].get("is_conditional", False)
+            )
         ]
 
         if len(same_benefit_cards) >= 2:
@@ -1750,7 +1821,7 @@ def recommend_cards(
             else:
                 recommended_card["reason"] = (
                     "현재 결제에서 적용 가능한 혜택이 없어, "
-                    "전월 실적 달성에 가장 유리한 "
+                    "이번 달 실적 달성에 가장 유리한 "
                     "카드를 추천합니다."
                 )
 
@@ -1775,7 +1846,7 @@ def recommend_cards(
 
             recommended_card["reason"] = (
                 "카드별 예상 혜택이 동일하여, "
-                "전월 실적 달성에 더 유리한 "
+                "이번 달 실적 달성에 더 유리한 "
                 "카드를 추천합니다."
             )
 
@@ -1812,6 +1883,8 @@ def recommend_cards(
                 f"예상 혜택 "
                 f"{card['expected_benefit']:,}원"
             )
+            if card.get("is_conditional", False):
+                card["ranking_reason"] += " · 적용 여부 확인 필요"
 
         elif card.get(
             "needs_performance",
@@ -1867,13 +1940,13 @@ def recommend_cards(
     elif recommendation_basis == "performance_tiebreak":
         saving_message = (
             "예상 혜택이 동일하여 "
-            "전월 실적 달성에 유리한 카드를 추천했습니다."
+            "이번 달 실적 달성에 유리한 카드를 추천했습니다."
         )
 
     else:
         saving_message = (
             "적용 가능한 즉시 혜택이 없어 "
-            "전월 실적 달성에 유리한 카드를 추천했습니다."
+            "이번 달 실적 달성에 유리한 카드를 추천했습니다."
         )
 
     performance_candidates = [

@@ -5,20 +5,24 @@ import hashlib
 import hmac
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Annotated, Any
+from uuid import uuid4
 
 import jwt
-from fastapi import HTTPException
-from sqlalchemy import select
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import SocialAccount, User
+from app.core.database import get_db
+from app.models import AuthRefreshToken, User
 
 
 SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -73,13 +77,13 @@ def _jwt_secret() -> str:
     return settings.jwt_secret_key
 
 
-def create_access_token(user: User, login_provider: str) -> str:
+def create_access_token(user: User) -> str:
     now = datetime.now(timezone.utc)
     return jwt.encode(
         {
             "sub": str(user.id),
             "type": "access",
-            "login_provider": login_provider,
+            "jti": str(uuid4()),
             "iat": now,
             "exp": now
             + timedelta(minutes=settings.access_token_expire_minutes),
@@ -89,110 +93,170 @@ def create_access_token(user: User, login_provider: str) -> str:
     )
 
 
-def create_oauth_state(provider: str) -> str:
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def create_refresh_token(db: Session, user: User) -> str:
     now = datetime.now(timezone.utc)
-    return jwt.encode(
+    expires_at = now + timedelta(days=settings.refresh_token_expire_days)
+    jti = str(uuid4())
+    token = jwt.encode(
         {
-            "type": "oauth_state",
-            "provider": provider,
-            "nonce": base64.urlsafe_b64encode(os.urandom(18)).decode(),
+            "sub": str(user.id),
+            "type": "refresh",
+            "jti": jti,
             "iat": now,
-            "exp": now + timedelta(minutes=10),
+            "exp": expires_at,
         },
         _jwt_secret(),
         algorithm=settings.jwt_algorithm,
     )
+    db.add(AuthRefreshToken(
+        user_id=user.id,
+        jti=jti,
+        token_hash=_token_hash(token),
+        expires_at=expires_at,
+    ))
+    return token
 
 
-def verify_oauth_state(state: str, provider: str) -> None:
+def _decode_refresh_token(token: str) -> tuple[dict[str, Any], int]:
+    unauthorized = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="유효한 Refresh Token이 필요합니다.",
+    )
     try:
         payload = jwt.decode(
-            state,
+            token,
             _jwt_secret(),
             algorithms=[settings.jwt_algorithm],
         )
-    except jwt.PyJWTError as error:
+        if payload.get("type") != "refresh" or not payload.get("jti"):
+            raise unauthorized
+        return payload, int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError) as error:
+        raise unauthorized from error
+
+
+def rotate_refresh_token(db: Session, token: str) -> dict[str, Any]:
+    payload, user_id = _decode_refresh_token(token)
+    row = db.scalar(select(AuthRefreshToken).where(
+        AuthRefreshToken.token_hash == _token_hash(token),
+        AuthRefreshToken.jti == payload["jti"],
+        AuthRefreshToken.user_id == user_id,
+    ))
+    if row is None or row.revoked_at is not None:
+        if row is not None:
+            db.execute(
+                update(AuthRefreshToken)
+                .where(
+                    AuthRefreshToken.user_id == user_id,
+                    AuthRefreshToken.revoked_at.is_(None),
+                )
+                .values(revoked_at=datetime.now(timezone.utc))
+            )
+            db.commit()
         raise HTTPException(
-            status_code=400,
-            detail="소셜 로그인 인증에 실패했습니다.",
-        ) from error
-    if (
-        payload.get("type") != "oauth_state"
-        or payload.get("provider") != provider
-    ):
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="폐기되었거나 이미 사용된 Refresh Token입니다.",
+        )
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
         raise HTTPException(
-            status_code=400,
-            detail="소셜 로그인 인증에 실패했습니다.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효한 Refresh Token이 필요합니다.",
+        )
+    row.revoked_at = datetime.now(timezone.utc)
+    new_refresh_token = create_refresh_token(db, user)
+    db.commit()
+    return token_pair_payload(user, new_refresh_token)
+
+
+def revoke_refresh_token(db: Session, token: str) -> None:
+    payload, user_id = _decode_refresh_token(token)
+    row = db.scalar(select(AuthRefreshToken).where(
+        AuthRefreshToken.token_hash == _token_hash(token),
+        AuthRefreshToken.jti == payload["jti"],
+        AuthRefreshToken.user_id == user_id,
+    ))
+    if row is not None and row.revoked_at is None:
+        row.revoked_at = datetime.now(timezone.utc)
+        db.commit()
+
+
+def get_current_user(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(bearer_scheme),
+    ],
+    db: Annotated[Session, Depends(get_db)],
+) -> User:
+    unauthorized = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="유효한 인증 토큰이 필요합니다.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise unauthorized
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            _jwt_secret(),
+            algorithms=[settings.jwt_algorithm],
+        )
+        if payload.get("type") != "access":
+            raise unauthorized
+        user_id = int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError) as error:
+        raise unauthorized from error
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise unauthorized
+    return user
+
+
+def require_user_access(requested_user_id: int, current_user: User) -> None:
+    if requested_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="다른 사용자의 정보에 접근할 수 없습니다.",
+        )
+
+
+def require_admin(current_user: User) -> None:
+    if current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다.",
         )
 
 
 def auth_user_payload(
     user: User,
-    login_provider: str,
-    social_email: str | None = None,
 ) -> dict[str, Any]:
     return {
         "user_id": user.id,
         "username": None,
-        "email": (
-            social_email if login_provider != "LOCAL" else user.email
-        ),
+        "email": user.email,
         "name": user.name,
-        "login_provider": login_provider,
     }
 
 
-def login_response(
-    user: User,
-    login_provider: str,
-    social_email: str | None = None,
-) -> dict[str, Any]:
+def token_pair_payload(user: User, refresh_token: str) -> dict[str, Any]:
+    return {
+        "access_token": create_access_token(user),
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": settings.access_token_expire_minutes * 60,
+        "user": auth_user_payload(user),
+    }
+
+
+def login_response(db: Session, user: User) -> dict[str, Any]:
+    refresh_token = create_refresh_token(db, user)
+    db.commit()
     return {
         "message": "로그인에 성공했습니다.",
-        "access_token": create_access_token(user, login_provider),
-        "token_type": "bearer",
-        "user": auth_user_payload(
-            user,
-            login_provider,
-            social_email,
-        ),
+        **token_pair_payload(user, refresh_token),
     }
-
-
-def get_or_create_social_user(
-    db: Session,
-    provider: str,
-    provider_user_id: str,
-    email: str | None,
-    name: str | None,
-    profile_image_url: str | None,
-) -> tuple[User, SocialAccount]:
-    account = db.scalar(
-        select(SocialAccount).where(
-            SocialAccount.provider == provider,
-            SocialAccount.provider_user_id == provider_user_id,
-        )
-    )
-    if account is not None:
-        return account.user, account
-
-    internal_email = (
-        f"{provider.lower()}_{provider_user_id}@oauth.local"
-    )
-    user = User(
-        email=internal_email,
-        name=name or f"{provider} 사용자",
-        provider=provider,
-        is_active=True,
-    )
-    account = SocialAccount(
-        user=user,
-        provider=provider,
-        provider_user_id=provider_user_id,
-        email=email,
-        profile_image_url=profile_image_url,
-    )
-    db.add_all([user, account])
-    db.commit()
-    db.refresh(account)
-    return user, account

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -10,6 +10,12 @@ from app.core.database import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('USER', 'ADMIN')",
+            name="ck_users_role",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -26,10 +32,6 @@ class User(Base):
         String(100),
         nullable=False,
     )
-    provider: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True,
-    )
     password_hash: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -39,6 +41,12 @@ class User(Base):
         nullable=False,
         default=True,
         server_default="true",
+    )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="USER",
+        server_default="USER",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -68,7 +76,16 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    social_accounts: Mapped[list["SocialAccount"]] = relationship(
+    eligibilities: Mapped[list["UserEligibility"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    persona_profile: Mapped["UserPersonaProfile | None"] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    refresh_tokens: Mapped[list["AuthRefreshToken"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

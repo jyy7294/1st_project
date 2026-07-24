@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -15,22 +15,26 @@ from app.core.database import get_db
 from app.models import (
     BenefitUsage,
     Card,
+    CardEligibilityRule,
+    CardRecommendationSnapshot,
+    DemoPaymentSession,
     MonthlyCardUsage,
     Transaction,
+    TransactionReward,
     User,
     UserCard,
+    UserEligibility,
+    UserPersonaProfile,
 )
 from app.services.card_registration_service import register_virtual_card
 from app.services.auth_service import (
-    create_oauth_state,
-    get_or_create_social_user,
+    get_current_user,
     login_response,
-    verify_oauth_state,
+    require_admin,
+    require_user_access,
+    revoke_refresh_token,
+    rotate_refresh_token,
     verify_password,
-)
-from app.services.oauth_service import (
-    authorization_url,
-    fetch_oauth_profile,
 )
 from app.services.recommendation_debug_service import (
     build_recommendation_debug,
@@ -43,7 +47,32 @@ from app.services.user_state_adapter import (
     NoActiveUserCardsError,
     UserNotFoundError,
     build_user_card_states,
-    resolve_merchant_category,
+    resolve_payment_category,
+)
+from app.schemas.recommendation import RecommendationResponse
+from app.schemas.spending_pattern_recommendation import (
+    SpendingPatternRecommendationResponse,
+)
+from app.schemas.spending_report import MonthlySpendingReportResponse
+from app.services.spending_report_service import (
+    SpendingReportUserNotFoundError,
+    build_monthly_spending_report,
+)
+from app.services.spending_pattern_recommendation_service import (
+    SpendingRecommendationUserNotFoundError,
+    get_daily_card_recommendations,
+    recommend_new_cards_by_spending,
+)
+from app.services.category_normalization import normalize_payment_category
+from app.services.reward_service import calculate_transaction_rewards
+from app.services.recommendation_audit_service import save_recommendation_audit
+from app.services.benefit_total_service import confirmed_benefit_totals_by_card
+from app.services.payment_gateway_service import authorize_demo_payment
+from app.services.privacy_audit_service import save_privacy_change_audit
+from app.services.pii_encryption_service import decrypt_text, encrypt_text
+from app.services.sensitive_log_filter import install_sensitive_data_log_filter
+from app.services.daily_recommendation_scheduler import (
+    daily_recommendation_scheduler,
 )
 
 
@@ -51,6 +80,7 @@ app = FastAPI(
     title="PICKA Card Recommendation API",
     description="사용자의 보유 카드와 사용 상태를 반영해 결제 카드를 추천합니다.",
     version="1.1.0",
+    swagger_ui_oauth2_redirect_url=None,
 )
 
 app.add_middleware(
@@ -63,6 +93,128 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def start_daily_recommendation_scheduler() -> None:
+    install_sensitive_data_log_filter()
+    daily_recommendation_scheduler.start()
+
+
+@app.on_event("shutdown")
+def stop_daily_recommendation_scheduler() -> None:
+    daily_recommendation_scheduler.stop()
+
+
+VERIFICATION_STATUSES = {
+    "VERIFIED",
+    "SELF_REPORTED",
+    "INFERRED",
+    "UNVERIFIED",
+}
+COMPARISON_OPERATORS = {"EQ", "GTE", "LTE", "CONTAINS"}
+
+
+class UserEligibilityInput(BaseModel):
+    eligibility_type: str = Field(min_length=1, max_length=100)
+    eligibility_value: str = Field(min_length=1, max_length=255)
+    verification_status: str = "SELF_REPORTED"
+    verified_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    @field_validator("eligibility_type", "verification_status")
+    @classmethod
+    def normalize_uppercase(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("verification_status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in VERIFICATION_STATUSES:
+            raise ValueError("지원하지 않는 verification_status입니다.")
+        return value
+
+
+class UserEligibilityUpdateRequest(BaseModel):
+    eligibilities: list[UserEligibilityInput]
+
+    @model_validator(mode="after")
+    def validate_unique_types(self):
+        types = [item.eligibility_type for item in self.eligibilities]
+        if len(types) != len(set(types)):
+            raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
+
+
+class PersonalProfileUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    birth_date: date | None = None
+    phone_number: str | None = Field(default=None, max_length=30)
+    gender: str | None = Field(default=None, max_length=30)
+    occupation: str | None = Field(default=None, max_length=200)
+    residence: str | None = Field(default=None, max_length=200)
+    eligibilities: list[UserEligibilityInput] | None = None
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, value: date | None) -> date | None:
+        if value is not None and value > date.today():
+            raise ValueError("생년월일은 미래일 수 없습니다.")
+        return value
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = re.sub(r"[\s-]", "", value)
+        if not normalized.isdigit() or not 7 <= len(normalized) <= 15:
+            raise ValueError("전화번호 형식이 올바르지 않습니다.")
+        return normalized
+
+    @field_validator("name", "gender", "occupation", "residence")
+    @classmethod
+    def trim_optional_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @model_validator(mode="after")
+    def validate_unique_eligibility_types(self):
+        if self.eligibilities is None:
+            return self
+        types = [item.eligibility_type for item in self.eligibilities]
+        if len(types) != len(set(types)):
+            raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
+
+
+class CardEligibilityRuleInput(BaseModel):
+    eligibility_type: str = Field(min_length=1, max_length=100)
+    required_value: str = Field(min_length=1, max_length=255)
+    comparison_operator: str = "EQ"
+    description: str | None = None
+
+    @field_validator("eligibility_type", "comparison_operator")
+    @classmethod
+    def normalize_uppercase(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("comparison_operator")
+    @classmethod
+    def validate_operator(cls, value: str) -> str:
+        if value not in COMPARISON_OPERATORS:
+            raise ValueError("지원하지 않는 comparison_operator입니다.")
+        return value
+
+
+class CardEligibilityRuleUpdateRequest(BaseModel):
+    rules: list[CardEligibilityRuleInput]
+
+    @model_validator(mode="after")
+    def validate_unique_types(self):
+        types = [item.eligibility_type for item in self.rules]
+        if len(types) != len(set(types)):
+            raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
 
 
 class RecommendationRequest(BaseModel):
@@ -159,10 +311,13 @@ class TransactionCreateResponse(BaseModel):
     approved_at: str
     user_id: int
     usage_month: str
+    data_source: str
+    demo_session_id: int | None
     merchant: TransactionMerchantResponse
     card: TransactionCardResponse
     payment: TransactionPaymentResponse
     applied_benefit: AppliedBenefitResponse
+    rewards: list[dict]
 
 
 class TransactionHistoryItemResponse(BaseModel):
@@ -177,6 +332,8 @@ class TransactionHistoryItemResponse(BaseModel):
     status: str
     usage_month: str
     approved_at: datetime
+    data_source: str
+    demo_session_id: int | None
 
 
 class TransactionHistoryListResponse(BaseModel):
@@ -199,18 +356,31 @@ class AuthUserResponse(BaseModel):
     username: str | None
     email: str | None
     name: str | None
-    login_provider: str
 
 
 class LoginResponse(BaseModel):
     message: str
     access_token: str
+    refresh_token: str
     token_type: str
+    expires_in: int
     user: AuthUserResponse
 
 
-class OAuthAuthorizeResponse(BaseModel):
-    authorization_url: str
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class TokenPairResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+    expires_in: int
+    user: AuthUserResponse
+
+
+class LogoutResponse(BaseModel):
+    message: str
 
 
 class ManualCardRegistrationRequest(BaseModel):
@@ -289,6 +459,8 @@ def transaction_history_item(transaction: Transaction) -> dict:
         "status": transaction.status,
         "usage_month": transaction.usage_month,
         "approved_at": transaction.approved_at,
+        "data_source": transaction.data_source,
+        "demo_session_id": transaction.demo_session_id,
     }
 
 
@@ -350,94 +522,32 @@ def local_login(
             status_code=401,
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
         )
-    return login_response(user, "LOCAL")
+    return login_response(db, user)
 
 
-@app.get(
-    "/api/v1/auth/kakao/authorize",
-    response_model=OAuthAuthorizeResponse,
-    summary="카카오 로그인 URL 생성",
+@app.post(
+    "/api/v1/auth/refresh",
+    response_model=TokenPairResponse,
+    summary="Access Token 재발급",
 )
-def kakao_authorize():
-    state = create_oauth_state("KAKAO")
-    return {
-        "authorization_url": authorization_url("KAKAO", state),
-    }
-
-
-@app.get(
-    "/api/v1/auth/naver/authorize",
-    response_model=OAuthAuthorizeResponse,
-    summary="네이버 로그인 URL 생성",
-)
-def naver_authorize():
-    state = create_oauth_state("NAVER")
-    return {
-        "authorization_url": authorization_url("NAVER", state),
-    }
-
-
-async def social_login_callback(
-    provider: str,
-    code: str,
-    state: str,
-    db: Session,
-) -> dict:
-    verify_oauth_state(state, provider)
-    profile = await fetch_oauth_profile(provider, code, state)
-    try:
-        user, account = get_or_create_social_user(
-            db=db,
-            provider=provider,
-            provider_user_id=profile["provider_user_id"],
-            email=profile.get("email"),
-            name=profile.get("name"),
-            profile_image_url=profile.get("profile_image_url"),
-        )
-        if not user.is_active:
-            raise HTTPException(
-                status_code=401,
-                detail="비활성 사용자입니다.",
-            )
-        return login_response(
-            user,
-            provider,
-            social_email=account.email,
-        )
-    except HTTPException:
-        raise
-    except SQLAlchemyError as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail="소셜 로그인 사용자 저장 중 오류가 발생했습니다.",
-        ) from error
-
-
-@app.get(
-    "/api/v1/auth/kakao/callback",
-    response_model=LoginResponse,
-    summary="카카오 로그인 콜백",
-)
-async def kakao_callback(
-    code: str,
-    state: str,
+def refresh_access_token(
+    request: RefreshTokenRequest,
     db: Annotated[Session, Depends(get_db)],
 ):
-    return await social_login_callback("KAKAO", code, state, db)
+    return rotate_refresh_token(db, request.refresh_token)
 
 
-@app.get(
-    "/api/v1/auth/naver/callback",
-    response_model=LoginResponse,
-    summary="네이버 로그인 콜백",
+@app.post(
+    "/api/v1/auth/logout",
+    response_model=LogoutResponse,
+    summary="로그아웃 및 Refresh Token 폐기",
 )
-async def naver_callback(
-    code: str,
-    state: str,
+def logout(
+    request: RefreshTokenRequest,
     db: Annotated[Session, Depends(get_db)],
 ):
-    return await social_login_callback("NAVER", code, state, db)
+    revoke_refresh_token(db, request.refresh_token)
+    return {"message": "로그아웃되었습니다."}
 
 
 @app.get("/")
@@ -450,6 +560,319 @@ def health_check():
     return {"status": "ok"}
 
 
+def _user_eligibility_payload(item: UserEligibility) -> dict:
+    value = item.eligibility_value
+    if item.eligibility_value_encrypted is not None:
+        value = decrypt_text(
+            item.eligibility_value_encrypted,
+            context=f"eligibility:{item.user_id}:{item.eligibility_type}",
+        )
+    return {
+        "id": item.id,
+        "user_id": item.user_id,
+        "eligibility_type": item.eligibility_type,
+        "eligibility_value": value,
+        "verification_status": item.verification_status,
+        "verified_at": item.verified_at,
+        "expires_at": item.expires_at,
+    }
+
+
+def _age_on(birth_date: date | None, today: date | None = None) -> int:
+    if birth_date is None:
+        return 0
+    reference = today or date.today()
+    return reference.year - birth_date.year - (
+        (reference.month, reference.day) < (birth_date.month, birth_date.day)
+    )
+
+
+def _personal_profile_payload(db: Session, user: User) -> dict:
+    profile = user.persona_profile
+    birth_date = profile.birth_date if profile else None
+    phone_number = profile.phone_number if profile else None
+    residence = profile.residence if profile else None
+    if profile and profile.birth_date_encrypted is not None:
+        decrypted_birth_date = decrypt_text(
+            profile.birth_date_encrypted,
+            context=f"profile:{user.id}:birth_date",
+        )
+        birth_date = date.fromisoformat(decrypted_birth_date)
+    if profile and profile.phone_number_encrypted is not None:
+        phone_number = decrypt_text(
+            profile.phone_number_encrypted,
+            context=f"profile:{user.id}:phone_number",
+        )
+    if profile and profile.residence_encrypted is not None:
+        residence = decrypt_text(
+            profile.residence_encrypted,
+            context=f"profile:{user.id}:residence",
+        )
+    rows = db.scalars(
+        select(UserEligibility)
+        .where(UserEligibility.user_id == user.id)
+        .order_by(UserEligibility.eligibility_type)
+    ).all()
+    return {
+        "user_id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "birth_date": birth_date,
+        "phone_number": phone_number,
+        "gender": profile.gender if profile else None,
+        "occupation": profile.job if profile else None,
+        "residence": residence,
+        "eligibilities": [_user_eligibility_payload(row) for row in rows],
+    }
+
+
+@app.get("/api/v1/users/{user_id}/personal-profile")
+def get_personal_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    return _personal_profile_payload(db, user)
+
+
+@app.patch("/api/v1/users/{user_id}/personal-profile")
+def update_personal_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    request: PersonalProfileUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if "name" in request.model_fields_set and request.name is None:
+        raise HTTPException(status_code=422, detail="이름은 비울 수 없습니다.")
+
+    changed_fields: list[str] = []
+    if "name" in request.model_fields_set and user.name != request.name:
+        user.name = request.name
+        changed_fields.append("name")
+
+    profile_field_map = {
+        "birth_date": "birth_date",
+        "phone_number": "phone_number",
+        "gender": "gender",
+        "occupation": "job",
+        "residence": "residence",
+    }
+    requested_profile_fields = set(profile_field_map) & request.model_fields_set
+    profile = user.persona_profile
+    if requested_profile_fields and profile is None:
+        profile = UserPersonaProfile(
+            persona_id=f"user-{user_id}",
+            age=_age_on(request.birth_date),
+            source_payload={},
+        )
+        user.persona_profile = profile
+    for api_field in requested_profile_fields:
+        model_field = profile_field_map[api_field]
+        new_value = getattr(request, api_field)
+        if getattr(profile, model_field) != new_value:
+            setattr(profile, model_field, new_value)
+            changed_fields.append(api_field)
+        if api_field in {"birth_date", "phone_number", "residence"}:
+            serialized = (
+                new_value.isoformat()
+                if isinstance(new_value, date)
+                else new_value
+            )
+            setattr(
+                profile,
+                f"{model_field}_encrypted",
+                encrypt_text(
+                    serialized,
+                    context=f"profile:{user_id}:{api_field}",
+                ),
+            )
+    if profile is not None and "birth_date" in requested_profile_fields:
+        profile.age = _age_on(request.birth_date)
+
+    if request.eligibilities is not None:
+        existing = {
+            row.eligibility_type: row
+            for row in db.scalars(
+                select(UserEligibility).where(UserEligibility.user_id == user_id)
+            ).all()
+        }
+        now = datetime.now(timezone.utc)
+        for item in request.eligibilities:
+            row = existing.get(item.eligibility_type)
+            values_changed = row is None or any((
+                row.eligibility_value != item.eligibility_value,
+                row.verification_status != item.verification_status,
+                row.expires_at != item.expires_at,
+            ))
+            if row is None:
+                row = UserEligibility(
+                    user_id=user_id,
+                    eligibility_type=item.eligibility_type,
+                    eligibility_value=item.eligibility_value,
+                    verification_status=item.verification_status,
+                )
+                db.add(row)
+            else:
+                row.eligibility_value = item.eligibility_value
+                row.verification_status = item.verification_status
+            row.eligibility_value_encrypted = encrypt_text(
+                item.eligibility_value,
+                context=f"eligibility:{user_id}:{item.eligibility_type}",
+            )
+            row.verified_at = (
+                None
+                if item.verification_status == "UNVERIFIED"
+                else item.verified_at or now
+            )
+            row.expires_at = item.expires_at
+            if values_changed:
+                changed_fields.append(f"eligibility.{item.eligibility_type}")
+
+    if changed_fields:
+        db.execute(
+            delete(CardRecommendationSnapshot).where(
+                CardRecommendationSnapshot.user_id == user_id
+            )
+        )
+        save_privacy_change_audit(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=user_id,
+            changed_fields=changed_fields,
+        )
+    db.commit()
+    db.refresh(user)
+    return _personal_profile_payload(db, user)
+
+
+@app.get("/api/v1/users/{user_id}/eligibilities")
+def get_user_eligibilities(
+    user_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_user_access(user_id, current_user)
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    rows = db.scalars(
+        select(UserEligibility)
+        .where(UserEligibility.user_id == user_id)
+        .order_by(UserEligibility.eligibility_type)
+    ).all()
+    return {
+        "user_id": user_id,
+        "eligibilities": [_user_eligibility_payload(row) for row in rows],
+    }
+
+
+@app.put("/api/v1/users/{user_id}/eligibilities")
+def update_user_eligibilities(
+    user_id: Annotated[int, Path(gt=0)],
+    request: UserEligibilityUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_user_access(user_id, current_user)
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    existing = {
+        row.eligibility_type: row
+        for row in db.scalars(
+            select(UserEligibility).where(UserEligibility.user_id == user_id)
+        ).all()
+    }
+    now = datetime.now(timezone.utc)
+    for item in request.eligibilities:
+        row = existing.get(item.eligibility_type)
+        if row is None:
+            row = UserEligibility(
+                user_id=user_id,
+                eligibility_type=item.eligibility_type,
+                eligibility_value=item.eligibility_value,
+                verification_status=item.verification_status,
+            )
+            db.add(row)
+        else:
+            row.eligibility_value = item.eligibility_value
+            row.verification_status = item.verification_status
+        row.eligibility_value_encrypted = encrypt_text(
+            item.eligibility_value,
+            context=f"eligibility:{user_id}:{item.eligibility_type}",
+        )
+        row.verified_at = (
+            None
+            if item.verification_status == "UNVERIFIED"
+            else item.verified_at or now
+        )
+        row.expires_at = item.expires_at
+
+    db.execute(
+        delete(CardRecommendationSnapshot).where(
+            CardRecommendationSnapshot.user_id == user_id
+        )
+    )
+    db.commit()
+    return get_user_eligibilities(user_id, db, current_user)
+
+
+def _card_rule_payload(item: CardEligibilityRule) -> dict:
+    return {
+        "id": item.id,
+        "card_id": item.card_id,
+        "eligibility_type": item.eligibility_type,
+        "comparison_operator": item.comparison_operator,
+        "required_value": item.required_value,
+        "description": item.description,
+    }
+
+
+@app.get("/api/v1/cards/{card_id}/eligibility-rules")
+def get_card_eligibility_rules(
+    card_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
+):
+    if db.get(Card, card_id) is None:
+        raise HTTPException(status_code=404, detail="카드를 찾을 수 없습니다.")
+    rows = db.scalars(
+        select(CardEligibilityRule)
+        .where(CardEligibilityRule.card_id == card_id)
+        .order_by(CardEligibilityRule.eligibility_type)
+    ).all()
+    return {"card_id": card_id, "rules": [_card_rule_payload(row) for row in rows]}
+
+
+@app.put("/api/v1/cards/{card_id}/eligibility-rules")
+def replace_card_eligibility_rules(
+    card_id: Annotated[int, Path(gt=0)],
+    request: CardEligibilityRuleUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(current_user)
+    if db.get(Card, card_id) is None:
+        raise HTTPException(status_code=404, detail="카드를 찾을 수 없습니다.")
+    db.execute(
+        delete(CardEligibilityRule).where(CardEligibilityRule.card_id == card_id)
+    )
+    db.add_all([
+        CardEligibilityRule(card_id=card_id, **item.model_dump())
+        for item in request.rules
+    ])
+    db.execute(delete(CardRecommendationSnapshot))
+    db.commit()
+    return get_card_eligibility_rules(card_id, db, current_user)
+
+
 @app.get(
     "/api/v1/users/{user_id}/cards",
     summary="사용자 보유 카드 조회",
@@ -458,11 +881,13 @@ def health_check():
 def get_user_cards(
     user_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     usage_month: Annotated[
         str | None,
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ] = None,
 ):
+    require_user_access(user_id, current_user)
     usage_month = usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -542,7 +967,9 @@ def register_card_manually(
     user_id: Annotated[int, Path(gt=0)],
     request: ManualCardRegistrationRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     return process_card_registration(request, user_id, "MANUAL", db)
 
 
@@ -556,7 +983,9 @@ def register_scanned_card(
     user_id: Annotated[int, Path(gt=0)],
     request: ScannedCardRegistrationRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     return process_card_registration(request, user_id, "SCAN", db)
 
 
@@ -569,11 +998,13 @@ def get_user_card_detail(
     user_id: Annotated[int, Path(gt=0)],
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     usage_month: Annotated[
         str | None,
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ] = None,
 ):
+    require_user_access(user_id, current_user)
     usage_month = usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -644,7 +1075,9 @@ def delete_user_card(
     user_id: Annotated[int, Path(gt=0)],
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     try:
         if db.get(User, user_id) is None:
             raise HTTPException(
@@ -694,7 +1127,9 @@ def delete_user_card(
 def create_transaction(
     request: TransactionCreateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(request.user_id, current_user)
     if (
         request.user_id < 1
         or request.card_id < 1
@@ -717,9 +1152,10 @@ def create_transaction(
     usage_month = request.usage_month or date.today().strftime("%Y-%m")
 
     try:
-        payment_category = (
-            request.payment_category
-            or resolve_merchant_category(db, request.merchant_name)
+        payment_category = resolve_payment_category(
+            db,
+            merchant_name=request.merchant_name,
+            supplied_category=request.payment_category,
         )
         user_card_states = build_user_card_states(
             db=db,
@@ -740,6 +1176,42 @@ def create_transaction(
                 detail="사용자의 보유 카드가 아닙니다.",
             )
 
+        selected_user_card = db.scalar(
+            select(UserCard).where(
+                UserCard.id == selected_card["user_card_id"],
+                UserCard.user_id == request.user_id,
+                UserCard.card_id == request.card_id,
+            )
+        )
+        if selected_user_card is None:
+            raise HTTPException(
+                status_code=404,
+                detail="사용자의 보유 카드가 아닙니다.",
+            )
+
+        # 같은 카드의 동시 결제가 월 통합한도를 함께 통과하지 못하도록
+        # 월 집계 행을 잠근 뒤 저장 직전의 확정 혜택 합계로 다시 검사한다.
+        monthly_usage = db.scalar(
+            select(MonthlyCardUsage)
+            .where(
+                MonthlyCardUsage.user_id == request.user_id,
+                MonthlyCardUsage.card_id == request.card_id,
+                MonthlyCardUsage.usage_month == usage_month,
+            )
+            .with_for_update()
+        )
+        if monthly_usage is None:
+            monthly_usage = MonthlyCardUsage(
+                user_id=request.user_id,
+                card_id=request.card_id,
+                usage_month=usage_month,
+                previous_month_spending=0,
+                current_month_spending=0,
+                card_monthly_benefit_used=0,
+            )
+            db.add(monthly_usage)
+            db.flush()
+
         calculation = calculate_card_benefit(
             card=selected_card,
             merchant_name=request.merchant_name,
@@ -756,6 +1228,17 @@ def create_transaction(
         saved_amount = int(
             min(max(raw_benefit, 0), request.payment_amount)
         )
+        monthly_total_limit = selected_card.get("monthly_total_limit")
+        if monthly_total_limit is not None:
+            confirmed_used = confirmed_benefit_totals_by_card(
+                db,
+                user_id=request.user_id,
+                usage_month=usage_month,
+            ).get(request.card_id, 0)
+            saved_amount = min(
+                saved_amount,
+                max(int(monthly_total_limit) - confirmed_used, 0),
+            )
         applied = saved_amount > 0 and bool(calculation.get("eligible"))
         benefit_name = calculation.get("benefit_name") if applied else None
         benefit = next(
@@ -767,8 +1250,27 @@ def create_transaction(
             None,
         )
 
-        approval_number = f"PICKA-{uuid4().hex[:12].upper()}"
+        authorization = authorize_demo_payment(
+            selected_user_card,
+            payment_amount=request.payment_amount,
+        )
+        approval_number = authorization.approval_number
         approved_at = datetime.now(timezone.utc)
+        demo_session = db.scalar(
+            select(DemoPaymentSession)
+            .where(
+                DemoPaymentSession.user_id == request.user_id,
+                DemoPaymentSession.status == "ACTIVE",
+            )
+            .order_by(DemoPaymentSession.started_at.desc())
+        )
+        if demo_session is None:
+            demo_session = DemoPaymentSession(
+                user_id=request.user_id,
+                status="ACTIVE",
+            )
+            db.add(demo_session)
+            db.flush()
         final_approved_amount = request.payment_amount - saved_amount
         transaction = Transaction(
             user_id=request.user_id,
@@ -787,26 +1289,23 @@ def create_transaction(
             status="APPROVED",
             usage_month=usage_month,
             approved_at=approved_at,
+            data_source="DEMO",
+            demo_session_id=demo_session.id,
         )
         db.add(transaction)
+        db.flush()
 
-        monthly_usage = db.scalar(
-            select(MonthlyCardUsage).where(
-                MonthlyCardUsage.user_id == request.user_id,
-                MonthlyCardUsage.card_id == request.card_id,
-                MonthlyCardUsage.usage_month == usage_month,
-            )
+        rewards = calculate_transaction_rewards(
+            selected_card,
+            payment_category=payment_category,
+            payment_amount=request.payment_amount,
         )
-        if monthly_usage is None:
-            monthly_usage = MonthlyCardUsage(
-                user_id=request.user_id,
-                card_id=request.card_id,
-                usage_month=usage_month,
-                previous_month_spending=0,
-                current_month_spending=0,
-                card_monthly_benefit_used=0,
-            )
-            db.add(monthly_usage)
+        for reward in rewards:
+            db.add(TransactionReward(
+                transaction_id=transaction.id,
+                **reward,
+            ))
+
         monthly_usage.current_month_spending += request.payment_amount
         monthly_usage.card_monthly_benefit_used += saved_amount
 
@@ -845,6 +1344,8 @@ def create_transaction(
             "approved_at": transaction.approved_at.isoformat(),
             "user_id": request.user_id,
             "usage_month": usage_month,
+            "data_source": transaction.data_source,
+            "demo_session_id": transaction.demo_session_id,
             "merchant": {
                 "merchant_name": request.merchant_name,
                 "payment_category": payment_category,
@@ -877,6 +1378,7 @@ def create_transaction(
                 ),
                 "applied": applied,
             },
+            "rewards": rewards,
         }
     except UserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
@@ -910,6 +1412,7 @@ def get_card_transactions(
     user_id: Annotated[int, Path(gt=0)],
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
     usage_month: Annotated[
@@ -917,6 +1420,7 @@ def get_card_transactions(
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ] = None,
 ):
+    require_user_access(user_id, current_user)
     try:
         card_states = build_user_card_states(
             db=db,
@@ -983,11 +1487,78 @@ def get_card_transactions(
         ) from error
 
 
-@app.post("/api/v1/recommendations")
+@app.get(
+    "/api/v1/users/{user_id}/card-recommendations",
+    response_model=SpendingPatternRecommendationResponse,
+)
+def get_spending_pattern_card_recommendations(
+    user_id: Annotated[int, Path(ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    card_type: Annotated[
+        str,
+        Query(alias="type", pattern="^(credit|check)$"),
+    ] = "credit",
+    limit: Annotated[int, Query(ge=1, le=20)] = 3,
+    refresh: Annotated[bool, Query()] = False,
+):
+    require_user_access(user_id, current_user)
+    try:
+        result = get_daily_card_recommendations(
+            db,
+            user_id=user_id,
+            card_type=card_type,
+            limit=limit,
+            force_refresh=refresh,
+        )
+        save_recommendation_audit(
+            db,
+            user_id=user_id,
+            request_kind="NEW_CARD_SPENDING_PATTERN",
+            input_payload={"card_type": card_type, "limit": limit, "refresh": refresh},
+            calculation_payload=result,
+            policy_version=result.get("policyVersion"),
+            cache_hit=bool(result.get("cached")),
+        )
+        return result
+    except SpendingRecommendationUserNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/users/{user_id}/spending-report",
+    response_model=MonthlySpendingReportResponse,
+)
+def get_monthly_spending_report(
+    user_id: Annotated[int, Path(ge=1)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    month: Annotated[
+        str,
+        Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    ],
+):
+    require_user_access(user_id, current_user)
+    try:
+        return build_monthly_spending_report(
+            db,
+            user_id=user_id,
+            usage_month=month,
+        )
+    except SpendingReportUserNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/recommendations",
+    response_model=RecommendationResponse,
+)
 def create_recommendation(
     request: RecommendationRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(request.user_id, current_user)
     usage_month = request.usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -996,8 +1567,10 @@ def create_recommendation(
             user_id=request.user_id,
             usage_month=usage_month,
         )
-        payment_category = request.payment_category or resolve_merchant_category(
-            db, request.merchant_name
+        payment_category = resolve_payment_category(
+            db,
+            merchant_name=request.merchant_name,
+            supplied_category=request.payment_category,
         )
         result = recommend_cards(
             merchant_name=request.merchant_name,
@@ -1029,6 +1602,18 @@ def create_recommendation(
                 payment_category=payment_category,
                 payment_amount=request.payment_amount,
             )
+        save_recommendation_audit(
+            db,
+            user_id=request.user_id,
+            request_kind="PAYMENT_CARD_RECOMMENDATION",
+            usage_month=usage_month,
+            input_payload={
+                "merchant_name": request.merchant_name,
+                "payment_category": payment_category,
+                "payment_amount": request.payment_amount,
+            },
+            calculation_payload=response,
+        )
         return response
     except UserNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
@@ -1053,7 +1638,9 @@ def create_recommendation(
 def select_recommended_card(
     request: CardSelectionRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(request.user_id, current_user)
     usage_month = request.usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -1065,9 +1652,10 @@ def select_recommended_card(
         )
 
         # 2. 가맹점 업종 확인
-        payment_category = request.payment_category or resolve_merchant_category(
+        payment_category = resolve_payment_category(
             db,
-            request.merchant_name,
+            merchant_name=request.merchant_name,
+            supplied_category=request.payment_category,
         )
 
         # 3. 사용자가 선택한 카드가 실제 보유 카드인지 확인
@@ -1104,7 +1692,7 @@ def select_recommended_card(
             payment_amount=request.payment_amount,
         )
 
-        return {
+        response = {
             "status": "CARD_SELECTED",
             "message": "결제에 사용할 카드가 선택되었습니다.",
             "user_id": request.user_id,
@@ -1122,6 +1710,24 @@ def select_recommended_card(
                 == request.selected_card_id
             ),
         }
+        save_recommendation_audit(
+            db,
+            user_id=request.user_id,
+            request_kind="PAYMENT_CARD_SELECTION",
+            usage_month=usage_month,
+            selected_card_id=request.selected_card_id,
+            input_payload={
+                "merchant_name": request.merchant_name,
+                "payment_category": payment_category,
+                "payment_amount": request.payment_amount,
+                "selected_card_id": request.selected_card_id,
+            },
+            calculation_payload={
+                "selection": response,
+                "original_recommendation": recommendation_result,
+            },
+        )
+        return response
 
     except UserNotFoundError as error:
         raise HTTPException(

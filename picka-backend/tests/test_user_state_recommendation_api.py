@@ -1,9 +1,6 @@
 import unittest
-from unittest.mock import AsyncMock, patch
-from urllib.parse import parse_qs, urlparse
-
+from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
-from fastapi import HTTPException
 from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -12,19 +9,19 @@ from app.core.database import Base, get_db
 from app.core.config import settings
 from app.main import app
 from app.models import (
+    AuthRefreshToken,
     BenefitUsage,
     Card,
     CardBenefit,
     MerchantAlias,
     MonthlyCardUsage,
+    RecommendationAuditLog,
     Transaction,
-    SocialAccount,
-    VirtualCardCredential,
     User,
     UserCard,
 )
 from app.services.user_state_adapter import build_user_card_states
-from app.services.auth_service import hash_password
+from app.services.auth_service import create_access_token, hash_password
 
 
 class UserStateRecommendationApiTest(unittest.TestCase):
@@ -32,25 +29,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.original_debug = settings.recommendation_debug
         self.original_auth_settings = {
             "jwt_secret_key": settings.jwt_secret_key,
-            "kakao_rest_api_key": settings.kakao_rest_api_key,
-            "kakao_client_secret": settings.kakao_client_secret,
-            "kakao_redirect_uri": settings.kakao_redirect_uri,
-            "naver_client_id": settings.naver_client_id,
-            "naver_client_secret": settings.naver_client_secret,
-            "naver_redirect_uri": settings.naver_redirect_uri,
         }
         settings.recommendation_debug = False
-        settings.jwt_secret_key = "test-jwt-secret-key"
-        settings.kakao_rest_api_key = "test-kakao-key"
-        settings.kakao_client_secret = "test-kakao-secret"
-        settings.kakao_redirect_uri = (
-            "http://testserver/api/v1/auth/kakao/callback"
-        )
-        settings.naver_client_id = "test-naver-id"
-        settings.naver_client_secret = "test-naver-secret"
-        settings.naver_redirect_uri = (
-            "http://testserver/api/v1/auth/naver/callback"
-        )
+        settings.jwt_secret_key = "test-jwt-secret-key-at-least-32-bytes"
         self.engine = create_engine(
             "sqlite://",
             connect_args={"check_same_thread": False},
@@ -66,6 +47,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_get_db
         self.client = TestClient(app)
+        with self.Session() as db:
+            token = create_access_token(db.get(User, 2))
+        self.client.headers.update({"Authorization": f"Bearer {token}"})
 
     def tearDown(self):
         settings.recommendation_debug = self.original_debug
@@ -225,16 +209,6 @@ class UserStateRecommendationApiTest(unittest.TestCase):
                     },
                 )
             )
-            db.add(
-                VirtualCardCredential(
-                    card_id=4,
-                    card_number="1234567890123456",
-                    expiry_month=12,
-                    expiry_year=2029,
-                    cvc="123",
-                    card_password_first2="45",
-                )
-            )
             db.commit()
 
     def _registration_request(self, method="manual", **overrides):
@@ -252,12 +226,44 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
 
     def test_seed_user_returns_three_owned_cards_and_month(self):
+        with self.Session() as db:
+            db.add(RecommendationAuditLog(
+                user_id=2,
+                request_kind="EXPIRED_TEST",
+                input_payload={},
+                calculation_payload={},
+                created_at=datetime.now(timezone.utc) - timedelta(days=91),
+            ))
+            db.commit()
+
         response = self._request()
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["owned_card_count"], 3)
         self.assertEqual(body["usage_month"], "2026-07")
         self.assertEqual(body["user_state_source"], "database")
+
+        with self.Session() as db:
+            audit = db.scalar(select(RecommendationAuditLog))
+            self.assertIsNotNone(audit)
+            self.assertEqual(db.query(RecommendationAuditLog).count(), 1)
+            self.assertEqual(audit.user_id, 2)
+            self.assertEqual(audit.request_kind, "PAYMENT_CARD_RECOMMENDATION")
+            self.assertEqual(audit.input_payload["payment_amount"], 10_000)
+            self.assertEqual(
+                audit.calculation_payload["recommendation_basis"],
+                body["recommendation_basis"],
+            )
+
+    def test_card_selection_saves_original_calculation_audit(self):
+        response = self._select_request()
+        self.assertEqual(response.status_code, 200)
+
+        with self.Session() as db:
+            audit = db.scalar(select(RecommendationAuditLog))
+            self.assertEqual(audit.request_kind, "PAYMENT_CARD_SELECTION")
+            self.assertEqual(audit.selected_card_id, 2)
+            self.assertIn("original_recommendation", audit.calculation_payload)
 
     def test_get_user_cards_returns_active_database_cards(self):
         response = self._cards_request()
@@ -272,13 +278,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             [1, 2, 3],
         )
 
-    def test_get_user_cards_unknown_user_returns_404(self):
+    def test_get_user_cards_other_user_id_returns_403(self):
         response = self._cards_request(user_id=999)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(
-            response.json()["detail"],
-            "사용자 ID 999를 찾을 수 없습니다.",
-        )
+        self.assertEqual(response.status_code, 403)
 
     def test_get_user_cards_validates_path_and_month(self):
         self.assertEqual(self._cards_request(user_id=0).status_code, 422)
@@ -318,6 +320,7 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.assertEqual(body["status"], "APPROVED")
         self.assertIsInstance(body["transaction_id"], int)
         self.assertTrue(body["approval_number"].startswith("PICKA-"))
+        self.assertNotIn("payment_token", str(body))
         self.assertEqual(body["card"]["card_id"], 2)
         self.assertEqual(body["card"]["card_name"], "테스트카드 2")
         self.assertEqual(
@@ -345,6 +348,44 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             self.assertEqual(monthly.current_month_spending, 160_000)
             self.assertEqual(monthly.card_monthly_benefit_used, 4_000)
 
+            # 집계 캐시에는 기존 3,000원이 들어 있어도 API 계산 기준은
+            # 승인 거래의 실제 saved_amount(1,000원)여야 한다.
+            states = build_user_card_states(db, 2, "2026-07")
+            card_two = next(card for card in states if card["card_id"] == 2)
+            self.assertEqual(card_two["card_monthly_benefit_used"], 1_000)
+
+        report = self.client.get(
+            "/api/v1/users/2/spending-report",
+            params={"month": "2026-07"},
+        ).json()
+        self.assertEqual(report["totalBenefit"], 1_000)
+        report_card = next(
+            card for card in report["cardBenefits"] if card["cardId"] == 2
+        )
+        self.assertEqual(report_card["benefit"], 1_000)
+
+    def test_payment_clamps_discount_to_card_monthly_total_limit(self):
+        with self.Session() as db:
+            card = db.get(Card, 2)
+            card.monthly_total_limit = 1_800
+            db.commit()
+
+        first = self._transaction_request().json()
+        second = self._transaction_request().json()
+
+        self.assertEqual(first["payment"]["saved_amount"], 1_000)
+        self.assertEqual(second["payment"]["saved_amount"], 800)
+        with self.Session() as db:
+            saved_total = db.scalar(
+                select(func.sum(Transaction.saved_amount)).where(
+                    Transaction.user_id == 2,
+                    Transaction.card_id == 2,
+                    Transaction.usage_month == "2026-07",
+                    Transaction.status == "APPROVED",
+                )
+            )
+            self.assertEqual(saved_total, 1_800)
+
     def test_create_transaction_rejects_unowned_card(self):
         response = self._transaction_request(card_id=999)
         self.assertEqual(response.status_code, 404)
@@ -354,7 +395,10 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
 
     def test_create_transaction_without_benefit_still_approves(self):
-        response = self._transaction_request(payment_category="병원")
+        response = self._transaction_request(
+            merchant_name="NO_ALIAS_HOSPITAL",
+            payment_category="MEDICAL",
+        )
         self.assertEqual(response.status_code, 201)
         body = response.json()
         self.assertEqual(body["payment"]["saved_amount"], 0)
@@ -366,12 +410,77 @@ class UserStateRecommendationApiTest(unittest.TestCase):
                 db.scalar(select(func.count()).select_from(Transaction)),
                 1,
             )
+            transaction = db.scalar(select(Transaction))
+            self.assertEqual(transaction.payment_category, "병원/약국")
+
+    def test_create_transaction_normalizes_english_payment_category(self):
+        response = self._transaction_request(
+            merchant_name="NO_ALIAS_MART",
+            payment_category="MART",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        with self.Session() as db:
+            transaction = db.scalar(select(Transaction))
+            self.assertEqual(transaction.payment_category, "마트/쇼핑")
 
     def test_create_transaction_validates_request(self):
         self.assertEqual(
             self._transaction_request(payment_amount=0).status_code,
             400,
         )
+
+    def test_merchant_alias_overrides_supplied_category(self):
+        response = self._transaction_request(payment_category="MART")
+        self.assertEqual(response.status_code, 201)
+        with self.Session() as db:
+            transaction = db.scalar(select(Transaction))
+            self.assertEqual(transaction.payment_category, "카페")
+
+    def test_monthly_spending_report_aggregates_categories_and_benefits(self):
+        self._transaction_request(
+            merchant_name="NO_ALIAS_RESTAURANT",
+            payment_category="RESTAURANT",
+            payment_amount=20_000,
+            usage_month="2026-07",
+        )
+        self._transaction_request(
+            merchant_name="NO_ALIAS_TELECOM",
+            payment_category="TELECOM",
+            payment_amount=30_000,
+            usage_month="2026-07",
+        )
+        self._transaction_request(
+            merchant_name="NO_ALIAS_FUEL",
+            payment_category="FUEL",
+            payment_amount=40_000,
+            usage_month="2026-07",
+        )
+        self._transaction_request(
+            merchant_name="NO_ALIAS_TRANSIT",
+            payment_category="TRANSIT",
+            payment_amount=10_000,
+            usage_month="2026-06",
+        )
+
+        response = self.client.get(
+            "/api/v1/users/2/spending-report",
+            params={"month": "2026-07"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["totalSpending"], 90_000)
+        self.assertEqual(body["previousMonthSpending"], 10_000)
+        self.assertEqual(body["spendingDifference"], 80_000)
+        categories = {
+            item["category"]: item["amount"] for item in body["categories"]
+        }
+        self.assertEqual(categories["식비"], 20_000)
+        self.assertEqual(categories["생활비"], 30_000)
+        self.assertEqual(categories["교통"], 0)
+        self.assertEqual(categories["주유"], 40_000)
+        self.assertEqual(len(body["categories"]), 7)
 
     def test_card_transaction_history_is_filtered_and_newest_first(self):
         first = self._transaction_request(
@@ -469,11 +578,7 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         response = self.client.get(
             "/api/v1/users/3/cards/2/transactions"
         )
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(
-            response.json()["detail"],
-            "사용자의 보유 카드가 아닙니다.",
-        )
+        self.assertEqual(response.status_code, 403)
 
     def test_card_transaction_history_validates_query(self):
         for params in (
@@ -523,13 +628,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             422,
         )
 
-    def test_unknown_user_returns_404(self):
+    def test_other_user_id_returns_403(self):
         response = self._request(user_id=999)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(
-            response.json()["detail"],
-            "사용자 ID 999를 찾을 수 없습니다.",
-        )
+        self.assertEqual(response.status_code, 403)
 
     def test_inactive_card_is_excluded(self):
         with self.Session() as db:
@@ -624,9 +725,66 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["token_type"], "bearer")
         self.assertTrue(body["access_token"])
-        self.assertEqual(body["user"]["login_provider"], "LOCAL")
+        self.assertTrue(body["refresh_token"])
+        self.assertEqual(body["expires_in"], 3600)
         self.assertNotIn("password", body["user"])
         self.assertNotIn("password_hash", body["user"])
+        with self.Session() as db:
+            stored = db.scalar(select(AuthRefreshToken))
+            self.assertIsNotNone(stored)
+            self.assertNotEqual(stored.token_hash, body["refresh_token"])
+            self.assertEqual(len(stored.token_hash), 64)
+
+    def test_refresh_token_rotates_and_reuse_revokes_session(self):
+        with self.Session() as db:
+            user = db.get(User, 2)
+            user.password_hash = hash_password("password123")
+            db.commit()
+        login = self.client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        ).json()
+
+        refreshed = self.client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": login["refresh_token"]},
+        )
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertNotEqual(
+            refreshed.json()["refresh_token"],
+            login["refresh_token"],
+        )
+        reused = self.client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": login["refresh_token"]},
+        )
+        self.assertEqual(reused.status_code, 401)
+        new_token_after_reuse = self.client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": refreshed.json()["refresh_token"]},
+        )
+        self.assertEqual(new_token_after_reuse.status_code, 401)
+
+    def test_logout_revokes_refresh_token(self):
+        with self.Session() as db:
+            user = db.get(User, 2)
+            user.password_hash = hash_password("password123")
+            db.commit()
+        login = self.client.post(
+            "/api/v1/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        ).json()
+
+        logout = self.client.post(
+            "/api/v1/auth/logout",
+            json={"refresh_token": login["refresh_token"]},
+        )
+        self.assertEqual(logout.status_code, 200)
+        rejected = self.client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": login["refresh_token"]},
+        )
+        self.assertEqual(rejected.status_code, 401)
 
     def test_local_login_hides_failure_reason(self):
         with self.Session() as db:
@@ -656,125 +814,20 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
 
-    def _oauth_state(self, provider: str) -> str:
+    def test_protected_api_requires_bearer_token(self):
         response = self.client.get(
-            f"/api/v1/auth/{provider.lower()}/authorize"
+            "/api/v1/users/2/cards",
+            headers={"Authorization": ""},
         )
-        self.assertEqual(response.status_code, 200)
-        url = response.json()["authorization_url"]
-        state = parse_qs(urlparse(url).query)["state"][0]
-        self.assertTrue(state)
-        return state
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["www-authenticate"], "Bearer")
 
-    def test_oauth_authorize_urls_include_state(self):
-        for provider, host in (
-            ("KAKAO", "kauth.kakao.com"),
-            ("NAVER", "nid.naver.com"),
-        ):
-            with self.subTest(provider=provider):
-                response = self.client.get(
-                    f"/api/v1/auth/{provider.lower()}/authorize"
-                )
-                self.assertEqual(response.status_code, 200)
-                parsed = urlparse(
-                    response.json()["authorization_url"]
-                )
-                self.assertEqual(parsed.netloc, host)
-                self.assertTrue(parse_qs(parsed.query)["state"][0])
-
-    def test_oauth_callback_creates_and_reuses_social_account(self):
-        profile = {
-            "provider_user_id": "social-123",
-            "email": "social@example.com",
-            "name": "소셜 사용자",
-            "profile_image_url": "https://example.com/profile.png",
-        }
-        for provider in ("KAKAO", "NAVER"):
-            with self.subTest(provider=provider):
-                state = self._oauth_state(provider)
-                with patch(
-                    "app.main.fetch_oauth_profile",
-                    new=AsyncMock(return_value=profile),
-                ):
-                    first = self.client.get(
-                        f"/api/v1/auth/{provider.lower()}/callback",
-                        params={"code": "valid-code", "state": state},
-                    )
-                    second = self.client.get(
-                        f"/api/v1/auth/{provider.lower()}/callback",
-                        params={"code": "valid-code", "state": state},
-                    )
-                self.assertEqual(first.status_code, 200)
-                self.assertEqual(second.status_code, 200)
-                self.assertEqual(
-                    first.json()["user"]["user_id"],
-                    second.json()["user"]["user_id"],
-                )
-                self.assertEqual(
-                    first.json()["user"]["login_provider"],
-                    provider,
-                )
-                with self.Session() as db:
-                    count = db.scalar(
-                        select(func.count())
-                        .select_from(SocialAccount)
-                        .where(SocialAccount.provider == provider)
-                    )
-                self.assertEqual(count, 1)
-
-    def test_oauth_callback_handles_missing_email(self):
-        state = self._oauth_state("KAKAO")
-        profile = {
-            "provider_user_id": "no-email",
-            "email": None,
-            "name": None,
-            "profile_image_url": None,
-        }
-        with patch(
-            "app.main.fetch_oauth_profile",
-            new=AsyncMock(return_value=profile),
-        ):
-            response = self.client.get(
-                "/api/v1/auth/kakao/callback",
-                params={"code": "valid-code", "state": state},
-            )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()["user"]["email"])
-
-    def test_oauth_callback_rejects_bad_state_and_missing_code(self):
-        bad_state = self.client.get(
-            "/api/v1/auth/kakao/callback",
-            params={"code": "code", "state": "invalid"},
+    def test_protected_api_rejects_invalid_token(self):
+        response = self.client.get(
+            "/api/v1/users/2/cards",
+            headers={"Authorization": "Bearer invalid-token"},
         )
-        self.assertEqual(bad_state.status_code, 400)
-        missing_code = self.client.get(
-            "/api/v1/auth/kakao/callback",
-            params={"state": self._oauth_state("KAKAO")},
-        )
-        self.assertEqual(missing_code.status_code, 422)
-
-    def test_oauth_callback_handles_provider_failures(self):
-        for status_code in (400, 502):
-            with self.subTest(status_code=status_code):
-                state = self._oauth_state("NAVER")
-                with patch(
-                    "app.main.fetch_oauth_profile",
-                    new=AsyncMock(
-                        side_effect=HTTPException(
-                            status_code=status_code,
-                            detail=(
-                                "소셜 로그인 인증에 실패했습니다."
-                                if status_code == 400
-                                else "외부 로그인 서비스와 통신하지 못했습니다."
-                            ),
-                        )
-                    ),
-                ):
-                    response = self.client.get(
-                        "/api/v1/auth/naver/callback",
-                        params={"code": "bad", "state": state},
-                    )
-                self.assertEqual(response.status_code, status_code)
+        self.assertEqual(response.status_code, 401)
 
     def test_manual_virtual_card_registration_and_integration(self):
         self._prepare_virtual_card()
@@ -793,6 +846,15 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.assertNotIn("1234567890123456", serialized)
         self.assertNotIn("'cvc'", serialized)
         self.assertNotIn("card_password_first2", serialized)
+        self.assertNotIn("payment_token", serialized)
+        with self.Session() as db:
+            registered = db.scalar(
+                select(UserCard).where(
+                    UserCard.user_id == 2,
+                    UserCard.card_id == 4,
+                )
+            )
+            self.assertTrue(registered.payment_token.startswith("picka_pg_"))
 
         cards = self._cards_request().json()["cards"]
         self.assertIn(4, [card["card_id"] for card in cards])
@@ -806,17 +868,12 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 201)
 
-    def test_virtual_card_registration_rejects_mismatch_and_format(self):
+    def test_virtual_card_registration_rejects_unknown_bin_and_format(self):
         self._prepare_virtual_card()
-        for override in (
-            {"card_number": "1111222233334444"},
-            {"cvc": "999"},
-            {"card_password_first2": "99"},
-            {"expiry_year": 2030},
-        ):
-            with self.subTest(override=override):
-                response = self._registration_request(**override)
-                self.assertEqual(response.status_code, 400)
+        response = self._registration_request(
+            card_number="7777777788889999"
+        )
+        self.assertEqual(response.status_code, 400)
         for override in (
             {"card_number": "1234"},
             {"cvc": "12"},
@@ -839,7 +896,7 @@ class UserStateRecommendationApiTest(unittest.TestCase):
                 "card_password_first2": "45",
             },
         )
-        self.assertEqual(unknown.status_code, 404)
+        self.assertEqual(unknown.status_code, 403)
         self.assertEqual(self._registration_request().status_code, 201)
         duplicate = self._registration_request()
         self.assertEqual(duplicate.status_code, 409)
@@ -875,13 +932,14 @@ class UserStateRecommendationApiTest(unittest.TestCase):
 
         with self.Session() as db:
             self.assertIsNotNone(db.get(Card, 4))
-            self.assertIsNotNone(
-                db.scalar(
-                    select(VirtualCardCredential).where(
-                        VirtualCardCredential.card_id == 4
-                    )
+            stored_card = db.scalar(
+                select(UserCard).where(
+                    UserCard.user_id == 2,
+                    UserCard.card_id == 4,
                 )
             )
+            self.assertEqual(stored_card.card_number_last4, "3456")
+            self.assertTrue(stored_card.payment_token.startswith("picka_pg_"))
             self.assertEqual(
                 db.scalar(
                     select(func.count())
@@ -911,7 +969,7 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             db.commit()
         self.assertEqual(
             self.client.delete("/api/v1/users/999/cards/1").status_code,
-            404,
+            403,
         )
         self.assertEqual(
             self.client.delete("/api/v1/users/2/cards/999").status_code,
@@ -968,13 +1026,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             "선택한 카드는 사용자의 활성 보유 카드가 아닙니다.",
         )
 
-    def test_select_unknown_user_returns_404(self):
+    def test_select_other_user_id_returns_403(self):
         response = self._select_request(user_id=999)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(
-            response.json()["detail"],
-            "사용자 ID 999를 찾을 수 없습니다.",
-        )
+        self.assertEqual(response.status_code, 403)
 
     def test_select_validates_usage_month(self):
         response = self._select_request(usage_month="2026-13")
