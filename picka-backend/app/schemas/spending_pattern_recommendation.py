@@ -7,6 +7,9 @@ class SpendingPatternCardResponse(BaseModel):
     issuer: str
     benefitName: str
     rate: float
+    benefitValue: float
+    benefitUnit: str | None
+    expectedBenefitAmount: int
     total: int
     fee: int
     url: str | None

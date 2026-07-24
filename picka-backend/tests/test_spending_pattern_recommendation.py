@@ -305,6 +305,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             set(response.json()["cards"][0]),
             {
                 "id", "name", "issuer", "benefitName", "rate", "total",
+                "benefitValue", "benefitUnit", "expectedBenefitAmount",
                 "fee", "url", "image_url", "benefitCategory", "monthlySpend",
                 "recommendationMessage", "matchedMerchants",
                 "benefits",
@@ -341,6 +342,60 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             params={"type": "credit", "limit": 1, "refresh": True},
         )
         self.assertFalse(refreshed_response.json()["cached"])
+
+    def test_fixed_amount_benefit_exposes_won_unit_not_percent(self):
+        with self.Session() as db:
+            db.add(Card(
+                id=9,
+                card_name="고정금액 할인 카드",
+                card_type="신용카드",
+                annual_fee=0,
+                is_active=True,
+            ))
+            db.flush()
+            db.add(CardBenefit(
+                card_id=9,
+                source_benefit_id="9-1",
+                benefit_name="마트 1,000원 할인",
+                category="마트/쇼핑",
+                benefit_type="할인",
+                benefit_unit="원",
+                benefit_value=1_000,
+                additional_conditions={"scoring_grade": "A_확정계산"},
+            ))
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            db.add_all([
+                Transaction(
+                    user_id=1,
+                    user_card_id=owned.id,
+                    card_id=1,
+                    merchant_name=f"추가 마트 {index}",
+                    payment_category="MART",
+                    original_payment_amount=10_000,
+                    saved_amount=0,
+                    final_approved_amount=10_000,
+                    approval_number=f"FIXED-FREQUENCY-{index}",
+                    status="APPROVED",
+                    usage_month="2026-06",
+                    approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                )
+                for index in range(4)
+            ])
+            db.commit()
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        fixed = next(card for card in result["cards"] if card["id"] == 9)
+        self.assertEqual(fixed["benefitValue"], 1_000)
+        self.assertEqual(fixed["benefitUnit"], "원")
+        self.assertEqual(fixed["rate"], 0)
+        self.assertEqual(fixed["expectedBenefitAmount"], 1_000)
+        self.assertEqual(fixed["total"], 33_600)
 
     def test_excludes_unconfirmed_membership_benefit_from_calculation(self):
         with self.Session() as db:

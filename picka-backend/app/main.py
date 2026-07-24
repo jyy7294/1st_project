@@ -48,7 +48,7 @@ from app.services.user_state_adapter import (
     NoActiveUserCardsError,
     UserNotFoundError,
     build_user_card_states,
-    resolve_merchant_category,
+    resolve_payment_category,
 )
 from app.schemas.recommendation import RecommendationResponse
 from app.schemas.spending_pattern_recommendation import (
@@ -938,13 +938,10 @@ def create_transaction(
     usage_month = request.usage_month or date.today().strftime("%Y-%m")
 
     try:
-        payment_category = (
-            request.payment_category
-            or resolve_merchant_category(db, request.merchant_name)
-        )
-        payment_category = (
-            normalize_payment_category(payment_category)
-            or payment_category
+        payment_category = resolve_payment_category(
+            db,
+            merchant_name=request.merchant_name,
+            supplied_category=request.payment_category,
         )
         user_card_states = build_user_card_states(
             db=db,
@@ -1331,8 +1328,10 @@ def create_recommendation(
             user_id=request.user_id,
             usage_month=usage_month,
         )
-        payment_category = request.payment_category or resolve_merchant_category(
-            db, request.merchant_name
+        payment_category = resolve_payment_category(
+            db,
+            merchant_name=request.merchant_name,
+            supplied_category=request.payment_category,
         )
         result = recommend_cards(
             merchant_name=request.merchant_name,
@@ -1412,9 +1411,10 @@ def select_recommended_card(
         )
 
         # 2. 가맹점 업종 확인
-        payment_category = request.payment_category or resolve_merchant_category(
+        payment_category = resolve_payment_category(
             db,
-            request.merchant_name,
+            merchant_name=request.merchant_name,
+            supplied_category=request.payment_category,
         )
 
         # 3. 사용자가 선택한 카드가 실제 보유 카드인지 확인

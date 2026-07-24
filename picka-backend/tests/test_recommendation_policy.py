@@ -1,6 +1,6 @@
 import unittest
 
-from app.services.recommendation_service import build_success_reason
+from app.services.recommendation_service import build_success_reason, calculate_base_benefit
 from unittest.mock import patch
 
 from app.services.recommendation_service import (
@@ -41,6 +41,15 @@ def card_result(
 
 
 class RecommendationPolicyTest(unittest.TestCase):
+    def test_fixed_amount_benefit_cannot_exceed_payment_amount(self):
+        self.assertEqual(
+            calculate_base_benefit(
+                600,
+                {"benefit_value": 1_000, "benefit_unit": "원"},
+            ),
+            600,
+        )
+
     def test_fixed_amount_benefit_reason_does_not_append_percent(self):
         reason, details = build_success_reason(
             payment_category="배달앱",

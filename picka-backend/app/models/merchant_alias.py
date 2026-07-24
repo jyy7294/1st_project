@@ -28,6 +28,11 @@ class MerchantAlias(Base):
         String(100),
     )
 
+    report_category: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
     match_type: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,

@@ -7,9 +7,10 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Card, Transaction, TransactionReward, User
+from app.models import Card, MerchantAlias, Transaction, TransactionReward, User
 from app.services.category_normalization import normalize_payment_category
 from app.services.benefit_total_service import confirmed_benefit_totals_by_card
+from app.services.user_state_adapter import resolve_merchant_alias
 
 
 REPORT_CATEGORY_MAP = {
@@ -51,6 +52,15 @@ def previous_month(usage_month: str) -> str:
 def report_category(payment_category: str | None) -> str:
     normalized = normalize_payment_category(payment_category)
     return REPORT_CATEGORY_MAP.get(normalized or "", "기타")
+
+
+def transaction_report_category(
+    transaction: Transaction,
+    aliases: list[MerchantAlias],
+) -> str:
+    alias = resolve_merchant_alias(aliases, transaction.merchant_name)
+    corrected = alias.report_category if alias is not None else None
+    return report_category(corrected or transaction.payment_category)
 
 
 def _month_rows(db: Session, user_id: int, usage_month: str):
@@ -122,11 +132,12 @@ def build_monthly_spending_report(
             TransactionReward.reward_unit,
         )
     ).all()
+    merchant_aliases = list(db.scalars(select(MerchantAlias)).all())
 
     category_amounts: dict[str, int] = defaultdict(int)
     card_benefits: dict[int, dict[str, Any]] = {}
     for transaction, card in current_rows:
-        category_amounts[report_category(transaction.payment_category)] += (
+        category_amounts[transaction_report_category(transaction, merchant_aliases)] += (
             transaction.original_payment_amount
         )
         card_item = card_benefits.setdefault(card.id, {

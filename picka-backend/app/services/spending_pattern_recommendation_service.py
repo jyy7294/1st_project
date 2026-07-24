@@ -23,7 +23,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
 
-RECOMMENDATION_POLICY_VERSION = "spending-v2-90d-weighted-eligibility-benefits"
+RECOMMENDATION_POLICY_VERSION = "spending-v4-fixed-benefit-frequency"
 
 
 CATEGORY_NORMALIZATION = {
@@ -273,6 +273,53 @@ def build_recent_spending_profile(
     )
 
 
+def _build_recent_transaction_frequencies(
+    db: Session,
+    user_id: int,
+    *,
+    reference_date: date | None = None,
+    days: int = 90,
+) -> tuple[dict[str, float], dict[tuple[str, str], float]]:
+    """Return EWMA-style monthly transaction frequencies for fixed benefits."""
+
+    korea = ZoneInfo("Asia/Seoul")
+    today = reference_date or datetime.now(korea).date()
+    end_local = datetime.combine(today, time.min, tzinfo=korea)
+    start_local = end_local - timedelta(days=days)
+    rows = db.execute(
+        select(
+            Transaction.merchant_name,
+            Transaction.payment_category,
+            Transaction.approved_at,
+        ).where(
+            Transaction.user_id == user_id,
+            Transaction.status == "APPROVED",
+            Transaction.approved_at >= start_local.astimezone(timezone.utc),
+            Transaction.approved_at < end_local.astimezone(timezone.utc),
+        )
+    ).all()
+    category_frequencies: dict[str, float] = defaultdict(float)
+    merchant_frequencies: dict[tuple[str, str], float] = defaultdict(float)
+    for merchant_name, category, approved_at in rows:
+        normalized = normalize_spending_category(category)
+        if not normalized:
+            continue
+        if approved_at.tzinfo is None:
+            approved_at = approved_at.replace(tzinfo=timezone.utc)
+        age_days = max((today - approved_at.astimezone(korea).date()).days - 1, 0)
+        weight = 0.5 if age_days < 30 else 0.3 if age_days < 60 else 0.2
+        category_frequencies[normalized] += weight
+        merchant_frequencies[(merchant_name, normalized)] += weight
+    return dict(category_frequencies), dict(merchant_frequencies)
+
+
+def _fixed_benefit_frequency(unit: str | None, frequency: float | None) -> float:
+    if unit not in {"원", "KRW"}:
+        return 1.0
+    # A historical transaction still represents a real applicable occurrence.
+    return max(float(frequency or 0), 1.0)
+
+
 def _normalize_search_text(value: str | None) -> str:
     return "".join(character.lower() for character in (value or "") if character.isalnum())
 
@@ -461,6 +508,11 @@ def recommend_new_cards_by_spending(
         user_id,
         reference_date=reference_date,
     )
+    category_frequencies, merchant_frequencies = _build_recent_transaction_frequencies(
+        db,
+        user_id,
+        reference_date=reference_date,
+    )
     monthly_spending = sum(profile.values())
     top_category = primary_category
     top_category_spend = profile.get(primary_category, 0) if primary_category else 0
@@ -548,6 +600,11 @@ def recommend_new_cards_by_spending(
                 payment_amount=amount,
             )
             benefit = int(calculation.get("expected_benefit", 0) or 0)
+            benefit_frequency = _fixed_benefit_frequency(
+                calculation.get("benefit_unit"),
+                category_frequencies.get(category),
+            )
+            monthly_benefit = int(benefit * benefit_frequency)
             if benefit > 0:
                 benefit_key = str(
                     calculation.get("benefit_name") or category
@@ -559,7 +616,7 @@ def recommend_new_cards_by_spending(
                         "monthly_limit": calculation.get("monthly_limit"),
                     },
                 )
-                bucket["amount"] = int(bucket["amount"] or 0) + benefit
+                bucket["amount"] = int(bucket["amount"] or 0) + monthly_benefit
             if (
                 benefit > 0
                 and (
@@ -571,6 +628,7 @@ def recommend_new_cards_by_spending(
                     "amount": benefit,
                     "name": calculation.get("benefit_name") or category,
                     "rate": calculation.get("benefit_rate") or 0,
+                    "unit": calculation.get("benefit_unit"),
                     "category": category,
                     "monthly_spend": amount,
                 }
@@ -612,7 +670,16 @@ def recommend_new_cards_by_spending(
                         "monthly_limit": calculation.get("monthly_limit"),
                     },
                 )
-                bucket["amount"] = max(int(bucket["amount"] or 0), amount)
+                merchant_frequency = _fixed_benefit_frequency(
+                    calculation.get("benefit_unit"),
+                    merchant_frequencies.get(
+                        (merchant["merchant_name"], merchant["category"])
+                    ),
+                )
+                bucket["amount"] = max(
+                    int(bucket["amount"] or 0),
+                    int(amount * merchant_frequency),
+                )
                 matched_merchants.add(merchant["canonical_merchant"])
                 if (
                     best_category_result is None
@@ -622,6 +689,7 @@ def recommend_new_cards_by_spending(
                         "amount": amount,
                         "name": benefit_name,
                         "rate": calculation.get("benefit_rate") or 0,
+                        "unit": calculation.get("benefit_unit"),
                         "category": merchant["category"],
                         "monthly_spend": merchant["amount"],
                     }
@@ -641,6 +709,7 @@ def recommend_new_cards_by_spending(
         best = best_category_result or {
             "name": "적용 가능한 혜택 없음",
             "rate": 0,
+            "unit": None,
             "category": top_category,
             "monthly_spend": top_category_spend,
         }
@@ -657,7 +726,17 @@ def recommend_new_cards_by_spending(
             "name": card.card_name,
             "issuer": card.issuer or "",
             "benefitName": best["name"],
-            "rate": float(best["rate"]),
+            # Legacy field: it is a percentage only. Fixed benefits use
+            # benefitValue + benefitUnit and expose rate as zero.
+            "rate": float(best["rate"]) if best["unit"] == "%" else 0.0,
+            "benefitValue": float(best["rate"]),
+            "benefitUnit": (
+                "원" if best["unit"] == "KRW" else best["unit"]
+            ),
+            "expectedBenefitAmount": (
+                int(best_category_result["amount"])
+                if best_category_result is not None else 0
+            ),
             "total": annual_total,
             "fee": fee,
             "url": card.source_url,

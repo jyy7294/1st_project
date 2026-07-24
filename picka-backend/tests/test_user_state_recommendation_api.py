@@ -426,7 +426,10 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         )
 
     def test_create_transaction_without_benefit_still_approves(self):
-        response = self._transaction_request(payment_category="병원")
+        response = self._transaction_request(
+            merchant_name="NO_ALIAS_HOSPITAL",
+            payment_category="MEDICAL",
+        )
         self.assertEqual(response.status_code, 201)
         body = response.json()
         self.assertEqual(body["payment"]["saved_amount"], 0)
@@ -442,7 +445,10 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             self.assertEqual(transaction.payment_category, "병원/약국")
 
     def test_create_transaction_normalizes_english_payment_category(self):
-        response = self._transaction_request(payment_category="MART")
+        response = self._transaction_request(
+            merchant_name="NO_ALIAS_MART",
+            payment_category="MART",
+        )
 
         self.assertEqual(response.status_code, 201)
         with self.Session() as db:
@@ -455,18 +461,28 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             400,
         )
 
+    def test_merchant_alias_overrides_supplied_category(self):
+        response = self._transaction_request(payment_category="MART")
+        self.assertEqual(response.status_code, 201)
+        with self.Session() as db:
+            transaction = db.scalar(select(Transaction))
+            self.assertEqual(transaction.payment_category, "카페")
+
     def test_monthly_spending_report_aggregates_categories_and_benefits(self):
         self._transaction_request(
+            merchant_name="NO_ALIAS_RESTAURANT",
             payment_category="RESTAURANT",
             payment_amount=20_000,
             usage_month="2026-07",
         )
         self._transaction_request(
+            merchant_name="NO_ALIAS_TELECOM",
             payment_category="TELECOM",
             payment_amount=30_000,
             usage_month="2026-07",
         )
         self._transaction_request(
+            merchant_name="NO_ALIAS_TRANSIT",
             payment_category="TRANSIT",
             payment_amount=10_000,
             usage_month="2026-06",

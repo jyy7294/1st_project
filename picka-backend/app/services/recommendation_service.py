@@ -852,7 +852,8 @@ def calculate_base_benefit(
         return max(payment_amount, 0) * benefit_value / 100
 
     if benefit_unit in {"원", "KRW"}:
-        return benefit_value
+        # A fixed discount cannot be larger than the transaction itself.
+        return min(max(payment_amount, 0), benefit_value)
 
     return 0
 
@@ -1464,6 +1465,7 @@ def calculate_card_benefit(
         "is_conditional": best_benefit["is_conditional"],
         "caveat": best_benefit["caveat"],
         "benefit_rate": best_benefit["benefit_rate"],
+        "benefit_unit": best_benefit["benefit_unit"],
         "reason": reason,
         "reason_details": reason_details,
         "benefit_name": best_benefit["benefit_name"],

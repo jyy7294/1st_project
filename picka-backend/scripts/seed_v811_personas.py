@@ -15,6 +15,7 @@ from app.models import (
     CardBenefit,
     CardRecommendationSnapshot,
     MonthlyCardUsage,
+    MerchantAlias,
     Transaction,
     TransactionBenefitOutcome,
     User,
@@ -26,6 +27,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.monthly_benefit_limit_service import (
     enforce_monthly_card_benefit_limits,
 )
+from app.services.user_state_adapter import resolve_category_from_aliases
 
 
 CSV_PATH = Path(__file__).resolve().parents[1] / "PICKA_persona_all_in_one_v8_11.csv"
@@ -107,6 +109,7 @@ def main() -> None:
     now = datetime.now(timezone.utc)
 
     with SessionLocal() as db:
+        merchant_aliases = list(db.scalars(select(MerchantAlias)).all())
         cards = db.scalars(
             select(Card).where(Card.source_card_id.in_(source_card_ids))
         ).all()
@@ -284,8 +287,15 @@ def main() -> None:
                 transaction.user_card_id = user_card.id
                 transaction.card_id = card.id
                 transaction.merchant_name = row["merchant_name"]
+                alias_category = resolve_category_from_aliases(
+                    merchant_aliases,
+                    row["merchant_name"],
+                )
                 transaction.payment_category = (
-                    normalize_payment_category(row["payment_category"])
+                    normalize_payment_category(
+                        alias_category or row["payment_category"]
+                    )
+                    or alias_category
                     or row["payment_category"]
                 )
                 transaction.original_payment_amount = _int(row["original_payment_amount"])

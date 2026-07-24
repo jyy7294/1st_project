@@ -232,24 +232,59 @@ def build_user_card_states(
     return states
 
 
-def resolve_merchant_category(db: Session, merchant_name: str) -> str:
+def resolve_category_from_aliases(
+    aliases: list[MerchantAlias],
+    merchant_name: str,
+) -> str | None:
+    alias = resolve_merchant_alias(aliases, merchant_name)
+    return alias.category if alias is not None else None
+
+
+def resolve_merchant_alias(
+    aliases: list[MerchantAlias],
+    merchant_name: str,
+) -> MerchantAlias | None:
     normalized_name = "".join(merchant_name.lower().split())
-    aliases = db.scalars(select(MerchantAlias)).all()
     matches = []
     for alias in aliases:
         normalized_alias = "".join(alias.alias.lower().split())
         if normalized_alias and normalized_alias in normalized_name:
             matches.append((alias, normalized_alias))
+    if not matches:
+        return None
+    alias, _ = min(
+        matches,
+        key=lambda item: (
+            -len(item[1]),
+            -(item[0].priority or 0),
+            item[0].id,
+        ),
+    )
+    return alias
 
-    if matches:
-        alias, _ = min(
-            matches,
-            key=lambda item: (
-                -len(item[1]),
-                -(item[0].priority or 0),
-                item[0].id,
-            ),
-        )
-        return alias.category
 
+def resolve_merchant_category(db: Session, merchant_name: str) -> str:
+    aliases = list(db.scalars(select(MerchantAlias)).all())
+    alias_category = resolve_category_from_aliases(aliases, merchant_name)
+    if alias_category is not None:
+        return alias_category
+
+    return get_merchant_category(merchant_name)
+
+
+def resolve_payment_category(
+    db: Session,
+    *,
+    merchant_name: str,
+    supplied_category: str | None = None,
+) -> str:
+    """등록된 가맹점 alias를 프론트 입력이나 일반 분류보다 우선한다."""
+    aliases = list(db.scalars(select(MerchantAlias)).all())
+    alias_category = resolve_category_from_aliases(aliases, merchant_name)
+    if alias_category is not None:
+        return alias_category
+    if supplied_category:
+        from app.services.category_normalization import normalize_payment_category
+
+        return normalize_payment_category(supplied_category) or supplied_category
     return get_merchant_category(merchant_name)
