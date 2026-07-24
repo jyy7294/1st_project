@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal
-from app.models import Card, CardEligibilityRule
+from app.models import Card, CardEligibilityRule, CardRecommendationSnapshot
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,48 @@ EXACT_SOURCE_CARD_IDS: dict[int, tuple[RuleDefinition, ...]] = {
         for card_id in (760, 1298, 2314, 2929)
     },
     1816: (RuleDefinition("AGE_GROUP", "SENIOR", description="시니어 연령 조건 확인 필요"),),
+    1451: (
+        RuleDefinition(
+            "FOREIGNER", "true",
+            description="만 18세 이상 외국인 대상 카드",
+        ),
+        RuleDefinition("AGE", "18", comparison_operator="GTE", description="만 18세 이상"),
+    ),
+    2917: (
+        RuleDefinition(
+            "FOREIGNER",
+            "true",
+            description="외국인 실명확인증표 보유 외국인 대상 카드",
+        ),
+        RuleDefinition("AGE", "7", comparison_operator="GTE", description="만 7세 이상"),
+    ),
+    2919: (
+        RuleDefinition(
+            "FOREIGNER", "true",
+            description="만 18세 이상 국내 거주 외국인 대상 카드",
+        ),
+        RuleDefinition("AGE", "18", comparison_operator="GTE", description="만 18세 이상"),
+    ),
+    2921: (
+        RuleDefinition(
+            "FOREIGNER", "true",
+            description="외국인등록증 소지 외국인 대상 카드",
+        ),
+        RuleDefinition("AGE", "12", comparison_operator="GTE", description="만 12세 이상"),
+    ),
+    2922: (
+        RuleDefinition(
+            "FOREIGNER", "true",
+            description="외국인등록증 소지 외국인 대상 카드",
+        ),
+        RuleDefinition("AGE", "12", comparison_operator="GTE", description="만 12세 이상"),
+    ),
+    685: (
+        RuleDefinition(
+            "AGE_GROUP", "TEEN",
+            description="만 12세~18세 청소년 전용 카드",
+        ),
+    ),
     **{
         card_id: (RuleDefinition("BUSINESS_OWNER", "true", description="개인사업자 전용 카드"),)
         for card_id in (2420, 2421)
@@ -120,6 +162,7 @@ def main() -> None:
 
         managed_types = {
             "MILITARY_SERVICE", "STUDENT", "AGE_GROUP", "BUSINESS_OWNER",
+            "FOREIGNER", "AGE",
             "COMPACT_CAR_OWNER", "VEHICLE_OWNER",
             "PREGNANCY_CHILDCARE_SUPPORT_ELIGIBLE", "CHILDREN_COUNT",
             "HIGHPASS_USER", "KPASS_USER", "TELECOM_PROVIDER",
@@ -148,6 +191,7 @@ def main() -> None:
             rule.comparison_operator = definition.comparison_operator
             rule.description = definition.description
 
+        db.execute(delete(CardRecommendationSnapshot))
         db.commit()
 
     print(f"inserted={inserted}")

@@ -68,6 +68,9 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.reward_service import calculate_transaction_rewards
 from app.services.recommendation_audit_service import save_recommendation_audit
 from app.services.benefit_total_service import confirmed_benefit_totals_by_card
+from app.services.daily_recommendation_scheduler import (
+    daily_recommendation_scheduler,
+)
 
 
 app = FastAPI(
@@ -86,6 +89,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def start_daily_recommendation_scheduler() -> None:
+    daily_recommendation_scheduler.start()
+
+
+@app.on_event("shutdown")
+def stop_daily_recommendation_scheduler() -> None:
+    daily_recommendation_scheduler.stop()
 
 
 VERIFICATION_STATUSES = {

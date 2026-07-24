@@ -170,7 +170,11 @@ def main() -> None:
 
             # v8.13은 unknown 자격을 제거한 시드다. 멤버십 열이 없다는 것은
             # 가입된 멤버십이 없다고 명시하여 제휴 혜택이 확인 대기로 남지 않게 한다.
-            values = {"AGE": first["persona_age"], "MEMBERSHIPS": "[]"}
+            values = {
+                "AGE": first["persona_age"],
+                "MEMBERSHIPS": "[]",
+                "FOREIGNER": "false",
+            }
             for source_key, target in ELIGIBILITY_MAPPING.items():
                 value = first.get(source_key, "")
                 if target in {"OCCUPATION_QUALIFICATIONS", "CHILD_AGE_GROUPS"}:

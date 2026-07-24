@@ -796,11 +796,25 @@ def get_daily_card_recommendations(
             CardRecommendationSnapshot.analysis_date == analysis_date,
         )
     )
+    stale_snapshot = None
+    if snapshot is None and not force_refresh:
+        stale_snapshot = db.scalar(
+            select(CardRecommendationSnapshot)
+            .where(CardRecommendationSnapshot.user_id == user_id)
+            .order_by(CardRecommendationSnapshot.analysis_date.desc())
+            .limit(1)
+        )
     policy_changed = (
         snapshot is not None
         and snapshot.policy_version != RECOMMENDATION_POLICY_VERSION
     )
-    if snapshot is None or force_refresh or policy_changed:
+    # Around midnight (or while a restarted server is backfilling), return the
+    # latest completed result immediately instead of making the user wait for a
+    # full synchronous recalculation.
+    if stale_snapshot is not None and stale_snapshot.policy_version == RECOMMENDATION_POLICY_VERSION:
+        snapshot = stale_snapshot
+        cached = True
+    elif snapshot is None or force_refresh or policy_changed:
         credit_result = recommend_new_cards_by_spending(
             db,
             user_id=user_id,
