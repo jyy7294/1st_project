@@ -18,8 +18,16 @@ export default function Login() {
     setPending(true)
     try {
       const result = await login(id, pw)
-      if (result.ok) dispatch({ type: A.LOGIN_SUCCESS, user: result.user })
-      else dispatch({ type: A.LOGIN_FAIL, message: result.message })
+      if (result.ok) {
+        dispatch({
+          type: A.LOGIN_SUCCESS,
+          user: result.user,
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        })
+      } else {
+        dispatch({ type: A.LOGIN_FAIL, message: result.message })
+      }
     } finally {
       setPending(false)
     }

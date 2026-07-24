@@ -1,7 +1,8 @@
 // PICKA 백엔드 API.
 //
 // 엔드포인트는 picka-backend/app/main.py 기준입니다.
-// 백엔드에 인증 미들웨어가 없어 토큰 대신 user_id 로 사용자를 식별합니다.
+// 인증은 JWT(Authorization: Bearer) 로 처리하며(client.js), user_id 는 사용자별
+// 리소스 경로(/users/{user_id}/...)를 가리키는 용도로 함께 실립니다.
 
 import { ApiError, request } from './client.js'
 import { adaptCard, adaptTransaction } from './adapters.js'

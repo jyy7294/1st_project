@@ -7,6 +7,9 @@ export const A = {
   SET_SCREEN: 'SET_SCREEN',
   LOGIN_SUCCESS: 'LOGIN_SUCCESS',
   LOGOUT: 'LOGOUT',
+  AUTH_RESTORED: 'AUTH_RESTORED',
+  AUTH_INIT_DONE: 'AUTH_INIT_DONE',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
   SET_CARDS_ERROR: 'SET_CARDS_ERROR',
   LOGIN_FAIL: 'LOGIN_FAIL',
   CLEAR_LOGIN_ERROR: 'CLEAR_LOGIN_ERROR',
@@ -92,8 +95,16 @@ export const initialState = {
   error: null, // 추천 호출 실패 메시지
   noEligibleCard: false, // 404 — 이 업종에 혜택 카드가 없음
   loginError: '',
-  // 로그인한 사용자. 백엔드에 인증 미들웨어가 없어 user_id 를 모든 요청에 실어 보냅니다.
+  // 로그인한 사용자. 사용자 식별용 user_id 는 API 경로에, 인증은 JWT 헤더로 처리합니다.
   user: null, // { userId, email, name }
+  // JWT 인증 상태. 토큰 원본은 API 계층(client.js)+sessionStorage 가 단일 원본이라
+  // 여기엔 화면 분기용 상태만 둡니다.
+  accessToken: null,
+  refreshToken: null,
+  isAuthenticated: false,
+  // 앱 시작 시 sessionStorage 의 refresh_token 으로 세션 복구를 시도하는 동안 true.
+  // 이 값이 true 인 동안에는 보유카드·추천 API 를 호출하지 않습니다.
+  authInitializing: true,
   cardsError: null, // 보유카드 조회 실패 메시지
 }
 
@@ -109,16 +120,41 @@ export function appReducer(state, action) {
         screen: 'home',
         loginError: '',
         user: action.user || state.user,
+        accessToken: action.accessToken ?? null,
+        refreshToken: action.refreshToken ?? null,
+        isAuthenticated: true,
+        authInitializing: false,
         cards: [],
         cardsLoaded: false,
         cardsError: null,
         active: 0,
       }
 
+    case A.AUTH_RESTORED:
+      // 새로고침 복구 성공 — 토큰·사용자를 되살리고 홈으로 바로 진입합니다.
+      return {
+        ...state,
+        screen: 'home',
+        user: action.user,
+        accessToken: action.accessToken ?? null,
+        refreshToken: action.refreshToken ?? null,
+        isAuthenticated: true,
+        authInitializing: false,
+        cards: [],
+        cardsLoaded: false,
+        cardsError: null,
+        active: 0,
+      }
+
+    case A.AUTH_INIT_DONE:
+      // 복구할 세션이 없음 — 초기화만 끝내고 스플래시/로그인 흐름을 그대로 둡니다.
+      return { ...state, authInitializing: false }
+
     case A.LOGOUT:
-      // 로그인 상태는 이 리듀서에만 있고 서버 세션이 없어(auth.js 참고),
-      // 상태를 초기값으로 되돌리고 로그인 화면으로 보내면 로그아웃이 끝납니다.
-      return { ...initialState, screen: 'login' }
+    case A.SESSION_EXPIRED:
+      // 토큰은 API 계층에서 지웁니다(auth.logout / client 의 401 처리).
+      // 화면 상태는 초기값으로 되돌리고 로그인 화면으로 보냅니다.
+      return { ...initialState, screen: 'login', authInitializing: false }
 
     case A.LOGIN_FAIL:
       return { ...state, loginError: action.message }
