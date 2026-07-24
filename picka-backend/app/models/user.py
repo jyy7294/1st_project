@@ -26,10 +26,6 @@ class User(Base):
         String(100),
         nullable=False,
     )
-    provider: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True,
-    )
     password_hash: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -65,10 +61,6 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
-    social_accounts: Mapped[list["SocialAccount"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

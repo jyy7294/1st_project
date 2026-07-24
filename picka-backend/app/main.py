@@ -27,15 +27,8 @@ from app.models import (
 )
 from app.services.card_registration_service import register_virtual_card
 from app.services.auth_service import (
-    create_oauth_state,
-    get_or_create_social_user,
     login_response,
-    verify_oauth_state,
     verify_password,
-)
-from app.services.oauth_service import (
-    authorization_url,
-    fetch_oauth_profile,
 )
 from app.services.recommendation_debug_service import (
     build_recommendation_debug,
@@ -77,6 +70,7 @@ app = FastAPI(
     title="PICKA Card Recommendation API",
     description="사용자의 보유 카드와 사용 상태를 반영해 결제 카드를 추천합니다.",
     version="1.1.0",
+    swagger_ui_oauth2_redirect_url=None,
 )
 
 app.add_middleware(
@@ -310,7 +304,6 @@ class AuthUserResponse(BaseModel):
     username: str | None
     email: str | None
     name: str | None
-    login_provider: str
 
 
 class LoginResponse(BaseModel):
@@ -318,10 +311,6 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str
     user: AuthUserResponse
-
-
-class OAuthAuthorizeResponse(BaseModel):
-    authorization_url: str
 
 
 class ManualCardRegistrationRequest(BaseModel):
@@ -463,94 +452,7 @@ def local_login(
             status_code=401,
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
         )
-    return login_response(user, "LOCAL")
-
-
-@app.get(
-    "/api/v1/auth/kakao/authorize",
-    response_model=OAuthAuthorizeResponse,
-    summary="카카오 로그인 URL 생성",
-)
-def kakao_authorize():
-    state = create_oauth_state("KAKAO")
-    return {
-        "authorization_url": authorization_url("KAKAO", state),
-    }
-
-
-@app.get(
-    "/api/v1/auth/naver/authorize",
-    response_model=OAuthAuthorizeResponse,
-    summary="네이버 로그인 URL 생성",
-)
-def naver_authorize():
-    state = create_oauth_state("NAVER")
-    return {
-        "authorization_url": authorization_url("NAVER", state),
-    }
-
-
-async def social_login_callback(
-    provider: str,
-    code: str,
-    state: str,
-    db: Session,
-) -> dict:
-    verify_oauth_state(state, provider)
-    profile = await fetch_oauth_profile(provider, code, state)
-    try:
-        user, account = get_or_create_social_user(
-            db=db,
-            provider=provider,
-            provider_user_id=profile["provider_user_id"],
-            email=profile.get("email"),
-            name=profile.get("name"),
-            profile_image_url=profile.get("profile_image_url"),
-        )
-        if not user.is_active:
-            raise HTTPException(
-                status_code=401,
-                detail="비활성 사용자입니다.",
-            )
-        return login_response(
-            user,
-            provider,
-            social_email=account.email,
-        )
-    except HTTPException:
-        raise
-    except SQLAlchemyError as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail="소셜 로그인 사용자 저장 중 오류가 발생했습니다.",
-        ) from error
-
-
-@app.get(
-    "/api/v1/auth/kakao/callback",
-    response_model=LoginResponse,
-    summary="카카오 로그인 콜백",
-)
-async def kakao_callback(
-    code: str,
-    state: str,
-    db: Annotated[Session, Depends(get_db)],
-):
-    return await social_login_callback("KAKAO", code, state, db)
-
-
-@app.get(
-    "/api/v1/auth/naver/callback",
-    response_model=LoginResponse,
-    summary="네이버 로그인 콜백",
-)
-async def naver_callback(
-    code: str,
-    state: str,
-    db: Annotated[Session, Depends(get_db)],
-):
-    return await social_login_callback("NAVER", code, state, db)
+    return login_response(user)
 
 
 @app.get("/")

@@ -9,7 +9,7 @@
 - DB 마이그레이션: Alembic
 - DB 드라이버: Psycopg
 - 데이터 검증: Pydantic
-- 인증: JWT, 카카오·네이버 OAuth
+- 인증: JWT 일반 로그인
 - LLM: OpenAI Responses API
 - API 문서: Swagger (`/docs`)
 - 테스트: Python unittest, 현재 102개 통과

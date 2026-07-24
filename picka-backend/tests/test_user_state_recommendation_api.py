@@ -1,10 +1,6 @@
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
-from urllib.parse import parse_qs, urlparse
-
 from fastapi.testclient import TestClient
-from fastapi import HTTPException
 from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -20,7 +16,6 @@ from app.models import (
     MonthlyCardUsage,
     RecommendationAuditLog,
     Transaction,
-    SocialAccount,
     VirtualCardCredential,
     User,
     UserCard,
@@ -34,25 +29,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.original_debug = settings.recommendation_debug
         self.original_auth_settings = {
             "jwt_secret_key": settings.jwt_secret_key,
-            "kakao_rest_api_key": settings.kakao_rest_api_key,
-            "kakao_client_secret": settings.kakao_client_secret,
-            "kakao_redirect_uri": settings.kakao_redirect_uri,
-            "naver_client_id": settings.naver_client_id,
-            "naver_client_secret": settings.naver_client_secret,
-            "naver_redirect_uri": settings.naver_redirect_uri,
         }
         settings.recommendation_debug = False
         settings.jwt_secret_key = "test-jwt-secret-key"
-        settings.kakao_rest_api_key = "test-kakao-key"
-        settings.kakao_client_secret = "test-kakao-secret"
-        settings.kakao_redirect_uri = (
-            "http://testserver/api/v1/auth/kakao/callback"
-        )
-        settings.naver_client_id = "test-naver-id"
-        settings.naver_client_secret = "test-naver-secret"
-        settings.naver_redirect_uri = (
-            "http://testserver/api/v1/auth/naver/callback"
-        )
         self.engine = create_engine(
             "sqlite://",
             connect_args={"check_same_thread": False},
@@ -756,7 +735,6 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["token_type"], "bearer")
         self.assertTrue(body["access_token"])
-        self.assertEqual(body["user"]["login_provider"], "LOCAL")
         self.assertNotIn("password", body["user"])
         self.assertNotIn("password_hash", body["user"])
 
@@ -787,126 +765,6 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             json={"email": "test@example.com", "password": ""},
         )
         self.assertEqual(response.status_code, 422)
-
-    def _oauth_state(self, provider: str) -> str:
-        response = self.client.get(
-            f"/api/v1/auth/{provider.lower()}/authorize"
-        )
-        self.assertEqual(response.status_code, 200)
-        url = response.json()["authorization_url"]
-        state = parse_qs(urlparse(url).query)["state"][0]
-        self.assertTrue(state)
-        return state
-
-    def test_oauth_authorize_urls_include_state(self):
-        for provider, host in (
-            ("KAKAO", "kauth.kakao.com"),
-            ("NAVER", "nid.naver.com"),
-        ):
-            with self.subTest(provider=provider):
-                response = self.client.get(
-                    f"/api/v1/auth/{provider.lower()}/authorize"
-                )
-                self.assertEqual(response.status_code, 200)
-                parsed = urlparse(
-                    response.json()["authorization_url"]
-                )
-                self.assertEqual(parsed.netloc, host)
-                self.assertTrue(parse_qs(parsed.query)["state"][0])
-
-    def test_oauth_callback_creates_and_reuses_social_account(self):
-        profile = {
-            "provider_user_id": "social-123",
-            "email": "social@example.com",
-            "name": "소셜 사용자",
-            "profile_image_url": "https://example.com/profile.png",
-        }
-        for provider in ("KAKAO", "NAVER"):
-            with self.subTest(provider=provider):
-                state = self._oauth_state(provider)
-                with patch(
-                    "app.main.fetch_oauth_profile",
-                    new=AsyncMock(return_value=profile),
-                ):
-                    first = self.client.get(
-                        f"/api/v1/auth/{provider.lower()}/callback",
-                        params={"code": "valid-code", "state": state},
-                    )
-                    second = self.client.get(
-                        f"/api/v1/auth/{provider.lower()}/callback",
-                        params={"code": "valid-code", "state": state},
-                    )
-                self.assertEqual(first.status_code, 200)
-                self.assertEqual(second.status_code, 200)
-                self.assertEqual(
-                    first.json()["user"]["user_id"],
-                    second.json()["user"]["user_id"],
-                )
-                self.assertEqual(
-                    first.json()["user"]["login_provider"],
-                    provider,
-                )
-                with self.Session() as db:
-                    count = db.scalar(
-                        select(func.count())
-                        .select_from(SocialAccount)
-                        .where(SocialAccount.provider == provider)
-                    )
-                self.assertEqual(count, 1)
-
-    def test_oauth_callback_handles_missing_email(self):
-        state = self._oauth_state("KAKAO")
-        profile = {
-            "provider_user_id": "no-email",
-            "email": None,
-            "name": None,
-            "profile_image_url": None,
-        }
-        with patch(
-            "app.main.fetch_oauth_profile",
-            new=AsyncMock(return_value=profile),
-        ):
-            response = self.client.get(
-                "/api/v1/auth/kakao/callback",
-                params={"code": "valid-code", "state": state},
-            )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()["user"]["email"])
-
-    def test_oauth_callback_rejects_bad_state_and_missing_code(self):
-        bad_state = self.client.get(
-            "/api/v1/auth/kakao/callback",
-            params={"code": "code", "state": "invalid"},
-        )
-        self.assertEqual(bad_state.status_code, 400)
-        missing_code = self.client.get(
-            "/api/v1/auth/kakao/callback",
-            params={"state": self._oauth_state("KAKAO")},
-        )
-        self.assertEqual(missing_code.status_code, 422)
-
-    def test_oauth_callback_handles_provider_failures(self):
-        for status_code in (400, 502):
-            with self.subTest(status_code=status_code):
-                state = self._oauth_state("NAVER")
-                with patch(
-                    "app.main.fetch_oauth_profile",
-                    new=AsyncMock(
-                        side_effect=HTTPException(
-                            status_code=status_code,
-                            detail=(
-                                "소셜 로그인 인증에 실패했습니다."
-                                if status_code == 400
-                                else "외부 로그인 서비스와 통신하지 못했습니다."
-                            ),
-                        )
-                    ),
-                ):
-                    response = self.client.get(
-                        "/api/v1/auth/naver/callback",
-                        params={"code": "bad", "state": state},
-                    )
-                self.assertEqual(response.status_code, status_code)
 
     def test_manual_virtual_card_registration_and_integration(self):
         self._prepare_virtual_card()

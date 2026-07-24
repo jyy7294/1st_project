@@ -161,7 +161,6 @@ def seed(apply: bool) -> dict[str, int]:
                 counts["users"] += 1
             user.email = email
             user.name = account["name"]
-            user.provider = "LOCAL"
             user.password_hash = hash_password(account["password"])
             user.is_active = True
             db.flush()

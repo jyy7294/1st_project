@@ -28,7 +28,6 @@ def seed_user_state() -> None:
             user = User(
                 email=SEED_EMAIL,
                 name="테스트유저",
-                provider="google",
             )
             db.add(user)
             db.flush()

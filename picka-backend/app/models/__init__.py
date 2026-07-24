@@ -9,7 +9,6 @@ from app.models.user import User
 from app.models.user_card import UserCard
 from app.models.transaction import Transaction
 from app.models.transaction_reward import TransactionReward
-from app.models.social_account import SocialAccount
 from app.models.virtual_card_credential import VirtualCardCredential
 from app.models.user_eligibility import UserEligibility
 from app.models.card_eligibility_rule import CardEligibilityRule
@@ -31,7 +30,6 @@ __all__ = [
     "UserCard",
     "Transaction",
     "TransactionReward",
-    "SocialAccount",
     "VirtualCardCredential",
     "UserEligibility",
     "CardEligibilityRule",
