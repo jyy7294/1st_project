@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -23,9 +23,18 @@ class UserPersonaProfile(Base):
         String(50), nullable=False, unique=True, index=True
     )
     age: Mapped[int] = mapped_column(Integer, nullable=False)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    memberships: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     gender: Mapped[str | None] = mapped_column(String(30), nullable=True)
     job: Mapped[str | None] = mapped_column(String(200), nullable=True)
     residence: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    is_foreigner: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    residence_sido: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    residence_sigungu: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    child_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    children_age_reference_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    children: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     monthly_budget: Mapped[int | None] = mapped_column(Integer, nullable=True)
     period: Mapped[str | None] = mapped_column(String(30), nullable=True)

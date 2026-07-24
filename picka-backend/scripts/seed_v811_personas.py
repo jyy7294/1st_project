@@ -32,6 +32,7 @@ from app.services.user_state_adapter import resolve_category_from_aliases
 
 CSV_PATH = Path(__file__).resolve().parents[1] / "PICKA_persona_all_in_one_v8_11.csv"
 SOURCE_VERSION = "v8_11"
+BENEFIT_ID_REFERENCE_CSV: Path | None = None
 PERSONA_USER_IDS = {"persona1": 1, "persona2": 3, "persona3": 4, "persona4": 5}
 KST = timezone(timedelta(hours=9))
 AFFECTED_MONTHS = {"2026-05", "2026-06", "2026-07"}
@@ -76,6 +77,18 @@ def _list_value(value: str | None) -> str:
     return json.dumps(items, ensure_ascii=False)
 
 
+def _list(value: str | None) -> list[str]:
+    return [item.strip() for item in (value or "").split("|") if item.strip()]
+
+
+def _date(value: str | None):
+    return datetime.strptime(value, "%Y-%m-%d").date() if value else None
+
+
+def _bool(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"true", "1", "yes", "y"}
+
+
 def _previous_month(usage_month: str) -> str:
     year, month = map(int, usage_month.split("-"))
     return f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
@@ -84,6 +97,27 @@ def _previous_month(usage_month: str) -> str:
 def main() -> None:
     with CSV_PATH.open(encoding="utf-8-sig", newline="") as file:
         all_rows = list(csv.DictReader(file))
+    if BENEFIT_ID_REFERENCE_CSV is not None:
+        with BENEFIT_ID_REFERENCE_CSV.open(
+            encoding="utf-8-sig", newline=""
+        ) as file:
+            reference_by_approval = {
+                row["approval_number_for_db"].upper(): row
+                for row in csv.DictReader(file)
+            }
+        for row in all_rows:
+            reference = reference_by_approval.get(
+                row.get("approval_number_for_db", "").upper()
+            )
+            if reference is not None:
+                # Spreadsheet programs converted IDs such as 2423-01 into
+                # Jan-23 in v8.18. Approval numbers are stable across versions,
+                # so restore only this corrupted identifier from v8.14.
+                row["card_benefit_source_id"] = reference.get(
+                    "card_benefit_source_id", ""
+                )
+                # The same spreadsheet conversion changed 2026-05 into May-26.
+                row["usage_month"] = reference.get("usage_month", "")
     rows = [
         row for row in all_rows
         if row.get("payment_source_type") == "CARD"
@@ -154,9 +188,20 @@ def main() -> None:
                 db.add(profile)
             profile.persona_id = persona_id
             profile.age = _int(first["persona_age"])
+            profile.birth_date = _date(first.get("persona_birth_date"))
+            profile.phone_number = first.get("persona_phone_number") or None
+            profile.memberships = _list(first.get("persona_memberships"))
             profile.gender = first["persona_gender"] or None
             profile.job = first["persona_job"] or None
             profile.residence = first["persona_residence"] or None
+            profile.is_foreigner = _bool(first.get("persona_is_foreigner"))
+            profile.residence_sido = first.get("persona_residence_sido") or None
+            profile.residence_sigungu = first.get("persona_residence_sigungu") or None
+            profile.child_count = _int(first.get("persona_child_count"))
+            profile.children_age_reference_date = _date(
+                first.get("persona_children_age_reference_date")
+            )
+            profile.children = json.loads(first.get("persona_children_json") or "[]")
             profile.description = first["persona_description"] or None
             profile.monthly_budget = _optional_int(first["persona_monthly_budget"])
             profile.period = first["persona_period"] or None
@@ -172,8 +217,11 @@ def main() -> None:
             # 가입된 멤버십이 없다고 명시하여 제휴 혜택이 확인 대기로 남지 않게 한다.
             values = {
                 "AGE": first["persona_age"],
-                "MEMBERSHIPS": "[]",
-                "FOREIGNER": "false",
+                "MEMBERSHIPS": json.dumps(profile.memberships, ensure_ascii=False),
+                "FOREIGNER": str(profile.is_foreigner).lower(),
+                "RESIDENCE_SIDO": profile.residence_sido or "unknown",
+                "RESIDENCE_SIGUNGU": profile.residence_sigungu or "unknown",
+                "CHILDREN_DETAILS": json.dumps(profile.children, ensure_ascii=False),
             }
             for source_key, target in ELIGIBILITY_MAPPING.items():
                 value = first.get(source_key, "")
