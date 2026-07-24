@@ -22,16 +22,16 @@ class UserPersonaProfile(Base):
     persona_id: Mapped[str] = mapped_column(
         String(50), nullable=False, unique=True, index=True
     )
-    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     birth_date_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone_number_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
-    gender: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    job: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    gender_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     residence_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_foreigner: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_foreigner_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     residence_sido_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     residence_sigungu_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
-    child_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    child_count_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     children_age_reference_date_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     memberships_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     children_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
@@ -119,6 +119,28 @@ class UserPersonaProfile(Base):
         lambda self: self._get_json("source_payload", {}),
         lambda self, value: setattr(self, "_pending_source_payload", value),
     )
+    age = property(
+        lambda self: int(self._get_text("age") or 0),
+        lambda self, value: self._set_text("age", str(value)),
+    )
+    gender = property(
+        lambda self: self._get_text("gender"),
+        lambda self, value: self._set_text("gender", value),
+    )
+    job = property(
+        lambda self: self._get_text("job"),
+        lambda self, value: self._set_text("job", value),
+    )
+    is_foreigner = property(
+        lambda self: self._get_text("is_foreigner") == "true",
+        lambda self, value: self._set_text(
+            "is_foreigner", str(bool(value)).lower(),
+        ),
+    )
+    child_count = property(
+        lambda self: int(self._get_text("child_count") or 0),
+        lambda self, value: self._set_text("child_count", str(value)),
+    )
 
 
 @event.listens_for(UserPersonaProfile, "before_insert")
@@ -127,11 +149,16 @@ def encrypt_profile_pii_before_write(mapper, connection, target) -> None:
     from app.services.pii_encryption_service import encrypt_json, encrypt_text
 
     scalar_values = {
+        "age": str(target.age),
         "birth_date": target.birth_date.isoformat() if target.birth_date else None,
         "phone_number": target.phone_number,
+        "gender": target.gender,
+        "job": target.job,
         "residence": target.residence,
         "residence_sido": target.residence_sido,
         "residence_sigungu": target.residence_sigungu,
+        "is_foreigner": str(target.is_foreigner).lower(),
+        "child_count": str(target.child_count),
         "children_age_reference_date": (
             target.children_age_reference_date.isoformat()
             if target.children_age_reference_date
@@ -158,10 +185,15 @@ def encrypt_profile_pii_before_write(mapper, connection, target) -> None:
     )
     for field in (
         "birth_date",
+        "age",
         "phone_number",
+        "gender",
+        "job",
         "residence",
         "residence_sido",
         "residence_sigungu",
+        "is_foreigner",
+        "child_count",
         "children_age_reference_date",
         "memberships",
         "children",

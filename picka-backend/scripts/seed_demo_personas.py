@@ -144,7 +144,12 @@ def seed(apply: bool) -> dict[str, int]:
             email = account["login_id"]
 
             id_owner = db.get(User, target_id)
-            email_owner = db.scalar(select(User).where(User.email == email))
+            from app.services.pii_encryption_service import email_blind_index
+            email_owner = db.scalar(
+                select(User).where(
+                    User.email_blind_index == email_blind_index(email)
+                )
+            )
             if id_owner is not None and id_owner.email != email:
                 raise RuntimeError(
                     f"users.id={target_id}가 다른 계정({id_owner.email})에 사용 중입니다."

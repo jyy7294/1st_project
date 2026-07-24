@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import os
 from typing import Any
@@ -76,3 +78,33 @@ def encrypt_json(value: Any, *, context: str) -> str:
 def decrypt_json(value: str | None, *, context: str) -> Any:
     plaintext = decrypt_text(value, context=context)
     return None if plaintext is None else json.loads(plaintext)
+
+
+def normalize_email(value: str) -> str:
+    return value.strip().lower()
+
+
+def blind_index(value: str, *, purpose: str) -> str:
+    if not settings.pii_blind_index_key:
+        raise PiiEncryptionConfigurationError(
+            "PII_BLIND_INDEX_KEY가 설정되지 않았습니다."
+        )
+    try:
+        key = base64.urlsafe_b64decode(settings.pii_blind_index_key.encode())
+    except Exception as error:
+        raise PiiEncryptionConfigurationError(
+            "PII_BLIND_INDEX_KEY는 URL-safe base64 형식이어야 합니다."
+        ) from error
+    if len(key) < 32:
+        raise PiiEncryptionConfigurationError(
+            "PII_BLIND_INDEX_KEY는 디코딩했을 때 32바이트 이상이어야 합니다."
+        )
+    return hmac.new(
+        key,
+        f"{purpose}:{value}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def email_blind_index(value: str) -> str:
+    return blind_index(normalize_email(value), purpose="user-email-v1")

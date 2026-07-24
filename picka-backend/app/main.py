@@ -70,6 +70,7 @@ from app.services.benefit_total_service import confirmed_benefit_totals_by_card
 from app.services.payment_gateway_service import authorize_demo_payment
 from app.services.privacy_audit_service import save_privacy_change_audit
 from app.services.pii_encryption_service import decrypt_text, encrypt_text
+from app.services.pii_encryption_service import email_blind_index
 from app.services.sensitive_log_filter import install_sensitive_data_log_filter
 from app.services.daily_recommendation_scheduler import (
     daily_recommendation_scheduler,
@@ -512,7 +513,11 @@ def local_login(
     request: LocalLoginRequest,
     db: Annotated[Session, Depends(get_db)],
 ):
-    user = db.scalar(select(User).where(User.email == request.email))
+    user = db.scalar(
+        select(User).where(
+            User.email_blind_index == email_blind_index(request.email)
+        )
+    )
     if (
         user is None
         or not user.is_active
