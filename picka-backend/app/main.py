@@ -24,10 +24,16 @@ from app.models import (
     User,
     UserCard,
     UserEligibility,
+    UserPersonaProfile,
 )
 from app.services.card_registration_service import register_virtual_card
 from app.services.auth_service import (
+    get_current_user,
     login_response,
+    require_admin,
+    require_user_access,
+    revoke_refresh_token,
+    rotate_refresh_token,
     verify_password,
 )
 from app.services.recommendation_debug_service import (
@@ -62,6 +68,9 @@ from app.services.reward_service import calculate_transaction_rewards
 from app.services.recommendation_audit_service import save_recommendation_audit
 from app.services.benefit_total_service import confirmed_benefit_totals_by_card
 from app.services.payment_gateway_service import authorize_demo_payment
+from app.services.privacy_audit_service import save_privacy_change_audit
+from app.services.pii_encryption_service import decrypt_text, encrypt_text
+from app.services.sensitive_log_filter import install_sensitive_data_log_filter
 from app.services.daily_recommendation_scheduler import (
     daily_recommendation_scheduler,
 )
@@ -88,6 +97,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def start_daily_recommendation_scheduler() -> None:
+    install_sensitive_data_log_filter()
     daily_recommendation_scheduler.start()
 
 
@@ -130,6 +140,47 @@ class UserEligibilityUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_unique_types(self):
+        types = [item.eligibility_type for item in self.eligibilities]
+        if len(types) != len(set(types)):
+            raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
+
+
+class PersonalProfileUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    birth_date: date | None = None
+    phone_number: str | None = Field(default=None, max_length=30)
+    gender: str | None = Field(default=None, max_length=30)
+    occupation: str | None = Field(default=None, max_length=200)
+    residence: str | None = Field(default=None, max_length=200)
+    eligibilities: list[UserEligibilityInput] | None = None
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, value: date | None) -> date | None:
+        if value is not None and value > date.today():
+            raise ValueError("생년월일은 미래일 수 없습니다.")
+        return value
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = re.sub(r"[\s-]", "", value)
+        if not normalized.isdigit() or not 7 <= len(normalized) <= 15:
+            raise ValueError("전화번호 형식이 올바르지 않습니다.")
+        return normalized
+
+    @field_validator("name", "gender", "occupation", "residence")
+    @classmethod
+    def trim_optional_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @model_validator(mode="after")
+    def validate_unique_eligibility_types(self):
+        if self.eligibilities is None:
+            return self
         types = [item.eligibility_type for item in self.eligibilities]
         if len(types) != len(set(types)):
             raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
@@ -310,8 +361,26 @@ class AuthUserResponse(BaseModel):
 class LoginResponse(BaseModel):
     message: str
     access_token: str
+    refresh_token: str
     token_type: str
+    expires_in: int
     user: AuthUserResponse
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class TokenPairResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+    expires_in: int
+    user: AuthUserResponse
+
+
+class LogoutResponse(BaseModel):
+    message: str
 
 
 class ManualCardRegistrationRequest(BaseModel):
@@ -453,7 +522,32 @@ def local_login(
             status_code=401,
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
         )
-    return login_response(user)
+    return login_response(db, user)
+
+
+@app.post(
+    "/api/v1/auth/refresh",
+    response_model=TokenPairResponse,
+    summary="Access Token 재발급",
+)
+def refresh_access_token(
+    request: RefreshTokenRequest,
+    db: Annotated[Session, Depends(get_db)],
+):
+    return rotate_refresh_token(db, request.refresh_token)
+
+
+@app.post(
+    "/api/v1/auth/logout",
+    response_model=LogoutResponse,
+    summary="로그아웃 및 Refresh Token 폐기",
+)
+def logout(
+    request: RefreshTokenRequest,
+    db: Annotated[Session, Depends(get_db)],
+):
+    revoke_refresh_token(db, request.refresh_token)
+    return {"message": "로그아웃되었습니다."}
 
 
 @app.get("/")
@@ -467,22 +561,205 @@ def health_check():
 
 
 def _user_eligibility_payload(item: UserEligibility) -> dict:
+    value = item.eligibility_value
+    if item.eligibility_value_encrypted is not None:
+        value = decrypt_text(
+            item.eligibility_value_encrypted,
+            context=f"eligibility:{item.user_id}:{item.eligibility_type}",
+        )
     return {
         "id": item.id,
         "user_id": item.user_id,
         "eligibility_type": item.eligibility_type,
-        "eligibility_value": item.eligibility_value,
+        "eligibility_value": value,
         "verification_status": item.verification_status,
         "verified_at": item.verified_at,
         "expires_at": item.expires_at,
     }
 
 
+def _age_on(birth_date: date | None, today: date | None = None) -> int:
+    if birth_date is None:
+        return 0
+    reference = today or date.today()
+    return reference.year - birth_date.year - (
+        (reference.month, reference.day) < (birth_date.month, birth_date.day)
+    )
+
+
+def _personal_profile_payload(db: Session, user: User) -> dict:
+    profile = user.persona_profile
+    birth_date = profile.birth_date if profile else None
+    phone_number = profile.phone_number if profile else None
+    residence = profile.residence if profile else None
+    if profile and profile.birth_date_encrypted is not None:
+        decrypted_birth_date = decrypt_text(
+            profile.birth_date_encrypted,
+            context=f"profile:{user.id}:birth_date",
+        )
+        birth_date = date.fromisoformat(decrypted_birth_date)
+    if profile and profile.phone_number_encrypted is not None:
+        phone_number = decrypt_text(
+            profile.phone_number_encrypted,
+            context=f"profile:{user.id}:phone_number",
+        )
+    if profile and profile.residence_encrypted is not None:
+        residence = decrypt_text(
+            profile.residence_encrypted,
+            context=f"profile:{user.id}:residence",
+        )
+    rows = db.scalars(
+        select(UserEligibility)
+        .where(UserEligibility.user_id == user.id)
+        .order_by(UserEligibility.eligibility_type)
+    ).all()
+    return {
+        "user_id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "birth_date": birth_date,
+        "phone_number": phone_number,
+        "gender": profile.gender if profile else None,
+        "occupation": profile.job if profile else None,
+        "residence": residence,
+        "eligibilities": [_user_eligibility_payload(row) for row in rows],
+    }
+
+
+@app.get("/api/v1/users/{user_id}/personal-profile")
+def get_personal_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    return _personal_profile_payload(db, user)
+
+
+@app.patch("/api/v1/users/{user_id}/personal-profile")
+def update_personal_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    request: PersonalProfileUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if "name" in request.model_fields_set and request.name is None:
+        raise HTTPException(status_code=422, detail="이름은 비울 수 없습니다.")
+
+    changed_fields: list[str] = []
+    if "name" in request.model_fields_set and user.name != request.name:
+        user.name = request.name
+        changed_fields.append("name")
+
+    profile_field_map = {
+        "birth_date": "birth_date",
+        "phone_number": "phone_number",
+        "gender": "gender",
+        "occupation": "job",
+        "residence": "residence",
+    }
+    requested_profile_fields = set(profile_field_map) & request.model_fields_set
+    profile = user.persona_profile
+    if requested_profile_fields and profile is None:
+        profile = UserPersonaProfile(
+            persona_id=f"user-{user_id}",
+            age=_age_on(request.birth_date),
+            source_payload={},
+        )
+        user.persona_profile = profile
+    for api_field in requested_profile_fields:
+        model_field = profile_field_map[api_field]
+        new_value = getattr(request, api_field)
+        if getattr(profile, model_field) != new_value:
+            setattr(profile, model_field, new_value)
+            changed_fields.append(api_field)
+        if api_field in {"birth_date", "phone_number", "residence"}:
+            serialized = (
+                new_value.isoformat()
+                if isinstance(new_value, date)
+                else new_value
+            )
+            setattr(
+                profile,
+                f"{model_field}_encrypted",
+                encrypt_text(
+                    serialized,
+                    context=f"profile:{user_id}:{api_field}",
+                ),
+            )
+    if profile is not None and "birth_date" in requested_profile_fields:
+        profile.age = _age_on(request.birth_date)
+
+    if request.eligibilities is not None:
+        existing = {
+            row.eligibility_type: row
+            for row in db.scalars(
+                select(UserEligibility).where(UserEligibility.user_id == user_id)
+            ).all()
+        }
+        now = datetime.now(timezone.utc)
+        for item in request.eligibilities:
+            row = existing.get(item.eligibility_type)
+            values_changed = row is None or any((
+                row.eligibility_value != item.eligibility_value,
+                row.verification_status != item.verification_status,
+                row.expires_at != item.expires_at,
+            ))
+            if row is None:
+                row = UserEligibility(
+                    user_id=user_id,
+                    eligibility_type=item.eligibility_type,
+                    eligibility_value=item.eligibility_value,
+                    verification_status=item.verification_status,
+                )
+                db.add(row)
+            else:
+                row.eligibility_value = item.eligibility_value
+                row.verification_status = item.verification_status
+            row.eligibility_value_encrypted = encrypt_text(
+                item.eligibility_value,
+                context=f"eligibility:{user_id}:{item.eligibility_type}",
+            )
+            row.verified_at = (
+                None
+                if item.verification_status == "UNVERIFIED"
+                else item.verified_at or now
+            )
+            row.expires_at = item.expires_at
+            if values_changed:
+                changed_fields.append(f"eligibility.{item.eligibility_type}")
+
+    if changed_fields:
+        db.execute(
+            delete(CardRecommendationSnapshot).where(
+                CardRecommendationSnapshot.user_id == user_id
+            )
+        )
+        save_privacy_change_audit(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=user_id,
+            changed_fields=changed_fields,
+        )
+    db.commit()
+    db.refresh(user)
+    return _personal_profile_payload(db, user)
+
+
 @app.get("/api/v1/users/{user_id}/eligibilities")
 def get_user_eligibilities(
     user_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     if db.get(User, user_id) is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     rows = db.scalars(
@@ -501,7 +778,9 @@ def update_user_eligibilities(
     user_id: Annotated[int, Path(gt=0)],
     request: UserEligibilityUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     if db.get(User, user_id) is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
@@ -525,6 +804,10 @@ def update_user_eligibilities(
         else:
             row.eligibility_value = item.eligibility_value
             row.verification_status = item.verification_status
+        row.eligibility_value_encrypted = encrypt_text(
+            item.eligibility_value,
+            context=f"eligibility:{user_id}:{item.eligibility_type}",
+        )
         row.verified_at = (
             None
             if item.verification_status == "UNVERIFIED"
@@ -538,7 +821,7 @@ def update_user_eligibilities(
         )
     )
     db.commit()
-    return get_user_eligibilities(user_id, db)
+    return get_user_eligibilities(user_id, db, current_user)
 
 
 def _card_rule_payload(item: CardEligibilityRule) -> dict:
@@ -556,6 +839,7 @@ def _card_rule_payload(item: CardEligibilityRule) -> dict:
 def get_card_eligibility_rules(
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    _current_user: Annotated[User, Depends(get_current_user)],
 ):
     if db.get(Card, card_id) is None:
         raise HTTPException(status_code=404, detail="카드를 찾을 수 없습니다.")
@@ -572,7 +856,9 @@ def replace_card_eligibility_rules(
     card_id: Annotated[int, Path(gt=0)],
     request: CardEligibilityRuleUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_admin(current_user)
     if db.get(Card, card_id) is None:
         raise HTTPException(status_code=404, detail="카드를 찾을 수 없습니다.")
     db.execute(
@@ -584,7 +870,7 @@ def replace_card_eligibility_rules(
     ])
     db.execute(delete(CardRecommendationSnapshot))
     db.commit()
-    return get_card_eligibility_rules(card_id, db)
+    return get_card_eligibility_rules(card_id, db, current_user)
 
 
 @app.get(
@@ -595,11 +881,13 @@ def replace_card_eligibility_rules(
 def get_user_cards(
     user_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     usage_month: Annotated[
         str | None,
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ] = None,
 ):
+    require_user_access(user_id, current_user)
     usage_month = usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -679,7 +967,9 @@ def register_card_manually(
     user_id: Annotated[int, Path(gt=0)],
     request: ManualCardRegistrationRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     return process_card_registration(request, user_id, "MANUAL", db)
 
 
@@ -693,7 +983,9 @@ def register_scanned_card(
     user_id: Annotated[int, Path(gt=0)],
     request: ScannedCardRegistrationRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     return process_card_registration(request, user_id, "SCAN", db)
 
 
@@ -706,11 +998,13 @@ def get_user_card_detail(
     user_id: Annotated[int, Path(gt=0)],
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     usage_month: Annotated[
         str | None,
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ] = None,
 ):
+    require_user_access(user_id, current_user)
     usage_month = usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -781,7 +1075,9 @@ def delete_user_card(
     user_id: Annotated[int, Path(gt=0)],
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(user_id, current_user)
     try:
         if db.get(User, user_id) is None:
             raise HTTPException(
@@ -831,7 +1127,9 @@ def delete_user_card(
 def create_transaction(
     request: TransactionCreateRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(request.user_id, current_user)
     if (
         request.user_id < 1
         or request.card_id < 1
@@ -1114,6 +1412,7 @@ def get_card_transactions(
     user_id: Annotated[int, Path(gt=0)],
     card_id: Annotated[int, Path(gt=0)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
     usage_month: Annotated[
@@ -1121,6 +1420,7 @@ def get_card_transactions(
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ] = None,
 ):
+    require_user_access(user_id, current_user)
     try:
         card_states = build_user_card_states(
             db=db,
@@ -1194,6 +1494,7 @@ def get_card_transactions(
 def get_spending_pattern_card_recommendations(
     user_id: Annotated[int, Path(ge=1)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     card_type: Annotated[
         str,
         Query(alias="type", pattern="^(credit|check)$"),
@@ -1201,6 +1502,7 @@ def get_spending_pattern_card_recommendations(
     limit: Annotated[int, Query(ge=1, le=20)] = 3,
     refresh: Annotated[bool, Query()] = False,
 ):
+    require_user_access(user_id, current_user)
     try:
         result = get_daily_card_recommendations(
             db,
@@ -1230,11 +1532,13 @@ def get_spending_pattern_card_recommendations(
 def get_monthly_spending_report(
     user_id: Annotated[int, Path(ge=1)],
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     month: Annotated[
         str,
         Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     ],
 ):
+    require_user_access(user_id, current_user)
     try:
         return build_monthly_spending_report(
             db,
@@ -1252,7 +1556,9 @@ def get_monthly_spending_report(
 def create_recommendation(
     request: RecommendationRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(request.user_id, current_user)
     usage_month = request.usage_month or date.today().strftime("%Y-%m")
 
     try:
@@ -1332,7 +1638,9 @@ def create_recommendation(
 def select_recommended_card(
     request: CardSelectionRequest,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
+    require_user_access(request.user_id, current_user)
     usage_month = request.usage_month or date.today().strftime("%Y-%m")
 
     try:

@@ -60,14 +60,6 @@ class UserCard(Base):
         String(50),
         nullable=True,
     )
-    virtual_credential_id: Mapped[int | None] = mapped_column(
-        ForeignKey(
-            "virtual_card_credentials.id",
-            ondelete="SET NULL",
-        ),
-        nullable=True,
-        index=True,
-    )
     card_number_last4: Mapped[str | None] = mapped_column(
         String(4),
         nullable=True,
@@ -108,7 +100,4 @@ class UserCard(Base):
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="user_card",
         cascade="all, delete-orphan",
-    )
-    virtual_credential: Mapped["VirtualCardCredential | None"] = relationship(
-        back_populates="user_cards"
     )

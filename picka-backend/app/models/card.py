@@ -122,7 +122,3 @@ class Card(Base):
         back_populates="card",
         cascade="all, delete-orphan",
     )
-    virtual_credentials: Mapped[list["VirtualCardCredential"]] = relationship(
-        back_populates="card",
-        cascade="all, delete-orphan",
-    )

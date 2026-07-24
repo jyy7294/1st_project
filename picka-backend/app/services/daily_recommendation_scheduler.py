@@ -12,6 +12,10 @@ from app.models import User
 from app.services.spending_pattern_recommendation_service import (
     get_daily_card_recommendations,
 )
+from app.services.privacy_audit_service import delete_expired_privacy_audits
+from app.services.recommendation_audit_service import (
+    delete_expired_recommendation_audits,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +43,9 @@ def refresh_all_daily_recommendations() -> None:
             return
 
         try:
+            deleted_privacy_logs = delete_expired_privacy_audits(db)
+            deleted_recommendation_logs = delete_expired_recommendation_audits(db)
+            db.commit()
             user_ids = db.scalars(select(User.id).order_by(User.id)).all()
             for user_id in user_ids:
                 # One invocation creates both credit and check snapshots. With
@@ -51,6 +58,11 @@ def refresh_all_daily_recommendations() -> None:
                     force_refresh=False,
                 )
             logger.info("Daily card recommendations ready for %d users", len(user_ids))
+            logger.info(
+                "Expired audit logs deleted: privacy=%d recommendation=%d",
+                deleted_privacy_logs,
+                deleted_recommendation_logs,
+            )
         except Exception:
             logger.exception("Failed to refresh daily card recommendations")
         finally:

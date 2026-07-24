@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
 from app.models import (
@@ -25,10 +26,13 @@ from app.services.spending_pattern_recommendation_service import (
     normalize_spending_category,
     recommend_new_cards_by_spending,
 )
+from app.services.auth_service import create_access_token
 
 
 class SpendingPatternRecommendationTest(unittest.TestCase):
     def setUp(self):
+        self.original_jwt_secret_key = settings.jwt_secret_key
+        settings.jwt_secret_key = "test-jwt-secret-key-at-least-32-bytes"
         self.engine = create_engine(
             "sqlite://",
             connect_args={"check_same_thread": False},
@@ -44,8 +48,12 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
 
         app.dependency_overrides[get_db] = override_get_db
         self.client = TestClient(app)
+        with self.Session() as db:
+            token = create_access_token(db.get(User, 1))
+        self.client.headers.update({"Authorization": f"Bearer {token}"})
 
     def tearDown(self):
+        settings.jwt_secret_key = self.original_jwt_secret_key
         app.dependency_overrides.clear()
         Base.metadata.drop_all(self.engine)
         self.engine.dispose()
@@ -332,7 +340,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             self.client.get(
                 "/api/v1/users/999/card-recommendations"
             ).status_code,
-            404,
+            403,
         )
         cached_response = self.client.get(
             "/api/v1/users/1/card-recommendations",

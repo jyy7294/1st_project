@@ -19,6 +19,7 @@ from app.models import (
     UserCard,
     UserEligibility,
 )
+from app.services.pii_encryption_service import decrypt_text
 from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
@@ -415,6 +416,20 @@ def _eligibility_value_matches(
     return False
 
 
+def _decrypted_eligibility_value(eligibility: UserEligibility) -> str:
+    if eligibility.eligibility_value_encrypted is None:
+        raise RuntimeError(
+            f"암호화되지 않은 사용자 자격정보입니다: {eligibility.id}"
+        )
+    return decrypt_text(
+        eligibility.eligibility_value_encrypted,
+        context=(
+            f"eligibility:{eligibility.user_id}:"
+            f"{eligibility.eligibility_type}"
+        ),
+    )
+
+
 def _is_card_eligible(
     card: Card,
     user_eligibilities: dict[str, UserEligibility],
@@ -438,7 +453,7 @@ def _card_eligibility_failure(
                 ),
             }
         if not _eligibility_value_matches(
-            eligibility.eligibility_value,
+            _decrypted_eligibility_value(eligibility),
             rule.comparison_operator,
             rule.required_value,
         ):
@@ -469,7 +484,7 @@ def _benefit_eligibility_failure(
                 ),
             }
         if not _eligibility_value_matches(
-            eligibility.eligibility_value,
+            _decrypted_eligibility_value(eligibility),
             rule.comparison_operator,
             rule.required_value,
         ):
