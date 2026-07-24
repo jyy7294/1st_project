@@ -1254,7 +1254,6 @@ def calculate_card_benefit(
                     "LLM benefit judgment failed",
                     extra={
                         "benefit_id": benefit_id,
-                        "merchant_name": merchant_name,
                     },
                 )
                 is_conditional = True
