@@ -33,7 +33,7 @@ from app.services.user_state_adapter import resolve_category_from_aliases
 CSV_PATH = Path(__file__).resolve().parents[1] / "PICKA_persona_all_in_one_v8_11.csv"
 SOURCE_VERSION = "v8_11"
 BENEFIT_ID_REFERENCE_CSV: Path | None = None
-PERSONA_USER_IDS = {"persona1": 1, "persona2": 3, "persona3": 4, "persona4": 5}
+PERSONA_USER_IDS = {"persona1": 1, "persona2": 2, "persona3": 3, "persona4": 4}
 KST = timezone(timedelta(hours=9))
 AFFECTED_MONTHS = {"2026-05", "2026-06", "2026-07"}
 

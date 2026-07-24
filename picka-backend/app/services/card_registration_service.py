@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -68,6 +69,9 @@ def register_virtual_card(
         db.add(user_card)
 
     user_card.virtual_credential_id = credential.id
+    # PG 결제수단 식별자는 카드 등록(또는 재등록) 시 새로 발급한다.
+    # 전체 카드번호, CVC, 카드 비밀번호는 이 토큰에 포함되지 않는다.
+    user_card.payment_token = f"picka_pg_{uuid4().hex}"
     user_card.card_number_last4 = credential.card_number[-4:]
     user_card.registration_method = registration_method
     user_card.registered_at = now

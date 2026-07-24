@@ -136,6 +136,12 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(normalize_spending_category("DELIVERY"), "배달앱")
         self.assertEqual(normalize_spending_category("MART"), "마트/쇼핑")
         self.assertEqual(normalize_spending_category("TUITION"), "교육/육아")
+        self.assertEqual(normalize_spending_category("FOOD_DINING"), "푸드/외식")
+        self.assertEqual(normalize_spending_category("FUEL"), "주유")
+        self.assertEqual(
+            normalize_spending_category("AIRLINE_MILEAGE"),
+            "항공/마일리지",
+        )
 
     def test_profile_uses_latest_months_and_monthly_average(self):
         with self.Session() as db:

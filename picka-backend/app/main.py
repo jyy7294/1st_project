@@ -61,6 +61,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.reward_service import calculate_transaction_rewards
 from app.services.recommendation_audit_service import save_recommendation_audit
 from app.services.benefit_total_service import confirmed_benefit_totals_by_card
+from app.services.payment_gateway_service import authorize_demo_payment
 from app.services.daily_recommendation_scheduler import (
     daily_recommendation_scheduler,
 )
@@ -877,6 +878,19 @@ def create_transaction(
                 detail="사용자의 보유 카드가 아닙니다.",
             )
 
+        selected_user_card = db.scalar(
+            select(UserCard).where(
+                UserCard.id == selected_card["user_card_id"],
+                UserCard.user_id == request.user_id,
+                UserCard.card_id == request.card_id,
+            )
+        )
+        if selected_user_card is None:
+            raise HTTPException(
+                status_code=404,
+                detail="사용자의 보유 카드가 아닙니다.",
+            )
+
         # 같은 카드의 동시 결제가 월 통합한도를 함께 통과하지 못하도록
         # 월 집계 행을 잠근 뒤 저장 직전의 확정 혜택 합계로 다시 검사한다.
         monthly_usage = db.scalar(
@@ -938,7 +952,11 @@ def create_transaction(
             None,
         )
 
-        approval_number = f"PICKA-{uuid4().hex[:12].upper()}"
+        authorization = authorize_demo_payment(
+            selected_user_card,
+            payment_amount=request.payment_amount,
+        )
+        approval_number = authorization.approval_number
         approved_at = datetime.now(timezone.utc)
         demo_session = db.scalar(
             select(DemoPaymentSession)

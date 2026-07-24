@@ -331,6 +331,7 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.assertEqual(body["status"], "APPROVED")
         self.assertIsInstance(body["transaction_id"], int)
         self.assertTrue(body["approval_number"].startswith("PICKA-"))
+        self.assertNotIn("payment_token", str(body))
         self.assertEqual(body["card"]["card_id"], 2)
         self.assertEqual(body["card"]["card_name"], "테스트카드 2")
         self.assertEqual(
@@ -791,6 +792,15 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.assertNotIn("1234567890123456", serialized)
         self.assertNotIn("'cvc'", serialized)
         self.assertNotIn("card_password_first2", serialized)
+        self.assertNotIn("payment_token", serialized)
+        with self.Session() as db:
+            registered = db.scalar(
+                select(UserCard).where(
+                    UserCard.user_id == 2,
+                    UserCard.card_id == 4,
+                )
+            )
+            self.assertTrue(registered.payment_token.startswith("picka_pg_"))
 
         cards = self._cards_request().json()["cards"]
         self.assertIn(4, [card["card_id"] for card in cards])

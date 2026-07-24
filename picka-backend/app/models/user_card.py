@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -70,6 +71,13 @@ class UserCard(Base):
     card_number_last4: Mapped[str | None] = mapped_column(
         String(4),
         nullable=True,
+    )
+    payment_token: Mapped[str] = mapped_column(
+        String(80),
+        nullable=False,
+        unique=True,
+        index=True,
+        default=lambda: f"picka_pg_{uuid4().hex}",
     )
     registration_method: Mapped[str | None] = mapped_column(
         String(20),

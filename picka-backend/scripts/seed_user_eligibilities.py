@@ -17,9 +17,9 @@ SEED_PATH = (
 
 PERSONA_USER_IDS = {
     "persona1": 1,
-    "persona2": 3,
-    "persona3": 4,
-    "persona4": 5,
+    "persona2": 2,
+    "persona3": 3,
+    "persona4": 4,
 }
 
 ATTRIBUTE_MAPPING = {
