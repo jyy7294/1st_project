@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { SCANNED_PRODUCT, buildRegisteredCard, gradientForCard } from '../../data/cards.js'
+import { SCANNED_PRODUCT, buildRegisteredCard } from '../../data/cards.js'
 import { registerCard } from '../../api/picka.js'
 import { lastFourOf } from '../../utils/cardForm.js'
 import styles from './add.module.css'
@@ -21,34 +21,35 @@ export default function AddTerms() {
   const requiredDone = terms.t1 && terms.t2 && terms.t3
   const allChecked = requiredDone && terms.t4
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const submit = async () => {
     if (!requiredDone || pending) return
     setPending(true)
-    setError('')
 
+    // 데모(가상 카드)라서 백엔드 등록이 실패해도 흐름은 완료까지 진행합니다.
+    // 성공하면 백엔드가 돌려준 실제 카드 정보를, 실패하면 스캔 상품명을 사용합니다.
+    let registered = {}
     try {
-      // 백엔드가 카드번호로 실제 카드 상품을 찾아 등록해 줍니다.
       const data = await registerCard(state.user?.userId, addForm, 'manual')
-      const registered = data?.card || {}
-      dispatch({
-        type: A.ADD_CARD,
-        card: buildRegisteredCard({
-          card_id: registered.card_id,
-          card_company: registered.card_company,
-          card_name: registered.card_name,
-          last_four: lastFourOf(addForm.number),
-          expiry: addForm.expiry,
-        }),
-      })
-      // 지갑 목록을 다시 받아오도록 표시합니다.
-      dispatch({ type: A.SET_CARDS_ERROR, message: null })
-    } catch (err) {
-      setError(err?.message || '카드를 등록하지 못했어요.')
-    } finally {
-      setPending(false)
+      registered = data?.card || {}
+    } catch {
+      registered = {}
     }
+
+    dispatch({
+      type: A.ADD_CARD,
+      card: buildRegisteredCard({
+        card_id: registered.card_id,
+        card_company: registered.card_company,
+        card_name: registered.card_name,
+        last_four: lastFourOf(addForm.number),
+        expiry: addForm.expiry,
+      }),
+    })
+    // 지갑 목록을 다시 받아오도록 표시합니다.
+    dispatch({ type: A.SET_CARDS_ERROR, message: null })
+    setPending(false)
   }
 
   return (
@@ -80,7 +81,7 @@ export default function AddTerms() {
       <div className={styles.termsCard}>
         <div
           className={styles.termsSwatch}
-          style={{ background: gradientForCard(SCANNED_PRODUCT) }}
+          style={{ backgroundImage: 'url(/assets/shinhan-card.png)' }}
         />
         <div>
           <div className={styles.termsCardLabel}>등록 중인 카드</div>
@@ -124,12 +125,47 @@ export default function AddTerms() {
         type="button"
         className={`${styles.primaryBtn} ${styles.pinToBottom}`}
         disabled={!requiredDone || pending}
-        onClick={submit}
+        onClick={() => setConfirmOpen(true)}
       >
         등록 완료
       </button>
 
-      {error && <div className={styles.registerError}>{error}</div>}
+      {confirmOpen && (
+        <div className={styles.addConfirmDim} onClick={() => setConfirmOpen(false)}>
+          <div
+            className={`${styles.addConfirm} pk-anim-pop-ease`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.addConfirmImg}>
+              <img src="/assets/shinhan-card.png" alt="" />
+            </div>
+            <div className={styles.addConfirmTitle}>정말 이 카드를 등록하시겠습니까?</div>
+            <div className={styles.addConfirmSub}>
+              {SCANNED_PRODUCT.card_company} {SCANNED_PRODUCT.card_name}
+            </div>
+            <div className={styles.addConfirmActions}>
+              <button
+                type="button"
+                className={styles.addConfirmNo}
+                onClick={() => setConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={styles.addConfirmYes}
+                disabled={pending}
+                onClick={() => {
+                  setConfirmOpen(false)
+                  submit()
+                }}
+              >
+                등록
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -70,7 +70,7 @@ export default function QrCode({
             onError={() => setBroken(true)}
           />
 
-          {/* 인식 중일 때만, 위에서 아래로 한 번 훑고 끝냅니다. */}
+          {/* 인식 중일 때만, 가운데에 레이저가 한 번 길게 찍히고 끝냅니다. */}
           {scanning && !expired && (
             <div
               className={`${styles.scanLine} pk-anim-qrscan`}

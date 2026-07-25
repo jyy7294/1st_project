@@ -23,12 +23,16 @@ def seed_user_state() -> None:
     }
 
     try:
-        user = db.scalar(select(User).where(User.email == SEED_EMAIL))
+        from app.services.pii_encryption_service import email_blind_index
+        user = db.scalar(
+            select(User).where(
+                User.email_blind_index == email_blind_index(SEED_EMAIL)
+            )
+        )
         if user is None:
             user = User(
                 email=SEED_EMAIL,
                 name="테스트유저",
-                provider="google",
             )
             db.add(user)
             db.flush()

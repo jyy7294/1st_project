@@ -60,14 +60,21 @@
   88% { opacity: 1; }
   100% { top: 84%; opacity: 0; }
 }
-/* QR 인식 연출: 스캔 라인이 위에서 아래로 한 번 훑고 끝납니다. */
+/* QR 인식 연출: 레이저가 QR 을 살짝 넘어서 한 번 찍히며 반짝였다가 사라집니다. */
 @keyframes pk-qrscan {
-  from { top: 6%; }
-  to { top: 94%; }
+  0% { transform: translateY(-50%) scaleX(0); opacity: 0; }
+  18% { transform: translateY(-50%) scaleX(1); opacity: 1; box-shadow: 0 0 30px 7px #ff4d5a; }
+  40% { opacity: 1; box-shadow: 0 0 14px 2px #ff4d5a; }
+  100% { transform: translateY(-50%) scaleX(1); opacity: 0; box-shadow: 0 0 4px 0 #ff4d5a; }
 }
 @keyframes pk-cardglow {
   0%, 100% { box-shadow: 0 0 0 1px rgba(76, 141, 255, .35); }
   50% { box-shadow: 0 0 22px 2px rgba(76, 141, 255, .45); }
+}
+/* 카드 스캔: 카드가 격자(코너 틀)에 닿을 때까지 서서히 확대됩니다. */
+@keyframes pk-cardgrow {
+  from { transform: scale(1); }
+  to { transform: scale(1.2); }
 }
 
 @keyframes pk-islandgrow {
@@ -135,8 +142,10 @@
 }
 
 .pk-anim-scanbeam { animation: pk-scan 1.6s ease-in-out infinite; }
+/* 스캔 탭 후 카드가 1.8초에 걸쳐 서서히 커지고 끝 크기를 유지합니다. */
+.pk-anim-cardgrow { animation: pk-cardgrow 1.5s ease-in-out forwards; }
 /* 한 번만 내려가고 끝(forwards). 끝나는 시점에 다음 화면으로 넘어갑니다. */
-.pk-anim-qrscan { animation: pk-qrscan 1.2s ease-in-out forwards; }
+.pk-anim-qrscan { animation: pk-qrscan 1s cubic-bezier(.2, .8, .3, 1) forwards; }
 
 /* Face ID */
 .pk-anim-islandgrow { animation: pk-islandgrow .55s cubic-bezier(.34, 1.56, .64, 1); }

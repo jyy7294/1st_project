@@ -164,7 +164,6 @@ export default function WalletHome() {
                       dispatch({ type: A.SET_SCREEN, screen: 'cards' })
                     }}
                   >
-                    <span className={styles.menuIcon}>💳</span>
                     카드 관리
                   </button>
                   <button
@@ -175,8 +174,17 @@ export default function WalletHome() {
                       dispatch({ type: A.SET_SCREEN, screen: 'report' })
                     }}
                   >
-                    <span className={styles.menuIcon}>📊</span>
                     소비리포트 보기
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      dispatch({ type: A.SET_SCREEN, screen: 'member' })
+                    }}
+                  >
+                    회원정보 수정
                   </button>
                   <button
                     type="button"
@@ -186,7 +194,6 @@ export default function WalletHome() {
                       setConfirmLogout(true)
                     }}
                   >
-                    <span className={styles.menuIcon}>🚪</span>
                     로그아웃
                   </button>
                 </div>

@@ -134,6 +134,40 @@ export async function removeCard(userId, cardId) {
   return request(`/api/v1/users/${userId}/cards/${cardId}`, { method: 'DELETE' })
 }
 
+/**
+ * 회원 자격정보 조회 — 카드 추천에 쓰이는 소비·자격 조건.
+ * (병역·사업자·경차·통신사·교통수단·자녀 등)
+ * @param {number} userId
+ * @returns {Promise<Record<string, string>>} { ELIGIBILITY_TYPE: value }
+ */
+export async function fetchEligibilities(userId) {
+  const data = await request(`/api/v1/users/${userId}/eligibilities`)
+  const map = {}
+  for (const row of data?.eligibilities || []) {
+    map[row.eligibility_type] = row.eligibility_value
+  }
+  return map
+}
+
+/**
+ * 회원 자격정보 수정. 백엔드는 보낸 항목만 갱신(upsert)하고 나머지는 유지하며,
+ * 저장과 동시에 추천 캐시를 비워 다음 추천부터 바뀐 조건이 반영됩니다.
+ * @param {number} userId
+ * @param {Record<string, string>} values { ELIGIBILITY_TYPE: value }
+ */
+export async function updateEligibilities(userId, values) {
+  const eligibilities = Object.entries(values).map(
+    ([eligibility_type, eligibility_value]) => ({
+      eligibility_type,
+      eligibility_value,
+    }),
+  )
+  return request(`/api/v1/users/${userId}/eligibilities`, {
+    method: 'PUT',
+    body: { eligibilities },
+  })
+}
+
 /*
  * 업종(payment_category)은 일부러 보내지 않습니다.
  *

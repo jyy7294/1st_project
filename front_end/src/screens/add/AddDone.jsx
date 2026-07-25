@@ -1,6 +1,5 @@
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { gradientForCard } from '../../data/cards.js'
 import styles from './add.module.css'
 
 /** 4단계 · 등록 완료. 방금 지갑에 추가된 카드를 그대로 보여줍니다. */
@@ -22,13 +21,11 @@ export default function AddDone() {
         성공적으로 등록되었습니다.
       </div>
 
-      <div className={styles.doneCard} style={{ background: gradientForCard(card) }}>
-        <div>
-          <div className={styles.previewCompany}>{card.card_company}</div>
-          <div className={styles.previewProduct}>{card.card_name}</div>
-        </div>
-        <div className={styles.doneCardNumber}>**** **** **** {card.last_four}</div>
-        <div className={styles.doneCardExpiry}>EXP {card.expiry}</div>
+      <div className={styles.doneCard}>
+        <img src="/assets/shinhan-card.png" alt="신한카드 Discount Plan+" className={styles.doneCardImg} />
+      </div>
+      <div className={styles.doneCardMeta}>
+        **** **** **** {card.last_four} · EXP {card.expiry}
       </div>
 
       <div className={styles.doneFacts}>

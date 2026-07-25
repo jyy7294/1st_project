@@ -6,6 +6,7 @@ import WalletHome from './screens/WalletHome.jsx'
 import CardDetail from './screens/CardDetail.jsx'
 import CardBenefits from './screens/CardBenefits.jsx'
 import CardsManage from './screens/CardsManage.jsx'
+import MemberInfo from './screens/MemberInfo.jsx'
 import Report from './screens/Report.jsx'
 import Recommend from './screens/Recommend.jsx'
 import RecommendDetail from './screens/RecommendDetail.jsx'
@@ -26,6 +27,7 @@ const SCREENS = {
   detail: CardDetail,
   benefits: CardBenefits,
   cards: CardsManage,
+  member: MemberInfo,
   report: Report,
   recommend: Recommend,
   recoDetail: RecommendDetail,

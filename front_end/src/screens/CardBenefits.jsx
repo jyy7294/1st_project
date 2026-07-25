@@ -53,7 +53,7 @@ export default function CardBenefits() {
         company: ownedCard.card_company,
         product: ownedCard.card_name,
         background: gradientForCard(ownedCard),
-        rows,
+        rows: rows.length > 0 ? rows : (ownedCard.benefits || []),
         back: 'detail',
       }
 

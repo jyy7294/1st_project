@@ -9,14 +9,13 @@ import styles from './QrScreen.module.css'
 const QR_LIFETIME_SEC = 180
 
 /**
- * 스캔 라인이 바닥에 닿으면 결제정보 화면으로 넘어갑니다(애니메이션 종료 이벤트).
- * 이 값은 그 이벤트가 오지 않을 때를 대비한 안전장치입니다.
- * (스캔 애니메이션 1.2초 + 여유)
+ * 레이저가 QR 을 살짝 넘어서 반짝였다 사라지고(약 1초) 애니메이션이 끝나면 결제정보 화면으로 넘어갑니다.
+ * 이 값은 그 종료 이벤트가 오지 않을 때를 대비한 안전장치입니다.
  *
  * 실제 결제서버를 붙일 때는 "QR 인식됨" 이벤트(폴링·웹소켓) 응답으로
  * recognize() 안의 setRecognizing(true) 흐름을 이어 주면 됩니다.
  */
-const RECOGNIZE_FALLBACK_MS = 2000
+const RECOGNIZE_FALLBACK_MS = 1300
 
 /**
  * 일회용 QR 토큰(표시용 숫자열)을 만듭니다. 새로 발급할 때마다 매번 다른 값이 나오도록

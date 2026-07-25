@@ -23,7 +23,12 @@ def main() -> None:
         raise SystemExit("비밀번호가 비어 있거나 서로 일치하지 않습니다.")
 
     with SessionLocal() as db:
-        user = db.scalar(select(User).where(User.email == args.email))
+        from app.services.pii_encryption_service import email_blind_index
+        user = db.scalar(
+            select(User).where(
+                User.email_blind_index == email_blind_index(args.email)
+            )
+        )
         if user is None:
             raise SystemExit("해당 이메일 사용자를 찾을 수 없습니다.")
         user.password_hash = hash_password(password)

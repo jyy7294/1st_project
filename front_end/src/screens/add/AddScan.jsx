@@ -1,33 +1,41 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../../state/AppContext.jsx'
 import { A } from '../../state/appReducer.js'
-import { SCANNED_PRODUCT } from '../../data/cards.js'
+import { SCANNED_CARD_INPUT } from '../../data/cards.js'
 import styles from './add.module.css'
 
-/** 인식 완료 연출을 보여주고 다음 단계로 넘어가기까지의 시간. */
-const RECOGNIZE_MS = 700
+const ZOOM_MS = 1500 // 카드가 격자(코너 틀)에 서서히 다다르기까지
+const DONE_MS = 600 // '인식 완료' 표시 후 다음 화면까지
 
 /**
  * 1단계 · 카드 스캔.
- * 실제 카메라 인식은 없고 스캔 연출만 보여줍니다. 어느 쪽을 눌러도
- * 카드사·상품명이 인식된 상태로 2단계(직접 입력)로 넘어갑니다.
- *
- * recognized 가 되면 반복 애니메이션(스캔 라인·글로우·플로트)이 멈추고
- * 그 뒤에 기존 다음 단계인 'input' 으로 이동합니다.
- * 실제 카드 인식 API를 붙일 때는 setRecognized(true) 를 응답 성공 시점으로 옮기면 됩니다.
+ * 시연이라 실제 카메라 인식은 없고, 스캔 영역(뷰파인더)을 탭하면 잠깐 '인식' 연출을
+ * 보여준 뒤 카드정보·유효기간·CVC 가 자동입력된 입력 화면(비번만 남음)으로 넘어갑니다.
+ * 아래 '직접 입력하기'는 스캔 대신 직접 입력하는 대안 경로입니다.
  */
 export default function AddScan() {
   const { dispatch } = useApp()
-  const [recognized, setRecognized] = useState(false)
+  // 'idle' → 탭 → 'scanning'(카드가 격자까지 확대) → 'done'(인식 완료) → 다음 화면
+  const [phase, setPhase] = useState('idle')
+  const scanning = phase !== 'idle'
+  const done = phase === 'done'
 
   useEffect(() => {
-    if (!recognized) return undefined
-    const timer = setTimeout(() => dispatch({ type: A.SET_ADD_STEP, step: 'input' }), RECOGNIZE_MS)
-    return () => clearTimeout(timer)
-  }, [recognized, dispatch])
+    if (phase === 'scanning') {
+      const t = setTimeout(() => setPhase('done'), ZOOM_MS)
+      return () => clearTimeout(t)
+    }
+    if (phase === 'done') {
+      const t = setTimeout(() => {
+        dispatch({ type: A.ENTER_ADD_INPUT, mode: 'scan', form: SCANNED_CARD_INPUT })
+      }, DONE_MS)
+      return () => clearTimeout(t)
+    }
+    return undefined
+  }, [phase, dispatch])
 
-  // 연속으로 눌러도 인식 흐름은 한 번만 시작됩니다.
-  const toInput = () => setRecognized(true)
+  const startScan = () => setPhase('scanning')
+  const manual = () => dispatch({ type: A.ENTER_ADD_INPUT, mode: 'manual' })
 
   return (
     <div className={`${styles.screen} pk-screen`}>
@@ -44,50 +52,64 @@ export default function AddScan() {
         <span className={styles.spacer} />
       </div>
 
-      <div className={styles.tabs}>
-        <button type="button" className={`${styles.tab} ${styles.active}`}>
-          <span className={styles.tabIcon}>📷</span>
-          카드 스캔
-        </button>
-        <button type="button" className={styles.tab} onClick={toInput} disabled={recognized}>
-          <span className={styles.tabIcon}>✏️</span>
-          직접 입력
-        </button>
-      </div>
-
+      {/* 뷰파인더 — 탭하면 인식 연출 후 정보 입력 화면으로 넘어갑니다. */}
       <div
-        className={`${styles.scanFrame} ${recognized ? styles.recognized : ''}`}
-        role="status"
-        aria-live="polite"
+        className={`${styles.viewfinder} ${scanning ? styles.scanning : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-label="카드 스캔하기"
+        onClick={scanning ? undefined : startScan}
+        onKeyDown={(e) => {
+          if (!scanning && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            startScan()
+          }
+        }}
       >
         <span className={`${styles.corner} ${styles.tl}`} />
         <span className={`${styles.corner} ${styles.tr}`} />
         <span className={`${styles.corner} ${styles.bl}`} />
         <span className={`${styles.corner} ${styles.br}`} />
 
-        <div className={`${styles.scanCard} ${recognized ? '' : 'pk-anim-cardscan'}`}>
-          <span className={styles.scanChip} />
-          <span className={styles.scanLineWide} />
-          <span className={styles.scanLineShort} />
+        <div className={`${styles.scanCard} ${scanning ? 'pk-anim-cardgrow' : 'pk-anim-float'}`}>
+          <img src="/assets/shinhan-card.png" alt="" className={styles.scanCardImg} />
         </div>
 
-        <div className={`${styles.scanBeam} ${recognized ? '' : 'pk-anim-scanbeam'}`} />
-        <span className={styles.scanHint}>카드를 사각형 안에 맞춰주세요</span>
+        <div className={`${styles.beam} ${scanning ? '' : 'pk-anim-scanbeam'}`} />
+
+        {done ? (
+          <span className={styles.scanDone}>
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path
+                d="M2.5 7.5l3 3 6-7"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            인식 완료
+          </span>
+        ) : (
+          <span className={styles.hint}>카드를 사각형 안에 맞춰 주세요</span>
+        )}
       </div>
 
-      <div className={styles.note}>
-        {SCANNED_PRODUCT.card_company} {SCANNED_PRODUCT.card_name}로 인식했어요.
-        <br />
-        번호와 유효기간은 다음 화면에서 확인해 주세요.
+      <div className={styles.manualHelp}>
+        카드 인식이 잘 되지 않을 경우에는 직접 입력하세요
       </div>
 
-      <button
-        type="button"
-        className={`${styles.primaryBtn} ${styles.pinToBottom}`}
-        onClick={toInput}
-        disabled={recognized}
-      >
-        등록하기 →
+      <button type="button" className={styles.primaryBtn} onClick={manual}>
+        직접 입력하기
+        <svg width="17" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true">
+          <path
+            d="M2 7h13M10 2l5 5-5 5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
     </div>
   )

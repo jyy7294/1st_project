@@ -44,28 +44,68 @@ export function gradientForCard(card) {
 // 등록 화면에서 '스캔으로 인식된' 카드 상품. 카드사·상품명은 스캔이 읽어온 값이고
 // 끝 4자리·유효기간은 사용자가 입력한 값으로 채워집니다.
 export const SCANNED_PRODUCT = {
-  card_company: 'KB국민카드',
-  card_name: '굿데이카드',
+  card_company: '신한카드',
+  card_name: 'Discount Plan+',
 }
+
+// 스캔 시 자동으로 채워지는 카드 정보(가상 데모 값). 사용자는 비밀번호만 입력합니다.
+export const SCANNED_CARD_INPUT = {
+  number: '3333 3333 3333 3333',
+  expiry: '05/32',
+  cvc: '333',
+  pin: '',
+}
+
+// 신한카드 Discount Plan+ 대표 혜택 (백엔드에 없는 데모 카드라 프론트에서 제공).
+// data/benefits.js 원본과 같은 모양이라 benefitView 로 그대로 표기됩니다.
+export const DISCOUNT_PLAN_BENEFITS = [
+  {
+    id: 'dp-cafe', category: '카페/디저트', type: '할인', value: 10, unit: '%',
+    desc: '스타벅스·투썸플레이스 등 주요 카페 10% 청구할인',
+    condition: 300000, limitMonth: 10000,
+  },
+  {
+    id: 'dp-shop', category: '온라인쇼핑', type: '할인', value: 5, unit: '%',
+    desc: '쿠팡·G마켓·11번가 등 온라인쇼핑 5% 청구할인',
+    condition: 300000, limitMonth: 15000,
+  },
+  {
+    id: 'dp-transit', category: '교통', type: '할인', value: 10, unit: '%',
+    desc: '버스·지하철 등 대중교통 10% 할인',
+    condition: 300000, limitMonth: 7000,
+  },
+  {
+    id: 'dp-cvs', category: '편의점', type: '할인', value: 10, unit: '%',
+    desc: 'GS25·CU·세븐일레븐 편의점 10% 할인',
+    limitMonth: 5000,
+  },
+]
 
 /**
  * 등록 폼 입력으로 지갑에 넣을 카드 한 장을 만듭니다.
- * card_id 는 카드 상품 번호가 아니라 임시 식별자라서
- * data/benefits.js·transactions.js 에는 없고, 상세 화면이 빈 상태를 보여줍니다.
+ * 데모 카드(신한카드 Discount Plan+)면 실제 카드 이미지와 대표 혜택을 함께 담아
+ * 상세 화면에서도 다른 카드처럼 보이게 합니다.
  *
  * @param {{card_id?: number, card_company?: string, card_name?: string,
  *           last_four: string, expiry: string}} input
  */
 export function buildRegisteredCard({ card_id, card_company, card_name, last_four, expiry }) {
+  const company = card_company || SCANNED_PRODUCT.card_company
+  const name = card_name || SCANNED_PRODUCT.card_name
+  const isDemoCard = name === SCANNED_PRODUCT.card_name
+
   return {
     card_id: card_id ?? `new-${last_four}-${expiry}`,
-    card_company: card_company || SCANNED_PRODUCT.card_company,
-    card_name: card_name || SCANNED_PRODUCT.card_name,
+    card_company: company,
+    card_name: name,
     last_four,
     expiry,
     nickname: '',
     spent: '0',
     benefit: '0',
+    ...(isDemoCard
+      ? { image_url: '/assets/shinhan-card.png', benefits: DISCOUNT_PLAN_BENEFITS }
+      : {}),
   }
 }
 

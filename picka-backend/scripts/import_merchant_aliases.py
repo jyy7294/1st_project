@@ -38,6 +38,7 @@ def main():
                     alias=alias,
                     canonical_merchant=row["canonical_merchant"],
                     category=row["category"],
+                    report_category=row["category"],
                     match_type=row["match_type"]
                     if pd.notna(row["match_type"])
                     else None,

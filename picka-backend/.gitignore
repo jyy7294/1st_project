@@ -30,3 +30,6 @@ env/
 # Local/generated data
 picka-backend/data/*.json
 picka-backend/data/*.csv
+
+# Runtime logs
+*.log

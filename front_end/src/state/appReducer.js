@@ -34,6 +34,7 @@ export const A = {
   SET_REPORT_STATUS: 'SET_REPORT_STATUS',
   SET_SPENDING_MIX: 'SET_SPENDING_MIX',
   START_ADD: 'START_ADD',
+  ENTER_ADD_INPUT: 'ENTER_ADD_INPUT',
   SET_ADD_STEP: 'SET_ADD_STEP',
   SET_ADD_FORM: 'SET_ADD_FORM',
   TOGGLE_TERM: 'TOGGLE_TERM',
@@ -71,6 +72,7 @@ export const initialState = {
   // 카드별 예외. { [card_id]: true|false } — 없으면 위 전체 설정을 따릅니다.
   cardStatsById: {},
   addStep: 'scan', // 'scan' | 'input' | 'terms' | 'done'
+  addMode: 'manual', // 'scan'(자동입력·비번만) | 'manual'(직접입력·확인창)
   addForm: EMPTY_ADD_FORM,
   terms: EMPTY_TERMS,
   addedCard: null, // 방금 등록한 카드 (등록 완료 화면에 표시)
@@ -286,9 +288,19 @@ export function appReducer(state, action) {
         ...state,
         screen: 'add',
         addStep: 'scan',
+        addMode: 'manual',
         addForm: EMPTY_ADD_FORM,
         terms: EMPTY_TERMS,
         addedCard: null,
+      }
+
+    case A.ENTER_ADD_INPUT:
+      // 스캔(자동입력) / 직접입력 어느 쪽으로 정보 입력 단계에 들어가는지 정합니다.
+      return {
+        ...state,
+        addStep: 'input',
+        addMode: action.mode || 'manual',
+        addForm: action.form || EMPTY_ADD_FORM,
       }
 
     case A.SET_ADD_STEP:

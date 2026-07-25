@@ -8,12 +8,12 @@
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .5);
 }
 
-/* QR 과 스캔 라인이 같은 좌표계를 쓰도록 감싸는 자리 */
+/* QR 과 스캔 라인이 같은 좌표계를 쓰도록 감싸는 자리
+   (레이저가 QR 을 살짝 넘어가야 해서 클리핑하지 않습니다) */
 .scanner {
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: hidden;
 }
 
 .image {
@@ -24,16 +24,18 @@
   transition: opacity .3s ease;
 }
 
-/* 위아래로 오르내리는 빨간 스캔 라인 (애니메이션은 pk-anim-qrscan) */
+/* 가운데에 QR 을 살짝 넘어서 한 번 찍히고 사라지는 빨간 레이저 (애니메이션은 pk-anim-qrscan) */
 .scanLine {
   position: absolute;
-  left: 8%;
-  top: 8%;
-  width: 84%;
+  left: -6%;
+  top: 50%;
+  width: 112%;
   height: 3px;
   border-radius: 3px;
   background: #ff4d5a;
-  box-shadow: 0 0 10px #ff4d5a;
+  box-shadow: 0 0 12px 1px #ff4d5a;
+  transform: translateY(-50%);
+  transform-origin: center;
   pointer-events: none;
 }
 

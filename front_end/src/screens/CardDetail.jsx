@@ -158,7 +158,8 @@ export default function CardDetail() {
   const benefitLimit = usage.benefit_limit || 0
   const showQuota = required > 0 || benefitLimit > 0
 
-  const benefits = detail.benefits
+  // 백엔드가 혜택을 주면 그걸, 없으면(데모 등록 카드) 카드에 담긴 혜택을 씁니다.
+  const benefits = detail.benefits.length > 0 ? detail.benefits : (card.benefits || [])
   const highlights = benefits.slice(0, HIGHLIGHT_COUNT).map(benefitView)
   const allTx = detail.transactions
   // 전체보기는 최근 1달치만, 접힌 상태는 최신 5건만 보여줍니다.
