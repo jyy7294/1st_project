@@ -191,11 +191,11 @@ class QualificationProfileRequest(StrictRequestModel):
     pregnancy_parenting_card_eligible: bool | None = None
     other_welfare_card_eligible: bool | None = None
     owns_vehicle: bool | None = None
-    primary_transportation: str | None = Field(default=None, min_length=1, max_length=100)
+    primary_transportation: list[str] | None = None
     uses_k_pass: bool | None = None
     uses_hipass: bool | None = None
     mobile_carrier: str | None = Field(default=None, min_length=1, max_length=100)
-    preferred_airline: str | None = Field(default=None, min_length=1, max_length=100)
+    preferred_airline: list[str] | None = None
     shopping_affiliates: list[str] | None = None
     memberships: list[str] | None = None
     has_children: bool | None = None
@@ -204,13 +204,21 @@ class QualificationProfileRequest(StrictRequestModel):
 
     @field_validator(
         "name", "gender", "occupation", "residence",
-        "primary_transportation", "mobile_carrier", "preferred_airline"
+        "mobile_carrier"
     )
     @classmethod
     def trim_qualification_text(cls, value: str | None) -> str | None:
         return value.strip() if value is not None else None
 
-    @field_validator("shopping_affiliates", "memberships", "children_age_groups")
+    @field_validator("primary_transportation", "preferred_airline", mode="before")
+    @classmethod
+    def accept_legacy_single_selection(cls, value):
+        return [value] if isinstance(value, str) else value
+
+    @field_validator(
+        "primary_transportation", "preferred_airline",
+        "shopping_affiliates", "memberships", "children_age_groups"
+    )
     @classmethod
     def validate_string_list(cls, value: list[str] | None) -> list[str] | None:
         if value is None:
@@ -221,6 +229,13 @@ class QualificationProfileRequest(StrictRequestModel):
         if len(normalized) != len(set(normalized)):
             raise ValueError("목록에 중복된 값을 넣을 수 없습니다.")
         return normalized
+
+    @field_validator("primary_transportation", "preferred_airline")
+    @classmethod
+    def limit_two_selections(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and len(value) > 2:
+            raise ValueError("최대 2개까지 선택할 수 있습니다.")
+        return value
 
     @field_validator("birth_date")
     @classmethod
@@ -668,14 +683,15 @@ QUALIFICATION_FIELD_TYPES = {
     "uses_hipass": "USES_HIPASS",
     "mobile_carrier": "MOBILE_CARRIER",
     "preferred_airline": "PREFERRED_AIRLINE",
-    "shopping_affiliates": "SHOPPING_AFFILIATES",
+    "shopping_affiliates": "PRIMARY_SHOPPING_AFFILIATION",
     "memberships": "MEMBERSHIPS",
     "has_children": "HAS_CHILDREN",
     "child_count": "CHILD_COUNT",
     "children_age_groups": "CHILDREN_AGE_GROUPS",
 }
 QUALIFICATION_LIST_FIELDS = {
-    "shopping_affiliates", "memberships", "children_age_groups"
+    "primary_transportation", "preferred_airline", "shopping_affiliates",
+    "memberships", "children_age_groups"
 }
 QUALIFICATION_BOOLEAN_FIELDS = {
     "military_service_eligible",
@@ -700,7 +716,11 @@ def _serialize_qualification_value(field: str, value) -> str:
 
 def _deserialize_qualification_value(field: str, value: str):
     if field in QUALIFICATION_LIST_FIELDS:
-        return json.loads(value)
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return [value]
+        return parsed if isinstance(parsed, list) else [parsed]
     if field in QUALIFICATION_BOOLEAN_FIELDS:
         return value.lower() == "true"
     if field == "child_count":

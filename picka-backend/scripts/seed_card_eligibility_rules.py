@@ -104,6 +104,30 @@ def _partner_rules(card_name: str) -> list[RuleDefinition]:
     upper_name = card_name.upper()
     lower_name = card_name.lower()
 
+    shopping_rule = None
+    if any(marker in card_name for marker in (
+        "롯데백화점", "롯데마트", "롯데면세점", "하이마트",
+    )):
+        shopping_rule = ("LOTTE", "롯데 쇼핑 제휴카드")
+    elif any(marker in card_name for marker in (
+        "이마트", "신세계백화점", "신세계면세점", "SSG",
+    )):
+        shopping_rule = ("SHINSEGAE_EMART", "신세계·이마트 쇼핑 제휴카드")
+    elif any(marker in card_name for marker in (
+        "현대백화점", "현대아울렛", "Hmall",
+    )):
+        shopping_rule = ("HYUNDAI", "현대백화점 쇼핑 제휴카드")
+    elif "쿠팡" in card_name:
+        shopping_rule = ("COUPANG", "쿠팡 쇼핑 제휴카드")
+    if shopping_rule is not None:
+        value, description = shopping_rule
+        return [RuleDefinition(
+            "PRIMARY_SHOPPING_AFFILIATION",
+            value,
+            comparison_operator="CONTAINS",
+            description=description,
+        )]
+
     if "하이패스" in card_name:
         return [
             RuleDefinition("HIGHPASS_USER", "true", description="하이패스 이용자 대상 카드"),
@@ -123,9 +147,9 @@ def _partner_rules(card_name: str) -> list[RuleDefinition]:
     ):
         return [RuleDefinition("TELECOM_PROVIDER", "KT", description="KT 제휴카드")]
     if "대한항공" in card_name:
-        return [RuleDefinition("PREFERRED_AIRLINE", "KOREAN_AIR", description="대한항공 제휴카드")]
+        return [RuleDefinition("PREFERRED_AIRLINE", "KOREAN_AIR", comparison_operator="CONTAINS", description="대한항공 제휴카드")]
     if "아시아나" in card_name:
-        return [RuleDefinition("PREFERRED_AIRLINE", "ASIANA", description="아시아나 제휴카드")]
+        return [RuleDefinition("PREFERRED_AIRLINE", "ASIANA", comparison_operator="CONTAINS", description="아시아나 제휴카드")]
     if any(marker in card_name for marker in ("롯데백화점", "롯데마트", "롯데면세점", "하이마트")):
         return [RuleDefinition("PRIMARY_SHOPPING_AFFILIATION", "LOTTE", description="롯데 쇼핑 제휴카드")]
     if any(marker in card_name for marker in ("이마트", "이마트에브리데이")):

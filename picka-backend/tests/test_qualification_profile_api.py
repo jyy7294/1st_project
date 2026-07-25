@@ -20,11 +20,11 @@ FULL_QUALIFICATION = {
     "pregnancy_parenting_card_eligible": False,
     "other_welfare_card_eligible": False,
     "owns_vehicle": True,
-    "primary_transportation": "자가용",
+    "primary_transportation": ["자가용", "대중교통"],
     "uses_k_pass": False,
     "uses_hipass": True,
     "mobile_carrier": "SKT",
-    "preferred_airline": "대한항공",
+    "preferred_airline": ["KOREAN_AIR", "ASIANA"],
     "shopping_affiliates": ["신세계", "쿠팡"],
     "memberships": ["T우주"],
     "has_children": True,
@@ -80,6 +80,16 @@ class QualificationProfileApiTest(unittest.TestCase):
         self.assertTrue(created.json()["qualification_completed"])
         self.assertEqual(created.json()["name"], "홍길동")
         self.assertEqual(created.json()["children_age_groups"], ["미취학", "초등학생"])
+        self.assertEqual(
+            created.json()["preferred_airline"], ["KOREAN_AIR", "ASIANA"]
+        )
+        with self.Session() as db:
+            shopping = db.scalar(select(UserEligibility).where(
+                UserEligibility.eligibility_type
+                == "PRIMARY_SHOPPING_AFFILIATION"
+            ))
+            self.assertIsNotNone(shopping)
+            self.assertEqual(shopping.eligibility_value, '["신세계","쿠팡"]')
 
         updated = self.client.patch(
             "/api/v1/users/1/qualification-profile",
@@ -108,6 +118,14 @@ class QualificationProfileApiTest(unittest.TestCase):
             "/api/v1/users/1/qualification-profile", json=payload
         )
         self.assertEqual(response.status_code, 422)
+
+    def test_rejects_more_than_two_airlines_or_transportation_types(self):
+        for field in ("preferred_airline", "primary_transportation"):
+            response = self.client.patch(
+                "/api/v1/users/1/qualification-profile",
+                json={field: ["ONE", "TWO", "THREE"]},
+            )
+            self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ def _definitions(benefit: CardBenefit) -> list[BenefitRuleDefinition]:
             definitions.append(BenefitRuleDefinition(
                 eligibility_type,
                 value,
-                "EQ",
+                "CONTAINS" if eligibility_type == "PREFERRED_AIRLINE" else "EQ",
                 description,
             ))
     return definitions
