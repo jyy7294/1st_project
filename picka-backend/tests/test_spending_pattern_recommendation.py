@@ -227,6 +227,30 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(benefit["unit"], "%")
         self.assertEqual(benefit["monthlyLimit"], 10_000)
 
+    def test_cached_recommendation_drops_card_deactivated_after_snapshot(self):
+        first = self.client.get(
+            "/api/v1/users/1/card-recommendations?type=credit&limit=3"
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        recommended_ids = [card["id"] for card in first.json()["cards"]]
+        self.assertTrue(recommended_ids)
+
+        discontinued_id = recommended_ids[0]
+        with self.Session() as db:
+            card = db.get(Card, discontinued_id)
+            card.is_active = False
+            db.commit()
+
+        cached = self.client.get(
+            "/api/v1/users/1/card-recommendations?type=credit&limit=3"
+        )
+        self.assertEqual(cached.status_code, 200, cached.text)
+        self.assertTrue(cached.json()["cached"])
+        self.assertNotIn(
+            discontinued_id,
+            [card["id"] for card in cached.json()["cards"]],
+        )
+
     def test_excludes_military_service_cards_for_non_military_personas(self):
         with self.Session() as db:
             db.add(Card(

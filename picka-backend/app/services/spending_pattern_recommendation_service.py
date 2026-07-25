@@ -24,7 +24,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
 
-RECOMMENDATION_POLICY_VERSION = "spending-v4-fixed-benefit-frequency"
+RECOMMENDATION_POLICY_VERSION = "spending-v5-active-issuance-only"
 
 
 CATEGORY_NORMALIZATION = {
@@ -865,7 +865,12 @@ def get_daily_card_recommendations(
         for card in db.scalars(
             select(Card)
             .options(selectinload(Card.eligibility_rules))
-            .where(Card.id.in_(cached_card_ids))
+            .where(
+                Card.id.in_(cached_card_ids),
+                # A card can be discontinued after today's snapshot was made.
+                # Re-check issuance availability on every cached response.
+                Card.is_active.is_(True),
+            )
         ).all()
         if _is_card_eligible(card, user_eligibilities)
     }

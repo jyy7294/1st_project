@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+import json
 import re
 from typing import Annotated
 from uuid import uuid4
@@ -174,6 +175,77 @@ class PersonalProfileUpdateRequest(StrictRequestModel):
         types = [item.eligibility_type for item in self.eligibilities]
         if len(types) != len(set(types)):
             raise ValueError("eligibility_type은 요청 안에서 중복될 수 없습니다.")
+        return self
+
+
+class QualificationProfileRequest(StrictRequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    birth_date: date | None = None
+    phone_number: str | None = Field(default=None, max_length=30)
+    gender: str | None = Field(default=None, max_length=30)
+    occupation: str | None = Field(default=None, max_length=200)
+    residence: str | None = Field(default=None, max_length=200)
+    military_service_eligible: bool | None = None
+    sole_proprietor: bool | None = None
+    compact_car_owner: bool | None = None
+    pregnancy_parenting_card_eligible: bool | None = None
+    other_welfare_card_eligible: bool | None = None
+    owns_vehicle: bool | None = None
+    primary_transportation: str | None = Field(default=None, min_length=1, max_length=100)
+    uses_k_pass: bool | None = None
+    uses_hipass: bool | None = None
+    mobile_carrier: str | None = Field(default=None, min_length=1, max_length=100)
+    preferred_airline: str | None = Field(default=None, min_length=1, max_length=100)
+    shopping_affiliates: list[str] | None = None
+    memberships: list[str] | None = None
+    has_children: bool | None = None
+    child_count: int | None = Field(default=None, ge=0, le=30)
+    children_age_groups: list[str] | None = None
+
+    @field_validator(
+        "name", "gender", "occupation", "residence",
+        "primary_transportation", "mobile_carrier", "preferred_airline"
+    )
+    @classmethod
+    def trim_qualification_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @field_validator("shopping_affiliates", "memberships", "children_age_groups")
+    @classmethod
+    def validate_string_list(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized = [item.strip() for item in value]
+        if any(not item or len(item) > 100 for item in normalized):
+            raise ValueError("목록 값은 1~100자의 문자열이어야 합니다.")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("목록에 중복된 값을 넣을 수 없습니다.")
+        return normalized
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_qualification_birth_date(cls, value: date | None) -> date | None:
+        if value is not None and value > date.today():
+            raise ValueError("생년월일은 미래일 수 없습니다.")
+        return value
+
+    @field_validator("phone_number")
+    @classmethod
+    def normalize_qualification_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = re.sub(r"[\s-]", "", value)
+        if not normalized.isdigit() or not 7 <= len(normalized) <= 15:
+            raise ValueError("전화번호 형식이 올바르지 않습니다.")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_children(self):
+        if self.has_children is False:
+            if self.child_count not in (None, 0) or self.children_age_groups not in (None, []):
+                raise ValueError("자녀가 없으면 자녀 수와 연령대를 입력할 수 없습니다.")
+        if self.child_count == 0 and self.has_children is True:
+            raise ValueError("자녀가 있으면 자녀 수는 1명 이상이어야 합니다.")
         return self
 
 
@@ -584,6 +656,179 @@ def _age_on(birth_date: date | None, today: date | None = None) -> int:
     )
 
 
+QUALIFICATION_FIELD_TYPES = {
+    "military_service_eligible": "MILITARY_SERVICE_ELIGIBLE",
+    "sole_proprietor": "SOLE_PROPRIETOR",
+    "compact_car_owner": "COMPACT_CAR_OWNER",
+    "pregnancy_parenting_card_eligible": "PREGNANCY_PARENTING_CARD_ELIGIBLE",
+    "other_welfare_card_eligible": "OTHER_WELFARE_CARD_ELIGIBLE",
+    "owns_vehicle": "OWNS_VEHICLE",
+    "primary_transportation": "PRIMARY_TRANSPORTATION",
+    "uses_k_pass": "USES_K_PASS",
+    "uses_hipass": "USES_HIPASS",
+    "mobile_carrier": "MOBILE_CARRIER",
+    "preferred_airline": "PREFERRED_AIRLINE",
+    "shopping_affiliates": "SHOPPING_AFFILIATES",
+    "memberships": "MEMBERSHIPS",
+    "has_children": "HAS_CHILDREN",
+    "child_count": "CHILD_COUNT",
+    "children_age_groups": "CHILDREN_AGE_GROUPS",
+}
+QUALIFICATION_LIST_FIELDS = {
+    "shopping_affiliates", "memberships", "children_age_groups"
+}
+QUALIFICATION_BOOLEAN_FIELDS = {
+    "military_service_eligible",
+    "sole_proprietor",
+    "compact_car_owner",
+    "pregnancy_parenting_card_eligible",
+    "other_welfare_card_eligible",
+    "owns_vehicle",
+    "uses_k_pass",
+    "uses_hipass",
+    "has_children",
+}
+
+
+def _serialize_qualification_value(field: str, value) -> str:
+    if field in QUALIFICATION_LIST_FIELDS:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if field in QUALIFICATION_BOOLEAN_FIELDS:
+        return str(value).lower()
+    return str(value)
+
+
+def _deserialize_qualification_value(field: str, value: str):
+    if field in QUALIFICATION_LIST_FIELDS:
+        return json.loads(value)
+    if field in QUALIFICATION_BOOLEAN_FIELDS:
+        return value.lower() == "true"
+    if field == "child_count":
+        return int(value)
+    return value
+
+
+def _qualification_rows(db: Session, user_id: int) -> dict[str, UserEligibility]:
+    types = set(QUALIFICATION_FIELD_TYPES.values())
+    return {
+        row.eligibility_type: row
+        for row in db.scalars(
+            select(UserEligibility).where(
+                UserEligibility.user_id == user_id,
+                UserEligibility.eligibility_type.in_(types),
+            )
+        ).all()
+    }
+
+
+def _qualification_profile_payload(db: Session, user: User) -> dict:
+    rows = _qualification_rows(db, user.id)
+    values = {}
+    missing_fields = []
+    for field, eligibility_type in QUALIFICATION_FIELD_TYPES.items():
+        row = rows.get(eligibility_type)
+        if row is None:
+            values[field] = None
+            missing_fields.append(field)
+        else:
+            values[field] = _deserialize_qualification_value(
+                field, row.eligibility_value
+            )
+    personal = _personal_profile_payload(db, user)
+    personal.pop("eligibilities", None)
+    return {
+        **personal,
+        **values,
+        "qualification_completed": not missing_fields,
+        "missing_fields": missing_fields,
+    }
+
+
+def _save_qualification_profile(
+    db: Session,
+    *,
+    user: User,
+    request: QualificationProfileRequest,
+    actor_user_id: int,
+) -> dict:
+    existing = _qualification_rows(db, user.id)
+    changed_fields: list[str] = []
+    now = datetime.now(timezone.utc)
+    requested_identity_fields = request.model_fields_set & {
+        "name", "birth_date", "phone_number", "gender", "occupation", "residence"
+    }
+    if "name" in requested_identity_fields and user.name != request.name:
+        user.name = request.name
+        changed_fields.append("name")
+    profile_field_map = {
+        "birth_date": "birth_date",
+        "phone_number": "phone_number",
+        "gender": "gender",
+        "occupation": "job",
+        "residence": "residence",
+    }
+    requested_profile_fields = requested_identity_fields & set(profile_field_map)
+    profile = user.persona_profile
+    if requested_profile_fields and profile is None:
+        profile = UserPersonaProfile(
+            persona_id=f"user-{user.id}",
+            age=_age_on(request.birth_date),
+            source_payload={},
+        )
+        user.persona_profile = profile
+    for api_field in requested_profile_fields:
+        model_field = profile_field_map[api_field]
+        value = getattr(request, api_field)
+        if getattr(profile, model_field) != value:
+            setattr(profile, model_field, value)
+            changed_fields.append(api_field)
+    if profile is not None and "birth_date" in requested_profile_fields:
+        profile.age = _age_on(request.birth_date)
+
+    qualification_fields = request.model_fields_set & set(QUALIFICATION_FIELD_TYPES)
+    if "has_children" in qualification_fields and request.has_children is False:
+        qualification_fields |= {"child_count", "children_age_groups"}
+    for field in qualification_fields:
+        value = getattr(request, field)
+        if request.has_children is False and field == "child_count":
+            value = 0
+        if request.has_children is False and field == "children_age_groups":
+            value = []
+        eligibility_type = QUALIFICATION_FIELD_TYPES[field]
+        serialized = _serialize_qualification_value(field, value)
+        row = existing.get(eligibility_type)
+        if row is None:
+            row = UserEligibility(
+                user_id=user.id,
+                eligibility_type=eligibility_type,
+                eligibility_value=serialized,
+                verification_status="SELF_REPORTED",
+            )
+            db.add(row)
+        elif row.eligibility_value != serialized:
+            row.eligibility_value = serialized
+        else:
+            continue
+        row.verification_status = "SELF_REPORTED"
+        row.verified_at = now
+        row.expires_at = None
+        changed_fields.append(f"qualification.{field}")
+
+    if changed_fields:
+        db.execute(delete(CardRecommendationSnapshot).where(
+            CardRecommendationSnapshot.user_id == user.id
+        ))
+        save_privacy_change_audit(
+            db,
+            actor_user_id=actor_user_id,
+            target_user_id=user.id,
+            changed_fields=changed_fields,
+        )
+    db.commit()
+    db.refresh(user)
+    return _qualification_profile_payload(db, user)
+
+
 def _personal_profile_payload(db: Session, user: User) -> dict:
     profile = user.persona_profile
     birth_date = profile.birth_date if profile else None
@@ -744,6 +989,77 @@ def update_personal_profile(
     db.commit()
     db.refresh(user)
     return _personal_profile_payload(db, user)
+
+
+@app.get("/api/v1/users/{user_id}/qualification-profile")
+def get_qualification_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """더보기 탭에서 개인정보와 카드 자격정보 전체를 조회합니다."""
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    return _qualification_profile_payload(db, user)
+
+
+@app.put("/api/v1/users/{user_id}/qualification-profile")
+def create_qualification_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    request: QualificationProfileRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """첫 카드 등록 전에 카드 자격정보를 최초 입력하거나 전체 교체합니다."""
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    missing = set(QUALIFICATION_FIELD_TYPES) - request.model_fields_set
+    null_fields = {
+        field for field in request.model_fields_set if getattr(request, field) is None
+    }
+    if missing or null_fields:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "최초 입력 시 모든 자격정보가 필요합니다.",
+                "missing_fields": sorted(missing | null_fields),
+            },
+        )
+    return _save_qualification_profile(
+        db, user=user, request=request, actor_user_id=current_user.id
+    )
+
+
+@app.patch("/api/v1/users/{user_id}/qualification-profile")
+def update_qualification_profile(
+    user_id: Annotated[int, Path(gt=0)],
+    request: QualificationProfileRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """더보기 탭에서 지정한 카드 자격정보만 수정합니다."""
+    require_user_access(user_id, current_user)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    null_fields = {
+        field for field in request.model_fields_set if getattr(request, field) is None
+    }
+    if not request.model_fields_set or null_fields:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "수정할 자격정보에는 null을 사용할 수 없습니다.",
+                "invalid_fields": sorted(null_fields),
+            },
+        )
+    return _save_qualification_profile(
+        db, user=user, request=request, actor_user_id=current_user.id
+    )
 
 
 @app.get("/api/v1/users/{user_id}/eligibilities")
@@ -919,6 +1235,25 @@ def process_card_registration(
 ) -> dict:
     usage_month = date.today().strftime("%Y-%m")
     try:
+        has_registered_card = db.scalar(
+            select(UserCard.id).where(UserCard.user_id == user_id).limit(1)
+        ) is not None
+        if not has_registered_card:
+            completed_types = set(_qualification_rows(db, user_id))
+            missing_fields = [
+                field
+                for field, eligibility_type in QUALIFICATION_FIELD_TYPES.items()
+                if eligibility_type not in completed_types
+            ]
+            if missing_fields:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "QUALIFICATION_PROFILE_REQUIRED",
+                        "message": "첫 카드 등록 전에 자격정보 입력을 완료해 주세요.",
+                        "missing_fields": missing_fields,
+                    },
+                )
         user_card, credential = register_virtual_card(
             db=db,
             user_id=user_id,
