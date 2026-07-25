@@ -598,10 +598,14 @@ def local_login(
             User.email_blind_index == email_blind_index(request.email)
         )
     )
+    password_valid = verify_password(
+        request.password,
+        user.password_hash if user is not None else None,
+    )
     if (
         user is None
         or not user.is_active
-        or not verify_password(request.password, user.password_hash)
+        or not password_valid
     ):
         raise HTTPException(
             status_code=401,

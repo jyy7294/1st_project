@@ -10,18 +10,32 @@ from app.core.config import settings
 LOCAL_DATABASE_HOSTS = {None, "localhost", "127.0.0.1", "::1"}
 
 
-def database_url_with_required_ssl(database_url: str) -> URL:
+def database_url_with_required_ssl(
+    database_url: str,
+    *,
+    sslmode: str = "require",
+    sslrootcert: str | None = None,
+) -> URL:
     url = make_url(database_url)
     if (
         url.drivername.startswith("postgresql")
         and url.host not in LOCAL_DATABASE_HOSTS
     ):
-        return url.update_query_dict({"sslmode": "require"})
+        if sslmode not in {"require", "verify-ca", "verify-full"}:
+            raise ValueError("DATABASE_SSLMODE must be require, verify-ca, or verify-full")
+        query = {"sslmode": sslmode}
+        if sslrootcert:
+            query["sslrootcert"] = sslrootcert
+        return url.update_query_dict(query)
     return url
 
 
 engine = create_engine(
-    database_url_with_required_ssl(settings.database_url),
+    database_url_with_required_ssl(
+        settings.database_url,
+        sslmode=settings.database_sslmode,
+        sslrootcert=settings.database_sslrootcert,
+    ),
     pool_pre_ping=True,
 )
 

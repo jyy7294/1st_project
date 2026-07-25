@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str
+    database_sslmode: str = "require"
+    database_sslrootcert: str | None = None
     recommendation_debug: bool = False
     jwt_secret_key: str | None = None
     jwt_algorithm: str = "HS256"

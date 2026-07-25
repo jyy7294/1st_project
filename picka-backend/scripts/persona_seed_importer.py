@@ -30,8 +30,11 @@ from app.services.monthly_benefit_limit_service import (
 from app.services.user_state_adapter import resolve_category_from_aliases
 
 
-CSV_PATH = Path(__file__).resolve().parents[1] / "PICKA_persona_all_in_one_v8_11.csv"
-SOURCE_VERSION = "v8_11"
+CSV_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "PICKA_persona_all_in_one_v8_22_no_financial_service.csv"
+)
+SOURCE_VERSION = "v8_22_no_financial_service"
 BENEFIT_ID_REFERENCE_CSV: Path | None = None
 PERSONA_USER_IDS = {"persona1": 1, "persona2": 2, "persona3": 3, "persona4": 4}
 KST = timezone(timedelta(hours=9))

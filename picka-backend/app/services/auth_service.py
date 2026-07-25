@@ -63,9 +63,14 @@ def hash_password(password: str) -> str:
     )
 
 
+# Used only to equalize the expensive password verification path when an email
+# does not exist. It is regenerated at process startup and is never an account
+# credential.
+DUMMY_PASSWORD_HASH = hash_password("picka-nonexistent-account")
+
+
 def verify_password(password: str, encoded: str | None) -> bool:
-    if not encoded:
-        return False
+    encoded = encoded or DUMMY_PASSWORD_HASH
     try:
         algorithm, n, r, p, salt, expected = encoded.split("$", 5)
         if algorithm != "scrypt":

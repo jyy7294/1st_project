@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scripts import seed_v811_personas as importer
+from scripts import persona_seed_importer as importer
 
 
 importer.CSV_PATH = (

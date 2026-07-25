@@ -24,6 +24,17 @@ class DatabaseSecurityTest(unittest.TestCase):
         self.assertNotIn("sslmode", local.query)
         self.assertNotIn("sslmode", sqlite.query)
 
+    def test_remote_postgresql_supports_full_certificate_verification(self):
+        secured = database_url_with_required_ssl(
+            "postgresql://user:secret@db.example.com/picka",
+            sslmode="verify-full",
+            sslrootcert="/run/secrets/provider-ca.crt",
+        )
+        self.assertEqual(secured.query["sslmode"], "verify-full")
+        self.assertEqual(
+            secured.query["sslrootcert"], "/run/secrets/provider-ca.crt"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
