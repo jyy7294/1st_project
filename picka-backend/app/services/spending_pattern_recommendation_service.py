@@ -24,7 +24,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
 
-RECOMMENDATION_POLICY_VERSION = "spending-v6-reward-benefits"
+RECOMMENDATION_POLICY_VERSION = "spending-v7-positive-benefit-ranking"
 
 
 CATEGORY_NORMALIZATION = {
@@ -727,8 +727,8 @@ def recommend_new_cards_by_spending(
             "name": "적용 가능한 혜택 없음",
             "rate": 0,
             "unit": None,
-            "category": top_category,
-            "monthly_spend": top_category_spend,
+            "category": None,
+            "monthly_spend": 0,
         }
         category_label = best["category"] or "주요 업종"
         recommendation_message = (
@@ -771,9 +771,12 @@ def recommend_new_cards_by_spending(
             ],
         })
 
+    # 금액으로 검증된 혜택이 없는 카드는 추천 순위에서 제외한다.
+    # 자격 확인이 필요한 카드는 confirmationRequired 계열 응답에 남는다.
+    results = [item for item in results if item["total"] > 0]
     results.sort(key=lambda item: (
-        item.get("benefitCategory") != primary_category,
         -item["total"],
+        item.get("benefitCategory") != primary_category,
         item["fee"],
         item["id"],
     ))

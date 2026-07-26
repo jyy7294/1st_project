@@ -474,8 +474,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 reference_date=date(2026, 6, 8),
             )
 
-        restricted = next(card for card in result["cards"] if card["id"] == 7)
-        self.assertEqual(restricted["total"], 0)
+        self.assertNotIn(7, [card["id"] for card in result["cards"]])
         self.assertGreater(result["excludedBenefitCount"], 0)
         self.assertEqual(
             result["benefitConfirmationRequired"][0]["eligibilityType"],
@@ -498,8 +497,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 reference_date=date(2026, 6, 8),
             )
 
-        restricted = next(card for card in confirmed_result["cards"] if card["id"] == 7)
-        self.assertEqual(restricted["total"], 0)
+        self.assertNotIn(7, [card["id"] for card in confirmed_result["cards"]])
         self.assertFalse(confirmed_result["benefitConfirmationRequired"])
 
     def test_specific_merchant_benefit_is_found_outside_transaction_category(self):
