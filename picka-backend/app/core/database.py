@@ -17,6 +17,10 @@ def database_url_with_required_ssl(
     sslrootcert: str | None = None,
 ) -> URL:
     url = make_url(database_url)
+    # SQLAlchemy의 기본 ``postgresql://`` 드라이버는 psycopg2이지만,
+    # 이 프로젝트는 requirements.txt에서 psycopg 3을 사용한다.
+    if url.drivername == "postgresql":
+        url = url.set(drivername="postgresql+psycopg")
     if (
         url.drivername.startswith("postgresql")
         and url.host not in LOCAL_DATABASE_HOSTS

@@ -14,6 +14,7 @@ class DatabaseSecurityTest(unittest.TestCase):
         secured = database_url_with_required_ssl(
             "postgresql://user:secret@db.example.com/picka?sslmode=disable"
         )
+        self.assertEqual(secured.drivername, "postgresql+psycopg")
         self.assertEqual(secured.query["sslmode"], "require")
 
     def test_local_and_sqlite_databases_are_unchanged(self):

@@ -32,9 +32,10 @@ from app.services.user_state_adapter import resolve_category_from_aliases
 
 CSV_PATH = (
     Path(__file__).resolve().parents[1]
-    / "PICKA_persona_all_in_one_v8_22_no_financial_service.csv"
+    / "PICKA_persona_all_in_one_v8_26_jeongeunju_budget450_pick45.csv"
 )
-SOURCE_VERSION = "v8_22_no_financial_service"
+SOURCE_VERSION = "v8_26_jeongeunju_budget450_pick45"
+CONSUMPTION_TENDENCY_SOURCE = "PICKA_페르소나_소비성향_정리.xlsx"
 BENEFIT_ID_REFERENCE_CSV: Path | None = None
 PERSONA_USER_IDS = {"persona1": 1, "persona2": 2, "persona3": 3, "persona4": 4}
 KST = timezone(timedelta(hours=9))
@@ -64,6 +65,47 @@ ELIGIBILITY_MAPPING = {
 CONFIRMED_OVERRIDES = {
     "persona2": {"MILITARY_SERVICE": ("false", "SELF_REPORTED")},
     "persona3": {"MILITARY_SERVICE": ("false", "SELF_REPORTED")},
+}
+
+# 페르소나 담당자가 v8.26 CSV와 함께 전달한 소비성향 정리본의 해석값이다.
+# 금액/건수 원장은 CSV에서 적재하고, 이 값은 발표·분석용 프로필 문맥으로 보존한다.
+CONSUMPTION_TENDENCIES = {
+    "persona1": {
+        "three_month_total": 3_486_600,
+        "transaction_count": 120,
+        "monthly_average": 1_162_200,
+        "top_spending_categories": ["백화점 (15.7%)", "외식 (11.1%)", "여행/숙박 (6.9%)"],
+        "pattern": "소액 다빈도형. 카페·교통 결제가 잦고 가끔 대형 지출이 튐 (롯데백화점 54.6만 원 1건)",
+        "main_merchants": ["스타벅스", "티머니", "카카오 T", "한식당"],
+        "diagnosis": "체크·신용 혼용으로 혜택 분산. 잘못된 카드 선택과 한도 소진이 비슷한 비중",
+    },
+    "persona2": {
+        "three_month_total": 3_297_700,
+        "transaction_count": 107,
+        "monthly_average": 1_099_233,
+        "top_spending_categories": ["주유 (21.4%)", "외식 (11.0%)", "항공 (7.3%)"],
+        "pattern": "차량 중심 고정지출형. 주유 14건이 최대 비중, 나머지는 외식·구독 위주",
+        "main_merchants": ["SK에너지 주유소", "한식당", "스타벅스", "김밥전문점"],
+        "diagnosis": "카드 2장으로 커버 한계 → 한도 소진이 최대 손실 원인 (61건)",
+    },
+    "persona3": {
+        "three_month_total": 8_652_400,
+        "transaction_count": 98,
+        "monthly_average": 2_884_133,
+        "top_spending_categories": ["마트/쇼핑 (19.3%)", "교육/육아 (18.3%)", "항공 (15.3%)"],
+        "pattern": "육아·마트 정기지출 + 대형 이벤트성 결제 (가족 항공권 108만 원)",
+        "main_merchants": ["이마트", "홈플러스", "아이사랑몰", "한식당"],
+        "diagnosis": "카드 3장 역할 분리는 되어 있으나 실제 결제 시 오선택 45건",
+    },
+    "persona4": {
+        "three_month_total": 13_500_000,
+        "transaction_count": 131,
+        "monthly_average": 4_500_000,
+        "top_spending_categories": ["교육/육아 (28.8%)", "마트/쇼핑 (18.3%)", "공과금 (10.2%)"],
+        "pattern": "고정비 집중형. 학원비·교재비가 매달 반복되고 예산과 지출이 거의 일치",
+        "main_merchants": ["이마트", "중등 영어학원", "홈플러스", "고등 수학학원"],
+        "diagnosis": "카드 6장 보유에도 오선택 72건 — 선택 실패가 압도적 손실 원인",
+    },
 }
 
 
@@ -128,6 +170,9 @@ def main() -> None:
         and row.get("actual_card_id")
     ]
     excluded_non_card = len(all_rows) - len(rows)
+    all_by_persona: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in all_rows:
+        all_by_persona[row["persona_id"]].append(row)
     by_persona: dict[str, list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         by_persona[row["persona_id"]].append(row)
@@ -209,10 +254,16 @@ def main() -> None:
             profile.monthly_budget = _optional_int(first["persona_monthly_budget"])
             profile.period = first["persona_period"] or None
             profile.preferred_benefits = first["persona_preferred_benefits"] or None
-            payload = dict(profile.source_payload or {})
-            payload[f"{SOURCE_VERSION}_rows"] = persona_rows
-            payload[f"{SOURCE_VERSION}_excludes_non_card_expenses"] = True
-            profile.source_payload = payload
+            profile.source_payload = {
+                # 원본 456건은 모두 보존하되, transactions 테이블에는 카드가
+                # 연결된 455건만 적재한다. 비카드 1건도 XLSX 소비성향 집계에는 포함된다.
+                f"{SOURCE_VERSION}_rows": all_by_persona[persona_id],
+                f"{SOURCE_VERSION}_excludes_non_card_expenses": True,
+                f"{SOURCE_VERSION}_database_card_rows": len(persona_rows),
+                f"{SOURCE_VERSION}_source_rows": len(all_by_persona[persona_id]),
+                "consumption_tendency_source": CONSUMPTION_TENDENCY_SOURCE,
+                "consumption_tendency": CONSUMPTION_TENDENCIES[persona_id],
+            }
             profile.source_version = SOURCE_VERSION
             counts["persona_profiles"] += 1
 
