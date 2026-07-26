@@ -24,7 +24,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
 
-RECOMMENDATION_POLICY_VERSION = "spending-v5-active-issuance-only"
+RECOMMENDATION_POLICY_VERSION = "spending-v6-reward-benefits"
 
 
 CATEGORY_NORMALIZATION = {
@@ -613,6 +613,7 @@ def recommend_new_cards_by_spending(
                 state,
                 payment_category=category,
                 payment_amount=amount,
+                include_reward_benefits=True,
             )
             benefit = int(calculation.get("expected_benefit", 0) or 0)
             benefit_frequency = _fixed_benefit_frequency(
@@ -669,6 +670,7 @@ def recommend_new_cards_by_spending(
                         benefit_item.category or merchant["category"] or "기타"
                     ),
                     payment_amount=merchant["amount"],
+                    include_reward_benefits=True,
                 )
                 amount = int(calculation.get("expected_benefit", 0) or 0)
                 if amount <= 0:
@@ -752,6 +754,9 @@ def recommend_new_cards_by_spending(
                 int(best_category_result["amount"])
                 if best_category_result is not None else 0
             ),
+            # 최근 소비를 기준으로 산출한 연간 총 예상혜택(연회비 차감 전).
+            # 기존 프론트 추천 카드 모델의 `benefit` 필드와 호환한다.
+            "benefit": monthly_total * 12,
             "total": annual_total,
             "fee": fee,
             "url": card.source_url,

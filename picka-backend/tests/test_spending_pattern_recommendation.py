@@ -344,6 +344,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             {
                 "id", "name", "issuer", "benefitName", "rate", "total",
                 "benefitValue", "benefitUnit", "expectedBenefitAmount",
+                "benefit",
                 "fee", "url", "image_url", "benefitCategory", "monthlySpend",
                 "recommendationMessage", "matchedMerchants",
                 "benefits",

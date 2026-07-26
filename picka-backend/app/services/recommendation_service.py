@@ -1157,6 +1157,7 @@ def calculate_card_benefit(
     payment_category: str,
     payment_amount: int,
     merchant_name: str | None = None,
+    include_reward_benefits: bool = False,
 ) -> dict:
     """
     Calculate the benefit for a given card and payment details.
@@ -1216,7 +1217,15 @@ def calculate_card_benefit(
             "benefit_type",
         )
 
-        if benefit_type != "할인":
+        allowed_benefit_types = {"할인"}
+        if include_reward_benefits:
+            # 신규 카드의 예상 혜택 비교에서는 결제 즉시 차감되는 할인뿐
+            # 아니라 현금성 캐시백과 포인트 적립도 원 단위 가치로 합산한다.
+            # 실제 결제 승인 호출은 기본값(False)을 사용하므로 포인트를
+            # 승인금액에서 잘못 차감하지 않는다.
+            allowed_benefit_types.update({"캐시백", "포인트 적립", "적립"})
+
+        if benefit_type not in allowed_benefit_types:
             continue
 
         benefit_unit = get_field(
