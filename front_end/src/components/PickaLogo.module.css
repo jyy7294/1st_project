@@ -1,0 +1,24 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.mark,
+.wordmark {
+  display: block;
+  width: auto;
+  flex: none;
+}
+
+/* 워드마크는 네이비 단색이라 어두운 배경에서는 흰색으로 뒤집어 씁니다. */
+.light { filter: brightness(0) invert(1); }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

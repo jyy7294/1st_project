@@ -1,0 +1,90 @@
+.title {
+  margin-top: 20px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.5px;
+}
+
+.sub { margin-top: 8px; font-size: 13.5px; color: rgba(255, 255, 255, .5); }
+
+.panelWrap { margin-top: 22px; }
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, .4);
+}
+
+.merchant {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.merchantIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: rgba(47, 107, 255, .15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex: none;
+}
+
+.merchantName { font-size: 15px; font-weight: 700; color: #fff; }
+.merchantLoc { font-size: 11.5px; color: rgba(255, 255, 255, .45); }
+
+.line { margin-top: 14px; }
+.lineValue { font-size: 13.5px; color: #fff; }
+
+.amount { font-size: 20px; font-weight: 800; color: #fff; }
+.amountUnit { font-size: 13px; font-weight: 600; }
+
+.loadingWrap {
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.spinnerWrap {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 회전 링 뒤에서 퍼지는 원 — 로딩이 살아 있다는 신호만 더합니다. */
+/* 실제 animation 은 전역 .pk-anim-* 클래스가 겁니다 (styles/tokens.css 주석 참고). */
+.spinnerGlow {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 107, 255, .32), transparent 70%);
+  --pk-dur: 1.8s;
+}
+
+.spinner {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border-top: 2px solid var(--blue-light);
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
+  --pk-dur: 1s;
+}
+
+.loadingText { font-size: 13px; color: rgba(255, 255, 255, .55); }

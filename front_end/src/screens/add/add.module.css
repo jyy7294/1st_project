@@ -1,0 +1,648 @@
+/* 카드 등록 4단계 공통 스타일. 모두 어두운 배경을 씁니다. */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  background: var(--add-dark);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 60px 20px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+
+.headerTitle { font-size: 16px; font-weight: 700; color: #fff; }
+.spacer { width: 36px; }
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .08);
+  font-size: 17px;
+  color: #fff;
+}
+
+/* 세그먼트 탭 (스캔 / 직접 입력) */
+.segTabs {
+  display: flex;
+  gap: 4px;
+  margin: 20px 24px 0;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .06);
+  flex: none;
+}
+
+.segTab {
+  flex: 1;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, .55);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: -.2px;
+  transition: color .2s ease;
+}
+
+.segActive {
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+/* 뷰파인더 */
+.viewfinder {
+  position: relative;
+  margin: 26px 24px 0;
+  height: 268px;
+  border-radius: 24px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background:
+    radial-gradient(130% 100% at 50% 30%, rgba(90, 120, 170, .10), transparent 62%),
+    linear-gradient(160deg, #101a30, #0a1120);
+  border: 1px solid rgba(255, 255, 255, .05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+
+.viewfinder:active {
+  transform: scale(.992);
+  box-shadow: inset 0 0 0 1px rgba(120, 170, 255, .35);
+}
+
+/* 스캔 뷰파인더의 실제 카드 이미지 (투명 배경 PNG 기준 — 박스 없이 카드만) */
+.scanCard {
+  width: 264px;
+  aspect-ratio: 1107 / 622;
+}
+
+.scanCardImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, .5));
+}
+
+/* 인식 연출 — 탭하면 빔을 끄고 카드가 격자(코너 틀)에 닿을 때까지 확대됩니다. */
+.scanning { cursor: default; }
+.scanning .beam { opacity: 0; transition: opacity .2s ease; }
+.scanning .corner { border-color: rgba(120, 170, 255, .9); }
+.scanning .scanCardImg {
+  filter: drop-shadow(0 0 20px rgba(120, 160, 255, .5)) drop-shadow(0 16px 24px rgba(0, 0, 0, .55));
+  transition: filter .8s ease;
+}
+
+/* 인식 완료 배지 */
+.scanDone {
+  position: absolute;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, .16);
+  border: 1px solid rgba(74, 222, 128, .4);
+  color: #7ff0a8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 직접입력 안내 문구 — 하단 버튼 바로 위에 붙습니다. */
+.manualHelp {
+  margin: auto 24px 0;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .55);
+  word-break: keep-all;
+  flex: none;
+}
+
+/* 뷰파인더 모서리 가이드 */
+.corner {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 0 solid rgba(160, 180, 210, .4);
+  transition: border-color .3s ease;
+}
+
+.tl { top: 45px; left: 20px; border-top-width: 2px; border-left-width: 2px; border-radius: 8px 0 0 0; }
+.tr { top: 45px; right: 20px; border-top-width: 2px; border-right-width: 2px; border-radius: 0 8px 0 0; }
+.bl { bottom: 45px; left: 20px; border-bottom-width: 2px; border-left-width: 2px; border-radius: 0 0 0 8px; }
+.br { bottom: 45px; right: 20px; border-bottom-width: 2px; border-right-width: 2px; border-radius: 0 0 8px 0; }
+
+/*
+ * 프리미엄 카드 목업. pk-cardglow(테두리 pulse) + pk-float(미세한 상하 이동)를 겹칩니다.
+ */
+.mockCard {
+  position: relative;
+  width: 214px;
+  height: 135px;
+  border-radius: 15px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  background: linear-gradient(135deg, #182640 0%, #223251 52%, #1a2b46 100%);
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+
+/* 카드 위를 가로지르는 사선 하이라이트 (은은한 광택) */
+.mockCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 44%, rgba(255, 255, 255, .1) 50%, transparent 56%);
+}
+
+.mockRow { display: flex; align-items: center; justify-content: space-between; }
+
+.mockChip {
+  width: 34px;
+  height: 25px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #f6e3a6 0%, #d8b567 55%, #b89448 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+}
+
+.mockWave { color: rgba(255, 255, 255, .7); }
+
+.mockNumber {
+  font-size: 15px;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, .82);
+  font-weight: 600;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .3);
+}
+
+.mockFoot { display: flex; align-items: flex-end; justify-content: space-between; }
+
+.mockValid {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .55);
+}
+
+/* 카드 네트워크 실루엣 (겹친 두 원) */
+.mockBrand { display: flex; }
+.mockBrand i { display: block; width: 18px; height: 18px; border-radius: 50%; }
+.mockBrand i:first-child { background: rgba(255, 255, 255, .5); }
+.mockBrand i:last-child { background: rgba(216, 181, 103, .8); margin-left: -8px; }
+
+/* 스캔 빔 (은은한 스틸블루) */
+.beam {
+  position: absolute;
+  left: 34px;
+  right: 34px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(170, 195, 230, .75), transparent);
+  box-shadow: 0 0 14px 1px rgba(120, 150, 200, .4);
+}
+
+.hint {
+  position: absolute;
+  bottom: 18px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, .5);
+  font-weight: 500;
+  letter-spacing: -.2px;
+}
+
+/* 카드 프리뷰 — 실물 카드 이미지를 프레임에 잘림 없이 정확히 담습니다. */
+.preview {
+  position: relative;
+  margin: 16px 24px 0;
+  aspect-ratio: 1107 / 622;
+  color: #fff;
+  flex: none;
+}
+
+.previewImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, .5));
+}
+
+/* 이미지 위 텍스트 가독성용 스크림 + 내용 배치 */
+.previewInner {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .55);
+  background: linear-gradient(180deg, rgba(6, 12, 28, .5), rgba(6, 12, 28, .1) 42%, rgba(6, 12, 28, .55));
+}
+
+.previewCompany { font-size: 12px; color: rgba(255, 255, 255, .8); }
+.previewProduct { font-size: 17px; font-weight: 700; margin-top: 2px; }
+
+.previewNumber {
+  font-size: 17px;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, .95);
+}
+
+.previewFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .55);
+}
+
+.previewFoot .cap { font-size: 10px; color: rgba(255, 255, 255, .7); }
+.previewFoot .val { margin-top: 2px; color: rgba(255, 255, 255, .95); font-weight: 600; }
+.previewFoot .right { text-align: right; }
+
+/* 입력 필드 */
+.field { padding: 16px 24px 0; display: flex; flex-direction: column; gap: 6px; flex: none; }
+.field.first { padding-top: 22px; }
+.fieldRow { display: flex; gap: 12px; padding: 16px 24px 0; flex: none; }
+.fieldRow .field { padding: 0; flex: 1; }
+
+.label { font-size: 12.5px; color: rgba(255, 255, 255, .6); font-weight: 600; }
+
+.input {
+  height: 52px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .1);
+  padding: 0 15px;
+  color: #fff;
+  font-size: 15px;
+  font-family: inherit;
+  letter-spacing: 1px;
+  outline: none;
+  width: 100%;
+}
+
+.input::placeholder { color: rgba(255, 255, 255, .35); letter-spacing: 1px; }
+.input:focus { border-color: var(--blue); background: rgba(47, 107, 255, .1); }
+.input.invalid { border-color: var(--danger); }
+
+.input.pin {
+  text-align: center;
+  letter-spacing: 14px;
+  padding-left: 14px;
+  font-size: 20px;
+}
+
+/* 스캔으로 자동입력된(읽기전용) 필드 — 채워졌지만 수정 불가임을 옅게 표시 */
+.readonly {
+  opacity: .72;
+  cursor: default;
+}
+.readonly:focus { border-color: rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .06); }
+
+.fieldError { font-size: 11.5px; color: #ff9aa0; }
+
+.registerError {
+  margin: -24px 24px 24px;
+  font-size: 12.5px;
+  color: #ff9aa0;
+  text-align: center;
+}
+
+.secureNote {
+  text-align: center;
+  margin: 18px 0 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, .4);
+  flex: none;
+}
+
+/* 직접입력 확인창 — 'OO카드가 맞나요?' */
+.addConfirmDim {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  background: rgba(4, 10, 24, .62);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 34px;
+}
+
+.addConfirm {
+  width: 100%;
+  background: #fff;
+  border-radius: 22px;
+  padding: 24px 22px 18px;
+  text-align: center;
+  box-shadow: 0 30px 60px -16px rgba(0, 0, 0, .6);
+  --pk-dur: .22s;
+}
+
+.addConfirmImg {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1107 / 622;
+  margin: 0 auto 18px;
+}
+
+.addConfirmImg img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 10px 16px rgba(10, 29, 79, .35));
+}
+
+.addConfirmTitle {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.3px;
+  word-break: keep-all;
+}
+
+.addConfirmSub {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+
+.addConfirmActions { display: flex; gap: 10px; margin-top: 20px; }
+
+.addConfirmNo,
+.addConfirmYes {
+  flex: 1;
+  height: 48px;
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.addConfirmNo {
+  border: 1.5px solid #dfe3ec;
+  background: #fff;
+  color: var(--navy-text);
+}
+
+.addConfirmYes {
+  border: none;
+  background: linear-gradient(90deg, #2F6BFF, #6ea6ff);
+  color: #fff;
+}
+
+/* 하단 버튼 */
+.primaryBtn {
+  margin: 22px 24px 40px;
+  width: calc(100% - 48px);
+  height: 56px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #2F6BFF, #6ea6ff);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 14px 28px -10px rgba(47, 107, 255, .6);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.primaryBtn.pinToBottom { margin-top: auto; }
+
+.primaryBtn:disabled {
+  background: rgba(255, 255, 255, .08);
+  color: rgba(255, 255, 255, .4);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* 약관 */
+.termsIntro { padding: 22px 24px 0; flex: none; }
+
+.termsTitle {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.4;
+  letter-spacing: -.5px;
+}
+
+.termsSub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, .55);
+  margin-top: 12px;
+  line-height: 1.55;
+}
+
+.termsCard {
+  margin: 22px 24px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+.termsSwatch {
+  width: 76px;
+  height: 44px;
+  flex: none;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.termsCardLabel { font-size: 11px; color: rgba(255, 255, 255, .5); }
+.termsCardName { font-size: 14.5px; font-weight: 700; color: #fff; margin-top: 1px; }
+
+.allRow {
+  margin: 16px 24px 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(47, 107, 255, .12);
+  border: 1px solid rgba(47, 107, 255, .3);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 48px);
+  flex: none;
+}
+
+.allText { font-size: 15px; font-weight: 700; color: #fff; }
+
+.termsList { margin: 14px 24px 0; display: flex; flex-direction: column; flex: none; }
+
+.termRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 2px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.termName { flex: 1; font-size: 14px; color: rgba(255, 255, 255, .85); }
+.termReq { color: var(--blue-light); }
+.termOpt { color: rgba(255, 255, 255, .45); }
+.termChevron { color: rgba(255, 255, 255, .3); font-size: 16px; }
+
+.check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: transparent;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, .28);
+}
+
+.check.on {
+  color: #fff;
+  background: linear-gradient(135deg, #2F6BFF, #5b9dff);
+  border: none;
+}
+
+.check.big { width: 24px; height: 24px; font-size: 13px; border-color: rgba(255, 255, 255, .4); }
+
+/* 완료 */
+.doneScreen { align-items: center; padding: 0 24px; }
+
+.doneBadge {
+  margin-top: 78px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2F6BFF, #5b9dff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #fff;
+  box-shadow: 0 12px 26px -8px rgba(47, 107, 255, .6);
+  --pk-dur: .4s;
+  flex: none;
+}
+
+.doneTitle { margin-top: 20px; font-size: 24px; font-weight: 800; color: #fff; flex: none; }
+
+.doneSub {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, .6);
+  text-align: center;
+  line-height: 1.5;
+  flex: none;
+}
+
+.doneCard {
+  margin-top: 24px;
+  width: 100%;
+  aspect-ratio: 1107 / 622;
+  flex: none;
+}
+
+.doneCardImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, .5));
+}
+
+.doneCardMeta {
+  margin-top: 12px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .6);
+  flex: none;
+}
+
+.doneFacts {
+  margin-top: 20px;
+  width: 100%;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 14px;
+  padding: 4px 16px;
+  flex: none;
+}
+
+.doneFact {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  font-size: 13px;
+}
+
+.doneFact:last-child { border-bottom: none; }
+.doneFactLabel { color: rgba(255, 255, 255, .5); }
+.doneFactValue { color: #fff; font-weight: 600; }
+
+.doneBtn {
+  margin-top: 24px;
+  width: 100%;
+  height: 54px;
+  border: none;
+  border-radius: 15px;
+  background: linear-gradient(90deg, #2F6BFF, #6ea6ff);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  flex: none;
+}
+
+.doneGhostBtn {
+  margin: 10px 0 40px;
+  width: 100%;
+  height: 54px;
+  border: 1.5px solid rgba(255, 255, 255, .15);
+  border-radius: 15px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  flex: none;
+}
