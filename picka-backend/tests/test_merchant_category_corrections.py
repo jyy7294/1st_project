@@ -1,7 +1,11 @@
 import unittest
 
 from app.models import MerchantAlias, Transaction
-from app.services.spending_report_service import transaction_report_category
+from app.services.spending_report_service import (
+    REPORT_CATEGORY_ORDER,
+    report_category,
+    transaction_report_category,
+)
 from app.services.user_state_adapter import resolve_category_from_aliases
 
 
@@ -29,6 +33,39 @@ class MerchantCategoryCorrectionTest(unittest.TestCase):
             "생활비",
         )
 
+    def test_report_categories_match_frontend_buckets(self):
+        expected = {
+            "카페/디저트": "카페",
+            "뷰티/피트니스": "뷰티/피트니스",
+            "병원/약국": "의료/건강",
+            "교육/육아": "교육",
+            "여행/숙박": "여행",
+            "항공/마일리지": "여행",
+            "공항서비스": "여행",
+            "간편결제": "기타",
+        }
+
+        self.assertEqual(
+            REPORT_CATEGORY_ORDER,
+            [
+                "식비",
+                "카페",
+                "쇼핑",
+                "뷰티/피트니스",
+                "생활비",
+                "의료/건강",
+                "교육",
+                "교통",
+                "주유",
+                "문화",
+                "여행",
+                "기타",
+            ],
+        )
+        for source, bucket in expected.items():
+            with self.subTest(source=source):
+                self.assertEqual(report_category(source), bucket)
+
     def test_report_category_falls_back_to_benefit_category(self):
         alias = MerchantAlias(
             id=1,
@@ -45,7 +82,7 @@ class MerchantCategoryCorrectionTest(unittest.TestCase):
 
         self.assertEqual(
             transaction_report_category(transaction, [alias]),
-            "생활비",
+            "의료/건강",
         )
 
     def test_fuel_is_not_merged_into_transport(self):

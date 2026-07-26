@@ -7,6 +7,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -852,7 +853,26 @@ def get_daily_card_recommendations(
             snapshot.check_result = check_result
             snapshot.policy_version = RECOMMENDATION_POLICY_VERSION
             snapshot.generated_at = datetime.now(timezone.utc)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Another request may create today's per-user snapshot after our
+            # initial SELECT but before INSERT. Reuse that row instead of
+            # failing the recommendation request on the unique constraint.
+            db.rollback()
+            snapshot = db.scalar(
+                select(CardRecommendationSnapshot).where(
+                    CardRecommendationSnapshot.user_id == user_id,
+                    CardRecommendationSnapshot.analysis_date == analysis_date,
+                )
+            )
+            if snapshot is None:
+                raise
+            snapshot.credit_result = credit_result
+            snapshot.check_result = check_result
+            snapshot.policy_version = RECOMMENDATION_POLICY_VERSION
+            snapshot.generated_at = datetime.now(timezone.utc)
+            db.commit()
         db.refresh(snapshot)
         cached = False
     else:

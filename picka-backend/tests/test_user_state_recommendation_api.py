@@ -484,7 +484,7 @@ class UserStateRecommendationApiTest(unittest.TestCase):
         self.assertEqual(categories["생활비"], 30_000)
         self.assertEqual(categories["교통"], 0)
         self.assertEqual(categories["주유"], 40_000)
-        self.assertEqual(len(body["categories"]), 7)
+        self.assertEqual(len(body["categories"]), 12)
 
     def test_card_transaction_history_is_filtered_and_newest_first(self):
         first = self._transaction_request(
