@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state/AppContext.jsx'
 import { A } from '../state/appReducer.js'
-import { MERCHANTS } from '../data/merchants.js'
+import { pickMerchantForCards } from '../data/merchants.js'
 import PickaMark from '../components/PickaMark.jsx'
 import QrCode from '../components/QrCode.jsx'
 import styles from './QrScreen.module.css'
@@ -30,12 +30,8 @@ function makeToken() {
   return out
 }
 
-function pickMerchant() {
-  return MERCHANTS[Math.floor(Math.random() * MERCHANTS.length)]
-}
-
 export default function QrScreen() {
-  const { dispatch } = useApp()
+  const { state, dispatch } = useApp()
   const [seconds, setSeconds] = useState(QR_LIFETIME_SEC)
   // seed: QR 이미지 번갈아 표시(1↔2)용. token: 표시용 인식번호(새로고침마다 랜덤).
   const [seed, setSeed] = useState(1)
@@ -82,7 +78,8 @@ export default function QrScreen() {
   // 여러 번 눌러도 인식은 한 번만 시작됩니다.
   function recognize() {
     if (recognizing || expired) return
-    pendingTx.current = pickMerchant()
+    // 보유 카드(페르소나) 혜택 업종에 맞는 결제처를 골라, 결제하면 혜택이 걸리도록 합니다.
+    pendingTx.current = pickMerchantForCards(state.cards)
     setRecognizing(true)
   }
 

@@ -23,6 +23,7 @@ const STYLE_BY_CATEGORY = {
   // 생활 · 쇼핑
   '마트/쇼핑': { icon: '🛒', tint: CREAM },
   온라인쇼핑: { icon: '📦', tint: CREAM },
+  백화점: { icon: '🛍️', tint: PINK },
   편의점: { icon: '🏪', tint: CREAM },
   생활: { icon: '🏠', tint: MINT },
   '공과금/생활요금': { icon: '🧾', tint: BLUE },
@@ -80,6 +81,15 @@ const STYLE_BY_CATEGORY = {
 
 const DEFAULT_STYLE = { icon: '✦', tint: GRAY }
 
+/**
+ * 카테고리 → 표시 아이콘·배경색. 혜택 목록·결제내역이 같은 표기를 쓰도록
+ * 이 한 곳에서 정합니다. 모르는 카테고리는 중립 아이콘으로 떨어집니다.
+ * @returns {{ icon: string, tint: string }}
+ */
+export function categoryStyle(category) {
+  return STYLE_BY_CATEGORY[category] || DEFAULT_STYLE
+}
+
 /** 만원 단위가 딱 떨어지면 '30만원', 아니면 '350,000원'으로 씁니다. */
 function moneyShort(won) {
   if (won >= 10000 && won % 10000 === 0) return `${won / 10000}만원`
@@ -97,6 +107,27 @@ function moneyShort(won) {
  */
 export function benefitView(benefit) {
   const style = STYLE_BY_CATEGORY[benefit.category] || DEFAULT_STYLE
+
+  /*
+   * '유의사항'은 실제 업종·혜택이 아니라 "카드사 조건을 확인하라"는 안내성 자리표시
+   * 데이터입니다. 이걸 제목에 그대로 쓰면 '유의사항 1% 무이자할부'처럼 되어, 아래
+   * '유의사항' 섹션 라벨과 겹쳐 무엇을 확인하라는 건지 헷갈립니다.
+   * 그래서 뜻이 분명한 안내 문구로 바꿔, 알려주려는 바(조건 확인 필요)를 명확히 합니다.
+   */
+  if (benefit.category === '유의사항') {
+    return {
+      id: benefit.id,
+      icon: style.icon,
+      tint: style.tint,
+      title: '혜택 조건 확인 필요',
+      rate: '',
+      desc: '적용 조건·한도는 카드사 안내를 확인하세요',
+      limitText: '한도 없음',
+      conditionText: '실적 무관',
+      notes: ['혜택마다 적용 조건·한도가 다를 수 있어요. 카드사 상세 안내를 확인하세요.'],
+    }
+  }
+
   const where = benefit.detail || benefit.category
 
   /*

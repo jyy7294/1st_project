@@ -6,6 +6,7 @@ import { cardImage } from '../../data/cardImages.js'
 import CardArt from '../../components/CardArt.jsx'
 import { krw, krwMinus } from '../../utils/format.js'
 import ServiceNotice from './ServiceNotice.jsx'
+import ShieldCheck from './ShieldCheck.jsx'
 import shared from './payShared.module.css'
 import styles from './PayConfirm.module.css'
 
@@ -46,9 +47,7 @@ export default function PayConfirm() {
 
       <div className={styles.shieldWrap}>
         <div className={styles.shield}>
-          <div className={styles.shieldRing} />
-          <div className={`${styles.shieldGlow} pk-anim-ring`} />
-          <div className={styles.shieldCore}>🛡️</div>
+          <ShieldCheck size={72} />
         </div>
         <div>
           <div className={styles.shieldTitle}>안전한 결제 환경</div>

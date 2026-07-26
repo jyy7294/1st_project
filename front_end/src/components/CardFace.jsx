@@ -42,7 +42,7 @@ export default function CardFace({
       ].join(' ')}
       style={{ background }}
     >
-      {image && <CardArt src={image} frame="landscape" />}
+      {image && <CardArt src={image} frame="landscape" fill={Boolean(card.image_url)} />}
 
       {/* 얹을 글자가 있을 때만 막을 깝니다. 아무것도 없으면 사진 그대로. */}
       {(showStats || showNumber) && <span className={styles.scrim} aria-hidden="true" />}

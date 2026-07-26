@@ -145,12 +145,34 @@
 .figure {
   display: flex;
   justify-content: space-between;
+  /* 값이 여러 줄이 돼도 라벨은 맨 윗줄에 고정되도록 위 정렬 */
+  align-items: flex-start;
+  gap: 14px;
   margin-top: 8px;
   font-size: 13px;
 }
 
 .figure + .figure { margin-top: 5px; }
-.figureLabel { color: var(--text-3); }
+
+/* 라벨("연회비"·"주요 혜택")은 절대 쪼개지지 않게 */
+.figureLabel {
+  color: var(--text-3);
+  flex: none;
+  white-space: nowrap;
+}
+
+/* 값은 남는 폭을 쓰되, 한글은 단어 중간에서 끊지 않고(keep-all)
+   데이터에 넣어둔 의도된 줄바꿈(\n)은 그대로 살립니다(pre-line). */
+.figureValue,
+.figureCash {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  word-break: keep-all;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
 .figureValue { color: var(--navy-text); }
 .figureCash { color: var(--teal-deep); font-weight: 700; }
 

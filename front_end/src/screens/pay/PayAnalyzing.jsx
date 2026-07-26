@@ -77,8 +77,10 @@ export default function PayAnalyzing() {
           <div className={`${styles.ring1} pk-anim-ring`} />
           <div className={`${styles.ring2} pk-anim-ring`} />
           <div className={`${styles.spin} pk-anim-spin pk-reduced-loading`} />
-          {/* 아이콘은 돌리지 않고 미세한 상하 움직임만 줍니다. 회전은 바깥 링이 맡습니다. */}
-          <div className={`${styles.core} pk-anim-float`}>🧠</div>
+          {/* 마스코트는 돌리지 않고 미세한 상하 움직임만 줍니다. 회전은 바깥 링이 맡습니다. */}
+          <div className={`${styles.core} pk-anim-float`}>
+            <img className={styles.coreImg} src="/assets/picka-robo.png" alt="" />
+          </div>
         </div>
       </div>
 

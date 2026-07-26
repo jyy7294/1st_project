@@ -148,7 +148,7 @@ export default function PayRecommend() {
 
         {mustSelect && !error && (
           <div className={styles.notice}>
-            <div className={styles.noticeIcon}>💡</div>
+            <div className={styles.noticeIcon} aria-hidden="true">!</div>
             <div className={styles.noticeTitle}>이 업종에 해당하는 혜택 카드가 없어요</div>
             <div className={styles.noticeBody}>
               {category} 업종에 적용되는 혜택이 없습니다.
@@ -234,7 +234,6 @@ export default function PayRecommend() {
             )}
 
             <div className={styles.reason}>
-              <span style={{ fontSize: 15 }}>💡</span>
               <span className={styles.reasonText}>
                 추천 이유 · {performanceOnly ? PERFORMANCE_REASON : chosen.reason}
               </span>

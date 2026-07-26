@@ -4,6 +4,7 @@ import { A } from '../../state/appReducer.js'
 import { payWithCard } from '../../api/picka.js'
 import { orderedComparison } from '../../utils/compare.js'
 import { krw } from '../../utils/format.js'
+import LockIcon from './LockIcon.jsx'
 import styles from './PayApproving.module.css'
 
 const APPROVE_MS = 4000
@@ -45,16 +46,15 @@ export default function PayApproving() {
       </div>
 
       <div className={styles.orb} role="status" aria-live="polite">
-        <div className={styles.ring} />
-        <div className={`${styles.glow} pk-anim-ring`} />
-        <div className={`${styles.spin} pk-anim-spin pk-reduced-loading`} />
-        <div className={`${styles.core} pk-anim-corepulse`}>🔐</div>
+        <div className={`${styles.icon} pk-anim-float`}>
+          <LockIcon size={84} />
+        </div>
       </div>
 
       <div className={styles.head}>
         <div className={styles.headTitle}>카드 승인 중</div>
         <div className={styles.headSub}>
-          은행 서버와 안전하게 연결하여
+          카드사 서버와 안전하게 연결하여
           <br />
           결제 승인을 요청하고 있습니다.
         </div>
@@ -62,12 +62,12 @@ export default function PayApproving() {
 
       <div className={styles.panel}>
         <div className={styles.row}>
-          <span className={styles.rowLabel}>Merchant</span>
+          <span className={styles.rowLabel}>가맹점</span>
           <span className={styles.rowValue}>{state.transaction?.merchant_name}</span>
         </div>
         <div className={styles.row}>
-          <span className={styles.rowLabel}>Amount</span>
-          <span className={styles.rowValue}>₩{krw(final)}</span>
+          <span className={styles.rowLabel}>결제 금액</span>
+          <span className={styles.rowValue}>{krw(final)}원</span>
         </div>
         <div className={styles.barTrack}>
           <div className={`${styles.barFill} pk-anim-grow`} />
@@ -76,7 +76,7 @@ export default function PayApproving() {
 
       <div className={styles.foot}>
         <span>✦</span>
-        AI is verifying transaction safety…
+        카드사 보안 채널로 안전하게 처리하고 있어요
       </div>
     </div>
   )

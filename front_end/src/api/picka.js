@@ -58,6 +58,8 @@ export async function fetchCardDetail(userId, cardId, { limit = 20 } = {}) {
  * @returns {Promise<{meta: object, cards: Array}>}
  */
 export async function fetchCardRecommendations(userId, type, limit = 3) {
+  // 백엔드가 혜택금액 기준 정렬 + 0원 카드 제외를 정확히 처리하므로,
+  // 프론트는 응답 순서를 그대로 신뢰합니다. (이전의 프론트 재정렬 임시보정 제거)
   const data = await request(
     `/api/v1/users/${userId}/card-recommendations?type=${type}&limit=${limit}`,
   )

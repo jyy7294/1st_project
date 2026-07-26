@@ -9,7 +9,12 @@ import {
   RECO_CATEGORY_SPLIT,
   RECO_NOTICE,
 } from '../data/recommend.js'
-import { selectRecoCard, benefitText, findMainBenefit } from '../utils/recommend.js'
+import {
+  selectRecoCard,
+  benefitText,
+  findMainBenefit,
+  findCategoryBenefit,
+} from '../utils/recommend.js'
 import { benefitsForRecoCard } from '../data/recommendBenefits.js'
 import { benefitView } from '../utils/benefit.js'
 import { buildDonut, buildSpendingMix } from '../utils/report.js'
@@ -63,8 +68,8 @@ export default function RecommendDetail() {
 
   if (!card) return null
 
-  // 광고 배너(소비패턴) 추천은 백엔드 분석 결과를, 결제 업종 추천은 정적 데이터를 씁니다.
-  const fromSpending = !state.recoCategory
+  // 홈 배너·결제 후 광고 탭 모두 백엔드 소비패턴 추천을 쓰므로 항상 소비 기반으로 표시합니다.
+  const fromSpending = true
   const meta = state.recoMeta
 
   // 대표 혜택 문구 — 단위(%/원)를 보고 만들어 정액 혜택에 %가 붙지 않게 합니다.
@@ -156,8 +161,16 @@ export default function RecommendDetail() {
           </div>
         ) : (
           <div className={styles.figure}>
-            <span className={styles.figureLabel}>{state.recoCategory || '주요'} 혜택</span>
-            <span className={styles.figureCash}>{mainBenefitText}</span>
+            <span className={styles.figureLabel}>
+              {state.recoCategory || card.benefitCategory || '주요'} 혜택
+            </span>
+            <span className={styles.figureCash}>
+              {benefitText(
+                (state.recoCategory && findCategoryBenefit(card, state.recoCategory)) ||
+                  findMainBenefit(card),
+                card,
+              )}
+            </span>
           </div>
         )}
       </div>

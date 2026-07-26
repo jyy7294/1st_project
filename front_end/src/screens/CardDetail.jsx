@@ -346,7 +346,7 @@ export default function CardDetail() {
       <div className={styles.txPanel}>
         {recent.map((t) => (
           <div key={t.id} className={styles.txRow}>
-            <div className={styles.icon} style={{ background: '#f4f6fa' }}>
+            <div className={styles.icon} style={{ background: t.tint || '#f4f6fa' }}>
               {t.icon}
             </div>
             <div className={styles.txBody}>

@@ -27,13 +27,18 @@
 /* 가운데에 QR 을 살짝 넘어서 한 번 찍히고 사라지는 빨간 레이저 (애니메이션은 pk-anim-qrscan) */
 .scanLine {
   position: absolute;
-  left: -6%;
+  /* QR 좌우로 넘어가도록 레이저를 길게 뺍니다(매장 리더기 느낌). */
+  left: -16%;
   top: 50%;
-  width: 112%;
+  width: 132%;
   height: 3px;
   border-radius: 3px;
   background: #ff4d5a;
-  box-shadow: 0 0 12px 1px #ff4d5a;
+  /* 실제 리더기 빛처럼 심지(밝은 코어)에서 바깥으로 부드럽게 번지도록 3겹 글로우. */
+  box-shadow:
+    0 0 10px 2px #ff6470,
+    0 0 24px 5px rgba(255, 77, 90, 0.85),
+    0 0 46px 12px rgba(255, 77, 90, 0.5);
   transform: translateY(-50%);
   transform-origin: center;
   pointer-events: none;

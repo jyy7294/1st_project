@@ -42,15 +42,20 @@
 }
 
 .core {
-  width: 74px;
-  height: 74px;
-  border-radius: 50%;
-  background: linear-gradient(140deg, #16294f, #0c1a3a);
+  width: 104px;
+  height: 104px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
   --pk-dur: 2.4s;
+}
+
+/* 마스코트는 배경 원 없이 링 안에 떠 있고, 자체 발광에 맞춰 옅은 파란 그림자를 줍니다. */
+.coreImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 14px rgba(90, 140, 255, .4));
 }
 
 .head { text-align: center; margin-top: 22px; }

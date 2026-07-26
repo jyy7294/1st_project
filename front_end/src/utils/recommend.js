@@ -72,6 +72,44 @@ export function findMainBenefit(card) {
 }
 
 /**
+ * 카드가 그 업종(예: '카페/디저트')에서 주는 대표 혜택을 benefits[] 에서 찾습니다.
+ * 같은 업종 혜택이 여럿이면 할인율(값)이 가장 큰 것을 씁니다. 없으면 null.
+ */
+export function findCategoryBenefit(card, category) {
+  const list = Array.isArray(card?.benefits) ? card.benefits : []
+  const matches = list.filter(
+    (b) => b.category === category && b.value !== null && b.value !== undefined,
+  )
+  if (!matches.length) return null
+  return matches.reduce((best, b) => (Number(b.value) > Number(best.value) ? b : best))
+}
+
+/**
+ * 결제 업종(예: 카페/디저트) 추천용 정렬.
+ *
+ * 그 업종 혜택이 있는 카드를 앞에 세우고(업종 할인율 높은 순), 그런 카드가 3장이 안 되면
+ * 나머지는 연간 총 혜택 순으로 뒤에 채워 목록이 비지 않게 합니다.
+ * (업종 혜택이 없는 카드는 화면에서 '주요 혜택'으로 라벨이 바뀝니다.)
+ * 연간 총 혜택 값 자체는 그대로(사용자 전체 소비 기준) 씁니다.
+ */
+export function rankByCategoryBenefit(cards, category) {
+  return (cards || [])
+    .map((card) => ({ card, ben: findCategoryBenefit(card, category) }))
+    .sort((a, b) => {
+      if (a.ben && b.ben) {
+        return (
+          Number(b.ben.value) - Number(a.ben.value) ||
+          (b.card.total || 0) - (a.card.total || 0)
+        )
+      }
+      if (a.ben) return -1
+      if (b.ben) return 1
+      return (b.card.total || 0) - (a.card.total || 0)
+    })
+    .map((x) => x.card)
+}
+
+/**
  * 백엔드 소비패턴 추천 카드(card-recommendations 응답) → 화면 모양.
  *
  * total 은 연회비를 뺀 순혜택이라, '혜택'(연회비 전)은 total+fee 로 되돌립니다.
@@ -110,9 +148,8 @@ export function adaptApiRecoCard(card, i = 0) {
  * 백엔드에서 받아 state.recoCards 에 담아 둔 목록을 씁니다.
  */
 export function selectRecoList(state) {
-  if (state.recoCategory) {
-    return rankedRecommendations(state.recoType, state.cards, state.recoCategory)
-  }
+  // 홈 배너·결제 후 광고 탭 모두 백엔드 소비패턴 추천(state.recoCards)을 씁니다.
+  // 카테고리는 상단 문구 표시용일 뿐, 추천 카드·연간 혜택 계산에는 관여하지 않습니다.
   return state.recoCards?.[state.recoType] || []
 }
 
@@ -133,9 +170,12 @@ export function selectRecoCard(state) {
  * @param {string|null} category 결제 업종
  */
 export function rankedRecommendations(type, myCards = [], category = null) {
-  const byCategory = category && CATEGORY_CARDS[category]?.[type]
-  if (byCategory?.length) {
-    return byCategory
+  const set = category ? CATEGORY_CARDS[category] : null
+  if (set) {
+    // 이 업종 데이터가 있으면(해당 타입이 비어 있어도) 그 목록만 씁니다.
+    // 비면 빈 목록을 돌려줘 "추천 카드 없음"으로 안내하고, 업종과 무관한
+    // 일반 추천(RECO_CARDS)으로 새지 않게 합니다.
+    return (set[type] || [])
       .filter((card) => !isOwned(card, myCards))
       .map(adaptCategoryCard)
   }

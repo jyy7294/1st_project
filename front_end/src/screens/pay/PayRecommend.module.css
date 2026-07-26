@@ -130,7 +130,21 @@
   text-align: center;
 }
 
-.noticeIcon { font-size: 30px; }
+/* AI스러운 전구 대신, 연한 파란 원 안의 파란 느낌표(안내 아이콘). */
+.noticeIcon {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: rgba(90, 140, 255, .16);
+  color: var(--blue-light, #5b8cff);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .noticeTitle { margin-top: 12px; font-size: 16px; font-weight: 700; color: #fff; }
 .noticeBody { margin-top: 8px; font-size: 13px; color: rgba(255, 255, 255, .55); line-height: 1.5; }
 

@@ -3,11 +3,12 @@ import { useApp } from '../state/AppContext.jsx'
 import CardArt from '../components/CardArt.jsx'
 import { A } from '../state/appReducer.js'
 import {
-  rankedRecommendations,
   adaptApiRecoCard,
   selectRecoList,
   benefitText,
   findMainBenefit,
+  findCategoryBenefit,
+  rankByCategoryBenefit,
 } from '../utils/recommend.js'
 import { fetchCardRecommendations } from '../api/picka.js'
 import { readRecoCache, writeRecoCache } from '../utils/recoCache.js'
@@ -15,6 +16,10 @@ import { krw, krwMinus, feeText } from '../utils/format.js'
 import styles from './Recommend.module.css'
 
 const TYPE_LABEL = { credit: '신용카드', check: '체크카드' }
+
+// 결제 업종(카페 등) 기준으로 다시 정렬하려면 후보를 넉넉히 받아와야 합니다.
+// (백엔드 스냅샷 상한이 20장이라 그만큼 받아 업종 혜택 있는 카드를 추립니다.)
+const POOL_SIZE = 20
 
 /**
  * 소비패턴 분석 카드 추천 순위.
@@ -29,7 +34,10 @@ export default function Recommend() {
   const { recoType, cards, recoCategory: category, recoStatus } = state
 
   const userId = state.user?.userId
-  const isPatternReco = !category && !!userId
+  // 결제 후 광고 탭(카테고리)도 홈 배너와 똑같이 백엔드 소비패턴 추천을 씁니다.
+  // 카드가 주는 연간 혜택은 '그 업종'만이 아니라 사용자 전체 소비 기준의 실제 값입니다.
+  // (category 는 화면 상단 문구 표시용으로만 남깁니다.)
+  const isPatternReco = !!userId
   // 이 탭을 아직 이번 세션 상태에 못 담았으면 데이터가 필요합니다.
   const needsData = isPatternReco && state.recoCards[recoType] === null
 
@@ -57,7 +65,7 @@ export default function Recommend() {
     // 2) 그날 최초 진입 — 백엔드가 실제 추천을 계산합니다(로딩 표시). 성공 시 캐시에 저장.
     let cancelled = false
     dispatch({ type: A.SET_RECO_STATUS, status: 'loading' })
-    fetchCardRecommendations(userId, recoType)
+    fetchCardRecommendations(userId, recoType, POOL_SIZE)
       .then(({ meta, cards: apiCards }) => {
         if (cancelled) return
         const adapted = apiCards.map(adaptApiRecoCard)
@@ -72,9 +80,12 @@ export default function Recommend() {
     }
   }, [needsData, todayCache, userId, recoType, dispatch])
 
+  // 홈 배너: 연간 총 혜택 많은 순 상위 3장.
+  // 결제 후(카테고리): 그 업종 할인율 높은 카드만 골라 정렬한 상위 3장.
+  const pool = selectRecoList(state)
   const list = category
-    ? rankedRecommendations(recoType, cards, category)
-    : selectRecoList(state)
+    ? rankByCategoryBenefit(pool, category).slice(0, 3)
+    : pool.slice(0, 3)
   const top = list[0]
   const rest = list.slice(1)
 
@@ -173,11 +184,11 @@ export default function Recommend() {
 
               <div className={styles.info}>
                 <div className={styles.totalRow}>
-                  <span className={styles.totalLabel}>총 혜택</span>
+                  <span className={styles.totalLabel}>연간 총 혜택</span>
                   <span className={styles.totalValue}>{krw(top.total)}원</span>
                 </div>
 
-                <Figures card={top} />
+                <Figures card={top} category={category} />
 
                 <button
                   type="button"
@@ -217,14 +228,14 @@ export default function Recommend() {
 
             <span className={styles.info}>
               <span className={styles.totalRow}>
-                <span className={styles.totalLabel}>총 혜택</span>
+                <span className={styles.totalLabel}>연간 총 혜택</span>
                 <span className={styles.totalRight}>
                   <span className={styles.totalValueSm}>{krw(card.total)}원</span>
                   <span className={styles.chevron}>›</span>
                 </span>
               </span>
 
-              <Figures card={card} />
+              <Figures card={card} category={category} />
             </span>
           </button>
 
@@ -234,21 +245,21 @@ export default function Recommend() {
 
       <div className={styles.footNote}>
         {category
-          ? `${category} 혜택 기준으로 추천된 ${TYPE_LABEL[recoType]} 순위예요`
+          ? `${category} 할인율 높은 순으로 추천된 ${TYPE_LABEL[recoType]}예요`
           : `내 소비패턴 기반으로 추천된 ${TYPE_LABEL[recoType]} 순위예요`}
       </div>
     </div>
   )
 }
 
-/** 혜택 / 연회비 / 캐시백 3줄. 1위와 나머지가 같은 표기를 씁니다. */
-function Figures({ card }) {
+/**
+ * 연회비 / (캐시백 또는) 주요 혜택 표기. 1위와 나머지가 같은 표기를 씁니다.
+ * 결제 후(카테고리) 진입이면 '주요 혜택' 대신 그 업종 혜택(예: 카페/디저트 30% 할인)을 보여줍니다.
+ */
+function Figures({ card, category }) {
+  const catBenefit = category ? findCategoryBenefit(card, category) : null
   return (
     <>
-      <span className={styles.figure}>
-        <span className={styles.figureLabel}>혜택</span>
-        <span className={styles.figureValue}>{krw(card.benefit)}원</span>
-      </span>
       <span className={styles.figure}>
         <span className={styles.figureLabel}>연회비</span>
         <span className={styles.figureValue}>{feeText(card.fee)}</span>
@@ -260,9 +271,11 @@ function Figures({ card }) {
         </span>
       ) : (
         <span className={styles.figure}>
-          <span className={styles.figureLabel}>주요 혜택</span>
+          <span className={styles.figureLabel}>
+            {catBenefit ? `${category} 혜택` : '주요 혜택'}
+          </span>
           <span className={styles.figureCash}>
-            {benefitText(findMainBenefit(card), card)}
+            {benefitText(catBenefit || findMainBenefit(card), card)}
           </span>
         </span>
       )}

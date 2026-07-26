@@ -10,8 +10,9 @@ import styles from './CardArt.module.css'
  * @param {object} props
  * @param {string} props.src 이미지 주소
  * @param {'landscape'|'portrait'} [props.frame] 이 이미지를 넣을 자리의 방향
+ * @param {boolean} [props.fill] 비율이 달라도 카드 앞면을 늘려서 꽉 채웁니다(잘림 없음).
  */
-export default function CardArt({ src, frame = 'landscape' }) {
+export default function CardArt({ src, frame = 'landscape', fill = false }) {
   const wrapRef = useRef(null)
   const [box, setBox] = useState(null) // 넣을 자리의 크기
   const [portrait, setPortrait] = useState(null) // 이미지가 세로형인지
@@ -43,7 +44,7 @@ export default function CardArt({ src, frame = 'landscape' }) {
         src={src}
         alt=""
         draggable={false}
-        className={`${styles.art} ${rotate ? styles.rotated : ''}`}
+        className={`${styles.art} ${rotate ? styles.rotated : ''} ${fill ? styles.fill : ''}`}
         style={style}
         onLoad={(e) => setPortrait(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)}
         // 이미지를 못 불러오면 아무것도 그리지 않고 배경 그라데이션만 남깁니다.

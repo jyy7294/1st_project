@@ -2,35 +2,26 @@
 // UI 컴포넌트는 그대로 두고, 필드 이름 차이는 전부 여기서 흡수합니다.
 
 import { krw, normalizeBenefitRate } from '../utils/format.js'
+import { categoryStyle } from '../utils/benefit.js'
 
-/** 카테고리별 표시 아이콘. 없는 카테고리는 카드 모양으로 떨어집니다. */
-const CATEGORY_ICON = {
-  카페: '☕',
-  '카페/디저트': '☕',
-  교통: '🚇',
-  대중교통: '🚇',
-  주유: '⛽',
-  편의점: '🏪',
-  '마트/쇼핑': '🛒',
-  온라인쇼핑: '🛒',
-  쇼핑: '🛍️',
-  '푸드/외식': '🍽️',
-  음식점: '🍽️',
-  배달앱: '🛵',
-  '병원/약국': '🏥',
-  '공과금/생활요금': '🧾',
-  공과금: '🧾',
-  통신: '📱',
-  '구독/멤버십': '🎬',
-  영화: '🎬',
-  '여행/항공': '✈️',
-  해외: '✈️',
-  생활: '🏠',
-  모든가맹점: '💳',
+/** 카테고리별 표시 아이콘. 혜택 목록과 같은 촘촘한 맵(categoryStyle)을 씁니다. */
+export function iconForCategory(category) {
+  return categoryStyle(category).icon
 }
 
-export function iconForCategory(category) {
-  return CATEGORY_ICON[category] || '💳'
+/**
+ * 같은 카테고리라도 가맹점 성격이 결이 다르면 아이콘만 따로 줍니다.
+ * (예: 교보문고는 카드사 기준 '영화/문화'로 분류되지만 서점이라 책 아이콘이 자연스럽습니다.)
+ * 배경색은 카테고리 색을 그대로 두어 업종 구분은 유지합니다.
+ */
+const MERCHANT_ICON_OVERRIDE = [
+  { test: /문고|서점|북스|book/i, icon: '📚' },
+]
+
+function transactionStyle(merchantName, category) {
+  const base = categoryStyle(category)
+  const hit = MERCHANT_ICON_OVERRIDE.find((o) => o.test.test(merchantName || ''))
+  return hit ? { ...base, icon: hit.icon } : base
 }
 
 /**
@@ -90,11 +81,14 @@ export function adaptBenefit(benefit) {
  */
 export function adaptTransaction(tx) {
   const category = tx.payment_category || '기타'
+  const style = transactionStyle(tx.merchant_name, category)
   return {
     id: String(tx.transaction_id),
     place: tx.merchant_name || '',
     category,
-    icon: iconForCategory(category),
+    icon: style.icon,
+    // 카테고리별 파스텔 배경 — 결제내역 아이콘이 회색 하나로 뭉치지 않고 업종별로 구분됩니다.
+    tint: style.tint,
     date: formatDate(tx.approved_at),
     amount: tx.original_payment_amount || 0,
     saved: tx.saved_amount ? `할인 ${krw(tx.saved_amount)}원` : '혜택 없음',

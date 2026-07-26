@@ -18,8 +18,11 @@ const DRAG_SLOP = 8
 
 // 카드 폭 360px(화면 404 − 좌우 여백 44)에 실물 카드 비율을 적용한 높이
 const CARD_HEIGHT = Math.round(360 / (85.6 / 54))
-const OFFSET_COLLAPSED = 54 // 접힌 카드 간격
+const OFFSET_COLLAPSED = 54 // 접힌 카드 간격 (최대)
 const OFFSET_EXPANDED = CARD_HEIGHT - 10 // 펼친 카드 간격 (10px 만 겹칩니다)
+// 접힌 스택에서 '겹쳐 보이는 틈'의 총합 상한. 카드가 이보다 많아지면 간격을 좁힙니다.
+// (54 × 6 = 카드 7장까지는 최대 간격 유지, 그 이상이면 줄어듦)
+const MAX_STRIP = OFFSET_COLLAPSED * 6
 
 export default function WalletHome() {
   const { state, dispatch } = useApp()
@@ -117,10 +120,17 @@ export default function WalletHome() {
     }
   }, [dragging, dispatch])
 
+  // 접힌 카드 간격: 카드가 많아지면 좁혀 화면을 넘지 않게 합니다(최대는 현재 간격 54).
+  // 겹쳐 보이는 '틈'의 총합을 MAX_STRIP 이하로 유지 → 카드 7장까지는 54, 그 이상이면 줄어듭니다.
+  const collapsedOffset =
+    cards.length > 1
+      ? Math.min(OFFSET_COLLAPSED, MAX_STRIP / (cards.length - 1))
+      : OFFSET_COLLAPSED
+
   // 드래그 중에는 펼친 간격 → 접힌 간격 사이를 손 위치대로 오갑니다.
   const offset = expanded
-    ? OFFSET_EXPANDED + (OFFSET_COLLAPSED - OFFSET_EXPANDED) * (progress ?? 0)
-    : OFFSET_COLLAPSED
+    ? OFFSET_EXPANDED + (collapsedOffset - OFFSET_EXPANDED) * (progress ?? 0)
+    : collapsedOffset
   const stackHeight = cards.length
     ? (cards.length - 1) * offset + CARD_HEIGHT + 8
     : 0
@@ -338,7 +348,6 @@ export default function WalletHome() {
                 variant="stack"
                 spent={card.spent}
                 benefit={card.benefit}
-                expiry={card.expiry}
                 showStats={cardStatsVisible(state, card)}
               />
             </div>
