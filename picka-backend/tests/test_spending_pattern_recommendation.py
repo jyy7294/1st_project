@@ -146,6 +146,8 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(normalize_spending_category("TUITION"), "교육/육아")
         self.assertEqual(normalize_spending_category("FOOD_DINING"), "푸드/외식")
         self.assertEqual(normalize_spending_category("FUEL"), "주유")
+        self.assertEqual(normalize_spending_category("백화점"), "마트/쇼핑")
+        self.assertEqual(normalize_spending_category("DEPARTMENT_STORE"), "마트/쇼핑")
         self.assertEqual(
             normalize_spending_category("AIRLINE_MILEAGE"),
             "항공/마일리지",
@@ -618,6 +620,74 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         specific = next(card for card in result["cards"] if card["id"] == 5)
         self.assertIn("테스트 마트", specific["matchedMerchants"])
         self.assertEqual(specific["benefitName"], "테스트 마트 20% 할인")
+
+    def test_unrelated_benefit_is_not_matched_from_full_source_detail(self):
+        with self.Session() as db:
+            card = Card(
+                id=12,
+                card_name="백화점 정상 매칭 카드",
+                card_type="신용카드",
+                annual_fee=0,
+                previous_spending=0,
+                is_active=True,
+            )
+            db.add(card)
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=12,
+                    source_benefit_id="12-1",
+                    benefit_name="롯데 자이언츠 20% 할인",
+                    category="테마파크/레저",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=20,
+                    source_detail="카드 전체 안내: 롯데백화점 이용 안내 포함",
+                    additional_conditions={
+                        "merchant_list": "롯데 자이언츠",
+                        "scoring_grade": "A_확정계산",
+                    },
+                ),
+                CardBenefit(
+                    card_id=12,
+                    source_benefit_id="12-2",
+                    benefit_name="쇼핑 5% 할인",
+                    category="마트/쇼핑",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=5,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            db.add(Transaction(
+                user_id=1,
+                user_card_id=owned.id,
+                card_id=1,
+                merchant_name="롯데백화점",
+                payment_category="백화점",
+                original_payment_amount=100_000,
+                saved_amount=0,
+                final_approved_amount=100_000,
+                approval_number="DEPARTMENT-STORE-MATCH",
+                status="APPROVED",
+                usage_month="2026-06",
+                approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        recommended = next(card for card in result["cards"] if card["id"] == 12)
+        self.assertEqual(recommended["benefitCategory"], "마트/쇼핑")
+        self.assertEqual(recommended["benefitName"], "쇼핑 5% 할인")
+        self.assertEqual(recommended["benefitValue"], 5)
 
 
 if __name__ == "__main__":

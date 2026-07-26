@@ -328,12 +328,14 @@ def _normalize_search_text(value: str | None) -> str:
 
 def _benefit_search_text(benefit: Any) -> str:
     conditions = benefit.additional_conditions or {}
+    # source_detail/exception_text often contain a card's entire guide rather
+    # than text scoped to this benefit row. Searching those fields can credit
+    # an unrelated benefit merely because another merchant appears elsewhere
+    # in the guide (for example 롯데 자이언츠 -> 롯데백화점).
     values = [
         benefit.benefit_name,
         benefit.source_summary,
-        benefit.source_detail,
         benefit.condition_text,
-        benefit.exception_text,
         conditions.get("merchant_list"),
         conditions.get("category_list"),
     ]
