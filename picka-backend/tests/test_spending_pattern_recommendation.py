@@ -226,6 +226,88 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(benefit["value"], 10)
         self.assertEqual(benefit["unit"], "%")
         self.assertEqual(benefit["monthlyLimit"], 10_000)
+        self.assertIsNone(result["cards"][0]["categoryBenefit"])
+        self.assertIsNone(result["requestedCategory"])
+
+    def test_category_recommendation_scans_full_pool_and_sorts_by_category_benefit(self):
+        with self.Session() as db:
+            db.add_all([
+                Card(
+                    id=10,
+                    card_name="영화 정액 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+                Card(
+                    id=11,
+                    card_name="영화 비율 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+            ])
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=10,
+                    source_benefit_id="10-1",
+                    benefit_name="영화 8천원 할인",
+                    category="영화/문화",
+                    benefit_type="할인",
+                    benefit_unit="원",
+                    benefit_value=8_000,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=11,
+                    source_benefit_id="11-1",
+                    benefit_name="영화 10% 할인",
+                    category="영화/문화",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=10,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                category="MOVIE",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertEqual(result["requestedCategory"], "영화/문화")
+        self.assertEqual([card["id"] for card in result["cards"]], [11, 10])
+        self.assertTrue(all(
+            card["categoryBenefit"]["category"] == "영화/문화"
+            for card in result["cards"]
+        ))
+        self.assertEqual(
+            result["cards"][0]["categoryBenefit"]["expectedAnnualBenefit"],
+            120_000,
+        )
+        # 전체 소비에 영화 이력이 없어도 업종 추천에는 포함되고,
+        # 전체 소비 기준 total은 기존 의미대로 유지된다.
+        self.assertEqual(result["cards"][0]["total"], 0)
+
+        response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "category": "MOVIE", "limit": 3},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["requestedCategory"], "영화/문화")
+        self.assertFalse(response.json()["cached"])
+        self.assertEqual(
+            [card["id"] for card in response.json()["cards"]],
+            [11, 10],
+        )
 
     def test_cached_recommendation_drops_card_deactivated_after_snapshot(self):
         first = self.client.get(
@@ -347,7 +429,7 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
                 "benefit",
                 "fee", "url", "image_url", "benefitCategory", "monthlySpend",
                 "recommendationMessage", "matchedMerchants",
-                "benefits",
+                "benefits", "categoryBenefit",
             },
         )
         self.assertEqual(

@@ -507,6 +507,7 @@ def recommend_new_cards_by_spending(
     card_type: str,
     limit: int,
     reference_date: date | None = None,
+    category: str | None = None,
 ) -> dict[str, Any]:
     if db.get(User, user_id) is None:
         raise SpendingRecommendationUserNotFoundError(
@@ -530,6 +531,11 @@ def recommend_new_cards_by_spending(
         reference_date=reference_date,
     )
     monthly_spending = sum(profile.values())
+    requested_category = normalize_spending_category(category)
+    requested_category_spend = (
+        profile.get(requested_category, 0) or 100_000
+        if requested_category else 0
+    )
     top_category = primary_category
     top_category_spend = profile.get(primary_category, 0) if primary_category else 0
     owned_card_ids = select(UserCard.card_id).where(UserCard.user_id == user_id)
@@ -600,6 +606,15 @@ def recommend_new_cards_by_spending(
                     },
                 )
                 bucket["cardBenefitIds"].append(benefit_item.id)
+
+        category_benefits = [
+            benefit
+            for benefit in eligible_benefits
+            if requested_category is not None
+            and normalize_spending_category(benefit.category) == requested_category
+        ]
+        if requested_category is not None and not category_benefits:
+            continue
 
         state = {
             **_candidate_state(card, monthly_spending),
@@ -724,6 +739,47 @@ def recommend_new_cards_by_spending(
 
         fee = max(int(card.annual_fee or 0), 0)
         annual_total = max(monthly_total * 12 - fee, 0)
+        category_benefit = None
+        if requested_category is not None:
+            category_calculation = calculate_card_benefit(
+                {
+                    **state,
+                    "benefits": category_benefits,
+                },
+                payment_category=requested_category,
+                payment_amount=requested_category_spend,
+                include_reward_benefits=True,
+            )
+            category_amount = int(
+                category_calculation.get("expected_benefit", 0) or 0
+            )
+            category_frequency = _fixed_benefit_frequency(
+                category_calculation.get("benefit_unit"),
+                category_frequencies.get(requested_category),
+            )
+            category_monthly_benefit = int(category_amount * category_frequency)
+            category_monthly_limit = category_calculation.get("monthly_limit")
+            if category_monthly_limit is not None:
+                category_monthly_benefit = min(
+                    category_monthly_benefit,
+                    max(int(category_monthly_limit), 0),
+                )
+            category_benefit = {
+                "category": requested_category,
+                "name": str(
+                    category_calculation.get("benefit_name")
+                    or f"{requested_category} 혜택"
+                ),
+                "value": float(category_calculation.get("benefit_rate") or 0),
+                "unit": (
+                    "원"
+                    if category_calculation.get("benefit_unit") == "KRW"
+                    else category_calculation.get("benefit_unit")
+                ),
+                "expectedMonthlyBenefit": category_monthly_benefit,
+                "expectedAnnualBenefit": category_monthly_benefit * 12,
+                "monthlySpend": requested_category_spend,
+            }
         best = best_category_result or {
             "name": "적용 가능한 혜택 없음",
             "rate": 0,
@@ -770,23 +826,38 @@ def recommend_new_cards_by_spending(
                 _benefit_response(benefit)
                 for benefit in eligible_benefits
             ],
+            "categoryBenefit": category_benefit,
         })
 
-    # 금액으로 검증된 혜택이 없는 카드는 추천 순위에서 제외한다.
-    # 자격 확인이 필요한 카드는 confirmationRequired 계열 응답에 남는다.
-    results = [item for item in results if item["total"] > 0]
-    results.sort(key=lambda item: (
-        -item["total"],
-        item.get("benefitCategory") != primary_category,
-        item["fee"],
-        item["id"],
-    ))
+    if requested_category is not None:
+        # 업종 추천은 전체 추천 상위 풀을 재정렬하지 않는다. 해당 업종에서
+        # 실제 계산 가능한 혜택이 있는 카드만 업종 예상혜택 순으로 뽑는다.
+        results = [
+            item for item in results
+            if item["categoryBenefit"]["expectedAnnualBenefit"] > 0
+        ]
+        results.sort(key=lambda item: (
+            -item["categoryBenefit"]["expectedAnnualBenefit"],
+            -item["total"],
+            item["fee"],
+            item["id"],
+        ))
+    else:
+        # 금액으로 검증된 혜택이 없는 카드는 전체 추천 순위에서 제외한다.
+        results = [item for item in results if item["total"] > 0]
+        results.sort(key=lambda item: (
+            -item["total"],
+            item.get("benefitCategory") != primary_category,
+            item["fee"],
+            item["id"],
+        ))
     return {
         "analysisStartDate": analysis_start.isoformat(),
         "analysisEndDate": analysis_end.isoformat(),
         "updateCycle": "daily 00:00 Asia/Seoul · rolling 30d 50%/30d 30%/30d 20%",
         "topCategory": top_category,
         "topCategorySpend": top_category_spend,
+        "requestedCategory": requested_category,
         "topMerchants": [
             {
                 "name": item["canonical_merchant"],
@@ -812,8 +883,22 @@ def get_daily_card_recommendations(
     card_type: str,
     limit: int,
     force_refresh: bool = False,
+    category: str | None = None,
 ) -> dict[str, Any]:
     analysis_date = datetime.now(ZoneInfo("Asia/Seoul")).date()
+    if category is not None:
+        payload = recommend_new_cards_by_spending(
+            db,
+            user_id=user_id,
+            card_type=card_type,
+            limit=limit,
+            reference_date=analysis_date,
+            category=category,
+        )
+        payload["cached"] = False
+        payload["generatedAt"] = datetime.now(timezone.utc).isoformat()
+        payload["policyVersion"] = RECOMMENDATION_POLICY_VERSION
+        return payload
     snapshot = db.scalar(
         select(CardRecommendationSnapshot).where(
             CardRecommendationSnapshot.user_id == user_id,

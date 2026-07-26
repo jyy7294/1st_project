@@ -1,6 +1,16 @@
 from pydantic import BaseModel
 
 
+class SpendingPatternCategoryBenefitResponse(BaseModel):
+    category: str
+    name: str
+    value: float
+    unit: str | None
+    expectedMonthlyBenefit: int
+    expectedAnnualBenefit: int
+    monthlySpend: int
+
+
 class SpendingPatternCardResponse(BaseModel):
     id: int
     name: str
@@ -20,6 +30,7 @@ class SpendingPatternCardResponse(BaseModel):
     recommendationMessage: str
     matchedMerchants: list[str]
     benefits: list["SpendingPatternBenefitResponse"]
+    categoryBenefit: SpendingPatternCategoryBenefitResponse | None = None
 
 
 class SpendingPatternBenefitResponse(BaseModel):
@@ -78,3 +89,4 @@ class SpendingPatternRecommendationResponse(BaseModel):
     cached: bool
     generatedAt: str
     policyVersion: str
+    requestedCategory: str | None = None

@@ -1849,6 +1849,7 @@ def get_spending_pattern_card_recommendations(
     ] = "credit",
     limit: Annotated[int, Query(ge=1, le=20)] = 3,
     refresh: Annotated[bool, Query()] = False,
+    category: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
 ):
     require_user_access(user_id, current_user)
     try:
@@ -1858,12 +1859,18 @@ def get_spending_pattern_card_recommendations(
             card_type=card_type,
             limit=limit,
             force_refresh=refresh,
+            category=category,
         )
         save_recommendation_audit(
             db,
             user_id=user_id,
             request_kind="NEW_CARD_SPENDING_PATTERN",
-            input_payload={"card_type": card_type, "limit": limit, "refresh": refresh},
+            input_payload={
+                "card_type": card_type,
+                "limit": limit,
+                "refresh": refresh,
+                "category": category,
+            },
             calculation_payload=result,
             policy_version=result.get("policyVersion"),
             cache_hit=bool(result.get("cached")),
