@@ -90,3 +90,4 @@ class SpendingPatternRecommendationResponse(BaseModel):
     generatedAt: str
     policyVersion: str
     requestedCategory: str | None = None
+    profileSource: str

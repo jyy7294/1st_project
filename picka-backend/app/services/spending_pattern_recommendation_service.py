@@ -25,7 +25,7 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.recommendation_service import calculate_card_benefit
 
 
-RECOMMENDATION_POLICY_VERSION = "spending-v7-positive-benefit-ranking"
+RECOMMENDATION_POLICY_VERSION = "spending-v9-onboarding-cold-start"
 
 
 CATEGORY_NORMALIZATION = {
@@ -433,6 +433,88 @@ def _decrypted_eligibility_value(eligibility: UserEligibility) -> str:
     )
 
 
+def _eligibility_values(
+    user_eligibilities: dict[str, UserEligibility],
+    *eligibility_types: str,
+) -> list[str]:
+    for eligibility_type in eligibility_types:
+        eligibility = user_eligibilities.get(eligibility_type)
+        if eligibility is None:
+            continue
+        raw = _decrypted_eligibility_value(eligibility).strip()
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            parsed = [item.strip() for item in raw.split(",") if item.strip()]
+        if not isinstance(parsed, list):
+            parsed = [parsed]
+        return [str(value).strip().upper() for value in parsed if str(value).strip()]
+    return []
+
+
+def _eligibility_is_true(
+    user_eligibilities: dict[str, UserEligibility],
+    *eligibility_types: str,
+) -> bool:
+    return any(
+        value in {"TRUE", "T", "Y", "YES", "1"}
+        for value in _eligibility_values(user_eligibilities, *eligibility_types)
+    )
+
+
+def build_cold_start_spending_profile(
+    user_eligibilities: dict[str, UserEligibility],
+) -> dict[str, int]:
+    """Build a conservative pre-transaction profile from onboarding answers."""
+    profile = {
+        "푸드/외식": 120_000,
+        "마트/쇼핑": 100_000,
+        "생활": 80_000,
+        "편의점": 50_000,
+    }
+
+    transportation = set(_eligibility_values(
+        user_eligibilities, "PRIMARY_TRANSPORTATION",
+    ))
+    if transportation & {"CAR", "PRIVATE_CAR", "MOTORCYCLE", "SCOOTER"}:
+        profile["주유"] = 150_000
+        profile["자동차/정비"] = 60_000
+    if transportation & {
+        "PUBLIC_TRANSIT", "BUS", "SUBWAY", "TAXI", "BICYCLE",
+    }:
+        profile["교통"] = 100_000
+    if _eligibility_is_true(user_eligibilities, "USES_K_PASS", "KPASS_USER"):
+        profile["교통"] = max(profile.get("교통", 0), 120_000)
+    if _eligibility_is_true(user_eligibilities, "USES_HIPASS", "HIGHPASS_USER"):
+        profile["자동차/정비"] = max(profile.get("자동차/정비", 0), 70_000)
+
+    carriers = set(_eligibility_values(
+        user_eligibilities, "MOBILE_CARRIER", "TELECOM_PROVIDER",
+    ))
+    if carriers - {"", "NONE", "UNKNOWN"}:
+        profile["통신"] = 70_000
+
+    airlines = set(_eligibility_values(
+        user_eligibilities, "PREFERRED_AIRLINE",
+    ))
+    if airlines - {"", "NONE", "UNKNOWN"}:
+        profile["항공/마일리지"] = 100_000
+
+    shopping = set(_eligibility_values(
+        user_eligibilities, "PRIMARY_SHOPPING_AFFILIATION",
+    ))
+    if shopping & {"COUPANG", "NAVER", "SSG", "MARKET_KURLY", "OTHER"}:
+        profile["온라인쇼핑"] = 130_000
+    if shopping & {
+        "LOTTE", "EMART", "SHINSEGAE", "SHINSEGAE_EMART", "HYUNDAI",
+    }:
+        profile["마트/쇼핑"] = 150_000
+
+    if _eligibility_is_true(user_eligibilities, "HAS_CHILDREN"):
+        profile["교육/육아"] = 150_000
+    return profile
+
+
 def _is_card_eligible(
     card: Card,
     user_eligibilities: dict[str, UserEligibility],
@@ -532,7 +614,20 @@ def recommend_new_cards_by_spending(
         user_id,
         reference_date=reference_date,
     )
+    user_eligibilities = _load_user_eligibilities(db, user_id)
+    profile_source = "transactions"
+    if not profile:
+        profile = build_cold_start_spending_profile(user_eligibilities)
+        primary_category = max(profile, key=profile.get)
+        profile_source = "onboarding"
     monthly_spending = sum(profile.values())
+    representative_categories = {
+        category_name
+        for category_name, _ in sorted(
+            profile.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:6]
+    }
     requested_category = normalize_spending_category(category)
     requested_category_spend = (
         profile.get(requested_category, 0) or 100_000
@@ -541,7 +636,6 @@ def recommend_new_cards_by_spending(
     top_category = primary_category
     top_category_spend = profile.get(primary_category, 0) if primary_category else 0
     owned_card_ids = select(UserCard.card_id).where(UserCard.user_id == user_id)
-    user_eligibilities = _load_user_eligibilities(db, user_id)
     cards = db.scalars(
         select(Card)
         .options(
@@ -651,21 +745,29 @@ def recommend_new_cards_by_spending(
                     },
                 )
                 bucket["amount"] = int(bucket["amount"] or 0) + monthly_benefit
+            representative_candidate = {
+                "amount": benefit,
+                "name": calculation.get("benefit_name") or category,
+                "rate": calculation.get("benefit_rate") or 0,
+                "unit": calculation.get("benefit_unit"),
+                "category": category,
+                "monthly_spend": amount,
+            }
             if (
                 benefit > 0
+                and category in representative_categories
                 and (
                     best_category_result is None
-                    or benefit > best_category_result["amount"]
+                    or (
+                        representative_candidate["monthly_spend"],
+                        representative_candidate["amount"],
+                    ) > (
+                        best_category_result["monthly_spend"],
+                        best_category_result["amount"],
+                    )
                 )
             ):
-                best_category_result = {
-                    "amount": benefit,
-                    "name": calculation.get("benefit_name") or category,
-                    "rate": calculation.get("benefit_rate") or 0,
-                    "unit": calculation.get("benefit_unit"),
-                    "category": category,
-                    "monthly_spend": amount,
-                }
+                best_category_result = representative_candidate
 
         for benefit_item in eligible_benefits:
             searchable = _benefit_search_text(benefit_item)
@@ -716,18 +818,29 @@ def recommend_new_cards_by_spending(
                     int(amount * merchant_frequency),
                 )
                 matched_merchants.add(merchant["canonical_merchant"])
+                representative_candidate = {
+                    "amount": amount,
+                    "name": benefit_name,
+                    "rate": calculation.get("benefit_rate") or 0,
+                    "unit": calculation.get("benefit_unit"),
+                    "category": merchant["category"],
+                    "monthly_spend": merchant["amount"],
+                }
                 if (
-                    best_category_result is None
-                    or amount > best_category_result["amount"]
+                    amount > 0
+                    and merchant["category"] in representative_categories
+                    and (
+                        best_category_result is None
+                        or (
+                            representative_candidate["monthly_spend"],
+                            representative_candidate["amount"],
+                        ) > (
+                            best_category_result["monthly_spend"],
+                            best_category_result["amount"],
+                        )
+                    )
                 ):
-                    best_category_result = {
-                        "amount": amount,
-                        "name": benefit_name,
-                        "rate": calculation.get("benefit_rate") or 0,
-                        "unit": calculation.get("benefit_unit"),
-                        "category": merchant["category"],
-                        "monthly_spend": merchant["amount"],
-                    }
+                    best_category_result = representative_candidate
 
         monthly_total = sum(
             min(int(bucket["amount"] or 0), int(bucket["monthly_limit"]))
@@ -790,12 +903,17 @@ def recommend_new_cards_by_spending(
             "monthly_spend": 0,
         }
         category_label = best["category"] or "주요 업종"
+        recommendation_basis = (
+            "가입 정보로 추정한 소비에서"
+            if profile_source == "onboarding"
+            else "최근 3개월 소비에서"
+        )
         recommendation_message = (
-            f"최근 3개월 소비에서 {category_label} 이용 빈도가 높았어요. "
+            f"{recommendation_basis} {category_label} 비중이 높아요. "
             f"이 카드를 쓰면 {best['name']} 혜택으로 "
             f"연간 약 {annual_total:,}원의 혜택을 받을 수 있어요."
             if annual_total > 0
-            else f"최근 3개월 {category_label} 소비에 적용 가능한 계산형 혜택이 없습니다."
+            else f"{recommendation_basis} {category_label}에 적용 가능한 계산형 혜택이 없습니다."
         )
         results.append({
             "id": card.id,
@@ -846,7 +964,10 @@ def recommend_new_cards_by_spending(
         ))
     else:
         # 금액으로 검증된 혜택이 없는 카드는 전체 추천 순위에서 제외한다.
-        results = [item for item in results if item["total"] > 0]
+        results = [
+            item for item in results
+            if item["total"] > 0 and item["benefitCategory"] is not None
+        ]
         results.sort(key=lambda item: (
             -item["total"],
             item.get("benefitCategory") != primary_category,
@@ -860,6 +981,7 @@ def recommend_new_cards_by_spending(
         "topCategory": top_category,
         "topCategorySpend": top_category_spend,
         "requestedCategory": requested_category,
+        "profileSource": profile_source,
         "topMerchants": [
             {
                 "name": item["canonical_merchant"],

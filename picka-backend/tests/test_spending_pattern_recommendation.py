@@ -158,6 +158,59 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
             profile = build_monthly_spending_profile(db, 1)
         self.assertEqual(profile, {"마트/쇼핑": 150_000})
 
+    def test_new_member_uses_onboarding_profile_instead_of_unrelated_history(self):
+        with self.Session() as db:
+            db.add(User(id=2, email="new@example.com", name="신규 회원"))
+            db.add_all([
+                UserEligibility(
+                    user_id=2,
+                    eligibility_type="PRIMARY_TRANSPORTATION",
+                    eligibility_value='["CAR"]',
+                    verification_status="SELF_REPORTED",
+                ),
+                UserEligibility(
+                    user_id=2,
+                    eligibility_type="MOBILE_CARRIER",
+                    eligibility_value="KT",
+                    verification_status="SELF_REPORTED",
+                ),
+            ])
+            db.add(Card(
+                id=15,
+                card_name="신규회원 주유 카드",
+                card_type="신용카드",
+                annual_fee=0,
+                previous_spending=0,
+                is_active=True,
+            ))
+            db.flush()
+            db.add(CardBenefit(
+                card_id=15,
+                source_benefit_id="15-fuel",
+                benefit_name="주유 5% 할인",
+                category="주유",
+                benefit_type="할인",
+                benefit_unit="%",
+                benefit_value=5,
+                additional_conditions={"scoring_grade": "A_확정계산"},
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=2,
+                card_type="credit",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertEqual(result["profileSource"], "onboarding")
+        self.assertEqual(result["topCategory"], "주유")
+        self.assertEqual(result["topCategorySpend"], 150_000)
+        fuel = next(card for card in result["cards"] if card["id"] == 15)
+        self.assertEqual(fuel["benefitCategory"], "주유")
+        self.assertIn("가입 정보로 추정한 소비", fuel["recommendationMessage"])
+
     def test_frequency_wins_unless_counts_are_similar(self):
         with self.Session() as db:
             owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
@@ -688,6 +741,101 @@ class SpendingPatternRecommendationTest(unittest.TestCase):
         self.assertEqual(recommended["benefitCategory"], "마트/쇼핑")
         self.assertEqual(recommended["benefitName"], "쇼핑 5% 할인")
         self.assertEqual(recommended["benefitValue"], 5)
+
+    def test_representative_benefit_prefers_meaningful_spending_categories(self):
+        with self.Session() as db:
+            db.add_all([
+                Card(
+                    id=13,
+                    card_name="주유와 테마파크 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+                Card(
+                    id=14,
+                    card_name="테마파크 전용 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+            ])
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=13,
+                    source_benefit_id="13-fuel",
+                    benefit_name="주유 1% 할인",
+                    category="주유",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=1,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=13,
+                    source_benefit_id="13-theme",
+                    benefit_name="테마파크 50% 할인",
+                    category="테마파크/레저",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=50,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=14,
+                    source_benefit_id="14-theme",
+                    benefit_name="테마파크 60% 할인",
+                    category="테마파크/레저",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=60,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            spending = [
+                ("주유", 300_000),
+                ("푸드/외식", 220_000),
+                ("카페/디저트", 200_000),
+                ("교통", 180_000),
+                ("통신", 160_000),
+                ("여행/숙박", 140_000),
+                ("테마파크/레저", 20_000),
+            ]
+            db.add_all([
+                Transaction(
+                    user_id=1,
+                    user_card_id=owned.id,
+                    card_id=1,
+                    merchant_name=f"대표업종 {index}",
+                    payment_category=category,
+                    original_payment_amount=amount,
+                    saved_amount=0,
+                    final_approved_amount=amount,
+                    approval_number=f"REPRESENTATIVE-{index}",
+                    status="APPROVED",
+                    usage_month="2026-06",
+                    approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                )
+                for index, (category, amount) in enumerate(spending)
+            ])
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        mixed = next(card for card in result["cards"] if card["id"] == 13)
+        self.assertEqual(mixed["benefitCategory"], "주유")
+        self.assertEqual(mixed["benefitName"], "주유 1% 할인")
+        self.assertNotIn(14, [card["id"] for card in result["cards"]])
 
 
 if __name__ == "__main__":
