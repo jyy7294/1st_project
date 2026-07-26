@@ -32,9 +32,9 @@ from app.services.user_state_adapter import resolve_category_from_aliases
 
 CSV_PATH = (
     Path(__file__).resolve().parents[1]
-    / "PICKA_persona_all_in_one_v8_26_jeongeunju_budget450_pick45.csv"
+    / "PICKA_persona_all_in_one_v8_32_fixed_1.csv"
 )
-SOURCE_VERSION = "v8_26_jeongeunju_budget450_pick45"
+SOURCE_VERSION = "v8_32_fixed_1"
 CONSUMPTION_TENDENCY_SOURCE = "PICKA_페르소나_소비성향_정리.xlsx"
 BENEFIT_ID_REFERENCE_CSV: Path | None = None
 PERSONA_USER_IDS = {"persona1": 1, "persona2": 2, "persona3": 3, "persona4": 4}
@@ -67,15 +67,16 @@ CONFIRMED_OVERRIDES = {
     "persona3": {"MILITARY_SERVICE": ("false", "SELF_REPORTED")},
 }
 
-# 페르소나 담당자가 v8.26 CSV와 함께 전달한 소비성향 정리본의 해석값이다.
+# 페르소나 담당자가 전달한 소비성향 정리본의 해석값이다. v8.32에서
+# persona1 소비금액이 조정되어 해당 합계와 설명을 최신 CSV에 맞췄다.
 # 금액/건수 원장은 CSV에서 적재하고, 이 값은 발표·분석용 프로필 문맥으로 보존한다.
 CONSUMPTION_TENDENCIES = {
     "persona1": {
-        "three_month_total": 3_486_600,
+        "three_month_total": 2_960_000,
         "transaction_count": 120,
-        "monthly_average": 1_162_200,
-        "top_spending_categories": ["백화점 (15.7%)", "외식 (11.1%)", "여행/숙박 (6.9%)"],
-        "pattern": "소액 다빈도형. 카페·교통 결제가 잦고 가끔 대형 지출이 튐 (롯데백화점 54.6만 원 1건)",
+        "monthly_average": 986_667,
+        "top_spending_categories": ["백화점 (15.9%)", "외식 (11.1%)", "여행/숙박 (6.9%)"],
+        "pattern": "소액 다빈도형. 카페·교통 결제가 잦고 가끔 대형 지출이 튐 (롯데백화점 47.0만 원)",
         "main_merchants": ["스타벅스", "티머니", "카카오 T", "한식당"],
         "diagnosis": "체크·신용 혼용으로 혜택 분산. 잘못된 카드 선택과 한도 소진이 비슷한 비중",
     },
@@ -165,8 +166,10 @@ def main() -> None:
                 row["usage_month"] = reference.get("usage_month", "")
     rows = [
         row for row in all_rows
-        if row.get("payment_source_type") == "CARD"
-        and row.get("actual_user_card_id")
+        # v8.32 fixed_1은 persona3 대한항공 거래에 실제 카드 연결을
+        # 복구했지만 payment_source_type은 BANK_AUTO로 남아 있다. 실제
+        # 카드 ID 두 개가 모두 있으면 그 연결을 최종 판단으로 신뢰한다.
+        if row.get("actual_user_card_id")
         and row.get("actual_card_id")
     ]
     excluded_non_card = len(all_rows) - len(rows)
@@ -255,10 +258,9 @@ def main() -> None:
             profile.period = first["persona_period"] or None
             profile.preferred_benefits = first["persona_preferred_benefits"] or None
             profile.source_payload = {
-                # 원본 456건은 모두 보존하되, transactions 테이블에는 카드가
-                # 연결된 455건만 적재한다. 비카드 1건도 XLSX 소비성향 집계에는 포함된다.
+                # 원본은 모두 보존하고 실제 카드 연결 ID가 있는 행을 거래로 적재한다.
                 f"{SOURCE_VERSION}_rows": all_by_persona[persona_id],
-                f"{SOURCE_VERSION}_excludes_non_card_expenses": True,
+                f"{SOURCE_VERSION}_excludes_non_card_expenses": excluded_non_card > 0,
                 f"{SOURCE_VERSION}_database_card_rows": len(persona_rows),
                 f"{SOURCE_VERSION}_source_rows": len(all_by_persona[persona_id]),
                 "consumption_tendency_source": CONSUMPTION_TENDENCY_SOURCE,
