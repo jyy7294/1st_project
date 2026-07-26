@@ -1,0 +1,256 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 74px 30px 40px;
+  overflow-y: auto;
+}
+
+.logo { margin-bottom: 6px; }
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--navy-text);
+  letter-spacing: -.5px;
+  margin-top: 18px;
+}
+
+.sub {
+  font-size: 14px;
+  color: var(--text-2);
+  margin-top: 6px;
+}
+
+/* 최근 로그인 계정 — 선택하면 이메일이 채워지는 자동완성용 목록 */
+.recent {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+}
+
+.recentTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 최근 1개 아래의 '다른 계정 N개 / 접기' 토글 */
+.recentToggle {
+  align-self: center;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.recentChevron {
+  display: block;
+  color: var(--text-3);
+  transition: transform .2s ease;
+}
+
+.recentChevronOpen { transform: rotate(180deg); }
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-btn);
+  background: #fafbfc;
+  cursor: pointer;
+}
+
+.recentItem:active { background: #f1f4f9; }
+
+.recentAvatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--navy-grad);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.recentBody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.recentName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentMeta {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentDel {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.recentDel:active { background: #e9edf4; }
+
+/* 계정 삭제 확인 팝업 */
+.confirmDim {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: rgba(10, 29, 79, .45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 34px;
+}
+
+.confirm {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px 22px 18px;
+  text-align: center;
+  box-shadow: 0 24px 50px -12px rgba(10, 29, 79, .45);
+  --pk-dur: .22s;
+}
+
+.confirmTitle {
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--navy-text);
+  letter-spacing: -.3px;
+  word-break: keep-all;
+}
+
+.confirmSub {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  word-break: keep-all;
+}
+
+.confirmActions { display: flex; gap: 10px; margin-top: 20px; }
+
+.confirmCancel,
+.confirmDelete {
+  flex: 1;
+  height: 46px;
+  border-radius: 13px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.confirmCancel {
+  border: 1.5px solid #dfe3ec;
+  background: #fff;
+  color: var(--navy-text);
+}
+
+.confirmDelete {
+  border: none;
+  background: var(--danger);
+  color: #fff;
+}
+
+/* 입력 2개 + 로그인 버튼을 감싸는 폼. 기존 세로 배치를 그대로 유지합니다. */
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.fields {
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input {
+  height: 54px;
+  padding: 0 16px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--r-btn);
+  background: #fafbfc;
+  font-size: 15px;
+  color: var(--navy-text);
+  font-family: inherit;
+  outline: none;
+}
+
+.input:focus { border-color: var(--blue); }
+
+.error {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.links {
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 0 4px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+/* 아직 동작하지 않는 링크 — 비활성으로 보이게 합니다. */
+.linkOff {
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-bottom: 1px dashed currentColor;
+}
+
+.submit {
+  margin-top: 22px;
+  height: 54px;
+  border: none;
+  border-radius: var(--r-btn);
+  background: linear-gradient(150deg, #10275F, #071844);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px -8px rgba(14, 36, 93, .5);
+}
+

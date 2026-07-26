@@ -1,0 +1,843 @@
+import unittest
+from datetime import date, datetime, timezone
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.core.config import settings
+from app.core.database import Base, get_db
+from app.main import app
+from app.models import (
+    Card,
+    CardBenefit,
+    CardBenefitEligibilityRule,
+    CardEligibilityRule,
+    Transaction,
+    User,
+    UserCard,
+    UserEligibility,
+    RecommendationAuditLog,
+)
+from app.services.spending_pattern_recommendation_service import (
+    RECOMMENDATION_POLICY_VERSION,
+    build_monthly_spending_profile,
+    build_recent_spending_profile,
+    normalize_spending_category,
+    recommend_new_cards_by_spending,
+)
+from app.services.auth_service import create_access_token
+
+
+class SpendingPatternRecommendationTest(unittest.TestCase):
+    def setUp(self):
+        self.original_jwt_secret_key = settings.jwt_secret_key
+        settings.jwt_secret_key = "test-jwt-secret-key-at-least-32-bytes"
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
+        self._seed()
+
+        def override_get_db():
+            with self.Session() as db:
+                yield db
+
+        app.dependency_overrides[get_db] = override_get_db
+        self.client = TestClient(app)
+        with self.Session() as db:
+            token = create_access_token(db.get(User, 1))
+        self.client.headers.update({"Authorization": f"Bearer {token}"})
+
+    def tearDown(self):
+        settings.jwt_secret_key = self.original_jwt_secret_key
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(self.engine)
+        self.engine.dispose()
+
+    def _seed(self):
+        with self.Session() as db:
+            db.add(User(id=1, email="pattern@example.com", name="패턴 사용자"))
+            cards = [
+                Card(id=1, card_name="보유 카드", card_type="신용", is_active=True),
+                Card(
+                    id=2,
+                    card_name="마트 특화 카드",
+                    issuer="A카드",
+                    card_type="신용",
+                    annual_fee=10_000,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+                Card(
+                    id=3,
+                    card_name="낮은 혜택 카드",
+                    issuer="B카드",
+                    card_type="credit",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+                Card(id=4, card_name="체크 카드", card_type="체크", is_active=True),
+            ]
+            db.add_all(cards)
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=2,
+                    source_benefit_id="2-1",
+                    benefit_name="마트 10% 할인",
+                    category="마트/쇼핑",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=10,
+                    monthly_benefit_limit=10_000,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=3,
+                    source_benefit_id="3-1",
+                    benefit_name="마트 5% 할인",
+                    category="마트/쇼핑",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=5,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=4,
+                    source_benefit_id="4-1",
+                    benefit_name="마트 체크 할인",
+                    category="마트/쇼핑",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=20,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            owned = UserCard(user_id=1, card_id=1, is_active=True)
+            db.add(owned)
+            db.flush()
+            for index, (month, amount) in enumerate(
+                [("2026-05", 100_000), ("2026-06", 200_000)], start=1
+            ):
+                db.add(Transaction(
+                    user_id=1,
+                    user_card_id=owned.id,
+                    card_id=1,
+                    merchant_name="테스트 마트",
+                    payment_category="MART",
+                    original_payment_amount=amount,
+                    saved_amount=0,
+                    final_approved_amount=amount,
+                    approval_number=f"PATTERN-{index}",
+                    status="APPROVED",
+                    usage_month=month,
+                    approved_at=datetime(2026, 5 + index - 1, 1, tzinfo=timezone.utc),
+                ))
+            db.commit()
+
+    def test_category_normalization(self):
+        self.assertEqual(normalize_spending_category("DELIVERY"), "배달앱")
+        self.assertEqual(normalize_spending_category("MART"), "마트/쇼핑")
+        self.assertEqual(normalize_spending_category("TUITION"), "교육/육아")
+        self.assertEqual(normalize_spending_category("FOOD_DINING"), "푸드/외식")
+        self.assertEqual(normalize_spending_category("FUEL"), "주유")
+        self.assertEqual(normalize_spending_category("백화점"), "마트/쇼핑")
+        self.assertEqual(normalize_spending_category("DEPARTMENT_STORE"), "마트/쇼핑")
+        self.assertEqual(
+            normalize_spending_category("AIRLINE_MILEAGE"),
+            "항공/마일리지",
+        )
+
+    def test_profile_uses_latest_months_and_monthly_average(self):
+        with self.Session() as db:
+            profile = build_monthly_spending_profile(db, 1)
+        self.assertEqual(profile, {"마트/쇼핑": 150_000})
+
+    def test_new_member_uses_onboarding_profile_instead_of_unrelated_history(self):
+        with self.Session() as db:
+            db.add(User(id=2, email="new@example.com", name="신규 회원"))
+            db.add_all([
+                UserEligibility(
+                    user_id=2,
+                    eligibility_type="PRIMARY_TRANSPORTATION",
+                    eligibility_value='["CAR"]',
+                    verification_status="SELF_REPORTED",
+                ),
+                UserEligibility(
+                    user_id=2,
+                    eligibility_type="MOBILE_CARRIER",
+                    eligibility_value="KT",
+                    verification_status="SELF_REPORTED",
+                ),
+            ])
+            db.add(Card(
+                id=15,
+                card_name="신규회원 주유 카드",
+                card_type="신용카드",
+                annual_fee=0,
+                previous_spending=0,
+                is_active=True,
+            ))
+            db.flush()
+            db.add(CardBenefit(
+                card_id=15,
+                source_benefit_id="15-fuel",
+                benefit_name="주유 5% 할인",
+                category="주유",
+                benefit_type="할인",
+                benefit_unit="%",
+                benefit_value=5,
+                additional_conditions={"scoring_grade": "A_확정계산"},
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=2,
+                card_type="credit",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertEqual(result["profileSource"], "onboarding")
+        self.assertEqual(result["topCategory"], "주유")
+        self.assertEqual(result["topCategorySpend"], 150_000)
+        fuel = next(card for card in result["cards"] if card["id"] == 15)
+        self.assertEqual(fuel["benefitCategory"], "주유")
+        self.assertIn("가입 정보로 추정한 소비", fuel["recommendationMessage"])
+
+    def test_frequency_wins_unless_counts_are_similar(self):
+        with self.Session() as db:
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            db.add_all([
+                Transaction(
+                    user_id=1, user_card_id=owned.id, card_id=1,
+                    merchant_name="올리브영", payment_category="BEAUTY",
+                    original_payment_amount=500_000, saved_amount=0,
+                    final_approved_amount=500_000, approval_number="EWMA-OLD",
+                    status="APPROVED", usage_month="2026-05",
+                    approved_at=datetime(2026, 5, 10, tzinfo=timezone.utc),
+                ),
+                Transaction(
+                    user_id=1, user_card_id=owned.id, card_id=1,
+                    merchant_name="CGV", payment_category="MOVIE",
+                    original_payment_amount=100_000, saved_amount=0,
+                    final_approved_amount=100_000, approval_number="EWMA-NEW",
+                    status="APPROVED", usage_month="2026-06",
+                    approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                ),
+                *[
+                    Transaction(
+                        user_id=1, user_card_id=owned.id, card_id=1,
+                        merchant_name="CGV", payment_category="MOVIE",
+                        original_payment_amount=100_000, saved_amount=0,
+                        final_approved_amount=100_000,
+                        approval_number=f"FREQ-{index}", status="APPROVED",
+                        usage_month="2026-06",
+                        approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                    )
+                    for index in range(3)
+                ],
+            ])
+            db.commit()
+            _, _, profile, _, primary = build_recent_spending_profile(
+                db, 1, reference_date=date(2026, 6, 8)
+            )
+
+        self.assertLess(profile["영화/문화"], profile["뷰티/피트니스"])
+        self.assertEqual(primary, "영화/문화")
+
+    def test_recommends_only_unowned_cards_of_requested_type(self):
+        with self.Session() as db:
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertEqual([card["id"] for card in result["cards"]], [2, 3])
+        self.assertEqual(result["cards"][0]["benefitName"], "마트 10% 할인")
+        self.assertEqual(result["cards"][0]["total"], 110_000)
+        self.assertEqual(result["cards"][0]["fee"], 10_000)
+        self.assertEqual(result["cards"][1]["total"], 78_000)
+        self.assertEqual(result["analysisStartDate"], "2026-03-10")
+        self.assertEqual(result["analysisEndDate"], "2026-06-07")
+        self.assertEqual(
+            result["updateCycle"],
+            "daily 00:00 Asia/Seoul · rolling 30d 50%/30d 30%/30d 20%",
+        )
+        self.assertEqual(result["topCategory"], "마트/쇼핑")
+        self.assertEqual(result["topCategorySpend"], 130_000)
+        self.assertIn("최근 3개월 소비에서 마트/쇼핑", result["cards"][0]["recommendationMessage"])
+        benefit = result["cards"][0]["benefits"][0]
+        self.assertEqual(benefit["category"], "마트/쇼핑")
+        self.assertEqual(benefit["value"], 10)
+        self.assertEqual(benefit["unit"], "%")
+        self.assertEqual(benefit["monthlyLimit"], 10_000)
+        self.assertIsNone(result["cards"][0]["categoryBenefit"])
+        self.assertIsNone(result["requestedCategory"])
+
+    def test_category_recommendation_scans_full_pool_and_sorts_by_category_benefit(self):
+        with self.Session() as db:
+            db.add_all([
+                Card(
+                    id=10,
+                    card_name="영화 정액 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+                Card(
+                    id=11,
+                    card_name="영화 비율 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+            ])
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=10,
+                    source_benefit_id="10-1",
+                    benefit_name="영화 8천원 할인",
+                    category="영화/문화",
+                    benefit_type="할인",
+                    benefit_unit="원",
+                    benefit_value=8_000,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=11,
+                    source_benefit_id="11-1",
+                    benefit_name="영화 10% 할인",
+                    category="영화/문화",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=10,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                category="MOVIE",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertEqual(result["requestedCategory"], "영화/문화")
+        self.assertEqual([card["id"] for card in result["cards"]], [11, 10])
+        self.assertTrue(all(
+            card["categoryBenefit"]["category"] == "영화/문화"
+            for card in result["cards"]
+        ))
+        self.assertEqual(
+            result["cards"][0]["categoryBenefit"]["expectedAnnualBenefit"],
+            120_000,
+        )
+        # 전체 소비에 영화 이력이 없어도 업종 추천에는 포함되고,
+        # 전체 소비 기준 total은 기존 의미대로 유지된다.
+        self.assertEqual(result["cards"][0]["total"], 0)
+
+        response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "category": "MOVIE", "limit": 3},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["requestedCategory"], "영화/문화")
+        self.assertFalse(response.json()["cached"])
+        self.assertEqual(
+            [card["id"] for card in response.json()["cards"]],
+            [11, 10],
+        )
+
+    def test_cached_recommendation_drops_card_deactivated_after_snapshot(self):
+        first = self.client.get(
+            "/api/v1/users/1/card-recommendations?type=credit&limit=3"
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        recommended_ids = [card["id"] for card in first.json()["cards"]]
+        self.assertTrue(recommended_ids)
+
+        discontinued_id = recommended_ids[0]
+        with self.Session() as db:
+            card = db.get(Card, discontinued_id)
+            card.is_active = False
+            db.commit()
+
+        cached = self.client.get(
+            "/api/v1/users/1/card-recommendations?type=credit&limit=3"
+        )
+        self.assertEqual(cached.status_code, 200, cached.text)
+        self.assertTrue(cached.json()["cached"])
+        self.assertNotIn(
+            discontinued_id,
+            [card["id"] for card in cached.json()["cards"]],
+        )
+
+    def test_excludes_military_service_cards_for_non_military_personas(self):
+        with self.Session() as db:
+            db.add(Card(
+                id=6,
+                card_name="IBK 나라사랑카드",
+                issuer="IBK기업은행",
+                card_type="체크카드",
+                is_active=True,
+            ))
+            db.add(CardEligibilityRule(
+                card_id=6,
+                eligibility_type="MILITARY_SERVICE",
+                required_value="true",
+                comparison_operator="EQ",
+            ))
+            db.add(UserEligibility(
+                user_id=1,
+                eligibility_type="MILITARY_SERVICE",
+                eligibility_value="false",
+                verification_status="SELF_REPORTED",
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="check",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertNotIn(
+            "IBK 나라사랑카드",
+            [card["name"] for card in result["cards"]],
+        )
+        excluded = next(
+            card
+            for card in result["excludedCards"]
+            if card["cardName"] == "IBK 나라사랑카드"
+        )
+        self.assertEqual(excluded["status"], "EXCLUDED")
+        self.assertEqual(excluded["eligibilityType"], "MILITARY_SERVICE")
+
+    def test_child_count_rule_requires_at_least_two_children(self):
+        with self.Session() as db:
+            db.add(Card(
+                id=8,
+                card_name="다둥이 행복카드",
+                card_type="신용카드",
+                is_active=True,
+            ))
+            db.add(CardEligibilityRule(
+                card_id=8,
+                eligibility_type="CHILDREN_COUNT",
+                required_value="2",
+                comparison_operator="GTE",
+            ))
+            db.add(UserEligibility(
+                user_id=1,
+                eligibility_type="CHILDREN_COUNT",
+                eligibility_value="1",
+                verification_status="VERIFIED",
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db, user_id=1, card_type="credit", limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertNotIn(8, [card["id"] for card in result["cards"]])
+        excluded = next(card for card in result["excludedCards"] if card["cardId"] == 8)
+        self.assertEqual(excluded["eligibilityType"], "CHILDREN_COUNT")
+
+    def test_api_contract_and_query_validation(self):
+        response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "limit": 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["cached"])
+        self.assertEqual(len(response.json()["cards"]), 1)
+        with self.Session() as db:
+            audit = db.scalar(select(RecommendationAuditLog))
+            self.assertEqual(audit.request_kind, "NEW_CARD_SPENDING_PATTERN")
+            self.assertFalse(audit.cache_hit)
+            self.assertEqual(audit.policy_version, RECOMMENDATION_POLICY_VERSION)
+        self.assertEqual(
+            set(response.json()["cards"][0]),
+            {
+                "id", "name", "issuer", "benefitName", "rate", "total",
+                "benefitValue", "benefitUnit", "expectedBenefitAmount",
+                "benefit",
+                "fee", "url", "image_url", "benefitCategory", "monthlySpend",
+                "recommendationMessage", "matchedMerchants",
+                "benefits", "categoryBenefit",
+            },
+        )
+        self.assertEqual(
+            response.json()["policyVersion"],
+            RECOMMENDATION_POLICY_VERSION,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/users/1/card-recommendations",
+                params={"type": "invalid"},
+            ).status_code,
+            422,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/v1/users/999/card-recommendations"
+            ).status_code,
+            403,
+        )
+        cached_response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "limit": 1},
+        )
+        self.assertTrue(cached_response.json()["cached"])
+        self.assertEqual(
+            cached_response.json()["generatedAt"],
+            response.json()["generatedAt"],
+        )
+        refreshed_response = self.client.get(
+            "/api/v1/users/1/card-recommendations",
+            params={"type": "credit", "limit": 1, "refresh": True},
+        )
+        self.assertFalse(refreshed_response.json()["cached"])
+
+    def test_fixed_amount_benefit_exposes_won_unit_not_percent(self):
+        with self.Session() as db:
+            db.add(Card(
+                id=9,
+                card_name="고정금액 할인 카드",
+                card_type="신용카드",
+                annual_fee=0,
+                is_active=True,
+            ))
+            db.flush()
+            db.add(CardBenefit(
+                card_id=9,
+                source_benefit_id="9-1",
+                benefit_name="마트 1,000원 할인",
+                category="마트/쇼핑",
+                benefit_type="할인",
+                benefit_unit="원",
+                benefit_value=1_000,
+                additional_conditions={"scoring_grade": "A_확정계산"},
+            ))
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            db.add_all([
+                Transaction(
+                    user_id=1,
+                    user_card_id=owned.id,
+                    card_id=1,
+                    merchant_name=f"추가 마트 {index}",
+                    payment_category="MART",
+                    original_payment_amount=10_000,
+                    saved_amount=0,
+                    final_approved_amount=10_000,
+                    approval_number=f"FIXED-FREQUENCY-{index}",
+                    status="APPROVED",
+                    usage_month="2026-06",
+                    approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                )
+                for index in range(4)
+            ])
+            db.commit()
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        fixed = next(card for card in result["cards"] if card["id"] == 9)
+        self.assertEqual(fixed["benefitValue"], 1_000)
+        self.assertEqual(fixed["benefitUnit"], "원")
+        self.assertEqual(fixed["rate"], 0)
+        self.assertEqual(fixed["expectedBenefitAmount"], 1_000)
+        self.assertEqual(fixed["total"], 33_600)
+
+    def test_excludes_unconfirmed_membership_benefit_from_calculation(self):
+        with self.Session() as db:
+            card = Card(
+                id=7,
+                card_name="멤버십 전용 혜택 카드",
+                card_type="신용",
+                is_active=True,
+            )
+            db.add(card)
+            db.flush()
+            benefit = CardBenefit(
+                card_id=7,
+                source_benefit_id="7-1",
+                benefit_name="마트 50% 할인",
+                category="마트/쇼핑",
+                benefit_type="할인",
+                benefit_unit="%",
+                benefit_value=50,
+            )
+            db.add(benefit)
+            db.flush()
+            db.add(CardBenefitEligibilityRule(
+                card_benefit_id=benefit.id,
+                eligibility_type="MEMBERSHIPS",
+                required_value="TEST_MEMBERSHIP",
+                comparison_operator="CONTAINS",
+                description="테스트 멤버십 가입 필요",
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertNotIn(7, [card["id"] for card in result["cards"]])
+        self.assertGreater(result["excludedBenefitCount"], 0)
+        self.assertEqual(
+            result["benefitConfirmationRequired"][0]["eligibilityType"],
+            "MEMBERSHIPS",
+        )
+
+        with self.Session() as db:
+            db.add(UserEligibility(
+                user_id=1,
+                eligibility_type="MEMBERSHIPS",
+                eligibility_value="[]",
+                verification_status="VERIFIED",
+            ))
+            db.commit()
+            confirmed_result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        self.assertNotIn(7, [card["id"] for card in confirmed_result["cards"]])
+        self.assertFalse(confirmed_result["benefitConfirmationRequired"])
+
+    def test_specific_merchant_benefit_is_found_outside_transaction_category(self):
+        with self.Session() as db:
+            card = Card(
+                id=5,
+                card_name="특정 마트 카드",
+                issuer="C카드",
+                card_type="신용카드",
+                annual_fee=0,
+                previous_spending=0,
+                is_active=True,
+            )
+            db.add(card)
+            db.flush()
+            db.add(CardBenefit(
+                card_id=5,
+                source_benefit_id="5-1",
+                benefit_name="테스트 마트 20% 할인",
+                category="생활",
+                benefit_type="할인",
+                benefit_unit="%",
+                benefit_value=20,
+                additional_conditions={"scoring_grade": "A_확정계산"},
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=3,
+                reference_date=date(2026, 6, 8),
+            )
+
+        specific = next(card for card in result["cards"] if card["id"] == 5)
+        self.assertIn("테스트 마트", specific["matchedMerchants"])
+        self.assertEqual(specific["benefitName"], "테스트 마트 20% 할인")
+
+    def test_unrelated_benefit_is_not_matched_from_full_source_detail(self):
+        with self.Session() as db:
+            card = Card(
+                id=12,
+                card_name="백화점 정상 매칭 카드",
+                card_type="신용카드",
+                annual_fee=0,
+                previous_spending=0,
+                is_active=True,
+            )
+            db.add(card)
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=12,
+                    source_benefit_id="12-1",
+                    benefit_name="롯데 자이언츠 20% 할인",
+                    category="테마파크/레저",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=20,
+                    source_detail="카드 전체 안내: 롯데백화점 이용 안내 포함",
+                    additional_conditions={
+                        "merchant_list": "롯데 자이언츠",
+                        "scoring_grade": "A_확정계산",
+                    },
+                ),
+                CardBenefit(
+                    card_id=12,
+                    source_benefit_id="12-2",
+                    benefit_name="쇼핑 5% 할인",
+                    category="마트/쇼핑",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=5,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            db.add(Transaction(
+                user_id=1,
+                user_card_id=owned.id,
+                card_id=1,
+                merchant_name="롯데백화점",
+                payment_category="백화점",
+                original_payment_amount=100_000,
+                saved_amount=0,
+                final_approved_amount=100_000,
+                approval_number="DEPARTMENT-STORE-MATCH",
+                status="APPROVED",
+                usage_month="2026-06",
+                approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+            ))
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        recommended = next(card for card in result["cards"] if card["id"] == 12)
+        self.assertEqual(recommended["benefitCategory"], "마트/쇼핑")
+        self.assertEqual(recommended["benefitName"], "쇼핑 5% 할인")
+        self.assertEqual(recommended["benefitValue"], 5)
+
+    def test_representative_benefit_prefers_meaningful_spending_categories(self):
+        with self.Session() as db:
+            db.add_all([
+                Card(
+                    id=13,
+                    card_name="주유와 테마파크 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+                Card(
+                    id=14,
+                    card_name="테마파크 전용 카드",
+                    card_type="신용카드",
+                    annual_fee=0,
+                    previous_spending=0,
+                    is_active=True,
+                ),
+            ])
+            db.flush()
+            db.add_all([
+                CardBenefit(
+                    card_id=13,
+                    source_benefit_id="13-fuel",
+                    benefit_name="주유 1% 할인",
+                    category="주유",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=1,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=13,
+                    source_benefit_id="13-theme",
+                    benefit_name="테마파크 50% 할인",
+                    category="테마파크/레저",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=50,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+                CardBenefit(
+                    card_id=14,
+                    source_benefit_id="14-theme",
+                    benefit_name="테마파크 60% 할인",
+                    category="테마파크/레저",
+                    benefit_type="할인",
+                    benefit_unit="%",
+                    benefit_value=60,
+                    additional_conditions={"scoring_grade": "A_확정계산"},
+                ),
+            ])
+            owned = db.query(UserCard).filter_by(user_id=1, card_id=1).one()
+            spending = [
+                ("주유", 300_000),
+                ("푸드/외식", 220_000),
+                ("카페/디저트", 200_000),
+                ("교통", 180_000),
+                ("통신", 160_000),
+                ("여행/숙박", 140_000),
+                ("테마파크/레저", 20_000),
+            ]
+            db.add_all([
+                Transaction(
+                    user_id=1,
+                    user_card_id=owned.id,
+                    card_id=1,
+                    merchant_name=f"대표업종 {index}",
+                    payment_category=category,
+                    original_payment_amount=amount,
+                    saved_amount=0,
+                    final_approved_amount=amount,
+                    approval_number=f"REPRESENTATIVE-{index}",
+                    status="APPROVED",
+                    usage_month="2026-06",
+                    approved_at=datetime(2026, 6, 7, tzinfo=timezone.utc),
+                )
+                for index, (category, amount) in enumerate(spending)
+            ])
+            db.commit()
+
+            result = recommend_new_cards_by_spending(
+                db,
+                user_id=1,
+                card_type="credit",
+                limit=20,
+                reference_date=date(2026, 6, 8),
+            )
+
+        mixed = next(card for card in result["cards"] if card["id"] == 13)
+        self.assertEqual(mixed["benefitCategory"], "주유")
+        self.assertEqual(mixed["benefitName"], "주유 1% 할인")
+        self.assertNotIn(14, [card["id"] for card in result["cards"]])
+
+
+if __name__ == "__main__":
+    unittest.main()
+from fastapi.testclient import TestClient

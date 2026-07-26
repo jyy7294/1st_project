@@ -1,0 +1,103 @@
+import unittest
+
+from app.models import MerchantAlias, Transaction
+from app.services.spending_report_service import (
+    REPORT_CATEGORY_ORDER,
+    report_category,
+    transaction_report_category,
+)
+from app.services.user_state_adapter import resolve_category_from_aliases
+
+
+class MerchantCategoryCorrectionTest(unittest.TestCase):
+    def test_report_and_benefit_categories_can_differ(self):
+        alias = MerchantAlias(
+            id=1,
+            alias="동네 문구점",
+            canonical_merchant="동네 문구점",
+            category="마트/쇼핑",
+            report_category="생활",
+            priority=200,
+        )
+        transaction = Transaction(
+            merchant_name="동네 문구점",
+            payment_category="마트/쇼핑",
+        )
+
+        self.assertEqual(
+            resolve_category_from_aliases([alias], transaction.merchant_name),
+            "마트/쇼핑",
+        )
+        self.assertEqual(
+            transaction_report_category(transaction, [alias]),
+            "생활비",
+        )
+
+    def test_report_categories_match_frontend_buckets(self):
+        expected = {
+            "카페/디저트": "카페",
+            "뷰티/피트니스": "뷰티/피트니스",
+            "병원/약국": "의료/건강",
+            "교육/육아": "교육",
+            "여행/숙박": "여행",
+            "항공/마일리지": "여행",
+            "공항서비스": "여행",
+            "간편결제": "기타",
+        }
+
+        self.assertEqual(
+            REPORT_CATEGORY_ORDER,
+            [
+                "식비",
+                "카페",
+                "쇼핑",
+                "뷰티/피트니스",
+                "생활비",
+                "의료/건강",
+                "교육",
+                "교통",
+                "주유",
+                "문화",
+                "여행",
+                "기타",
+            ],
+        )
+        for source, bucket in expected.items():
+            with self.subTest(source=source):
+                self.assertEqual(report_category(source), bucket)
+
+    def test_report_category_falls_back_to_benefit_category(self):
+        alias = MerchantAlias(
+            id=1,
+            alias="온누리약국",
+            canonical_merchant="온누리약국",
+            category="병원/약국",
+            report_category=None,
+            priority=200,
+        )
+        transaction = Transaction(
+            merchant_name="온누리약국",
+            payment_category="병원/약국",
+        )
+
+        self.assertEqual(
+            transaction_report_category(transaction, [alias]),
+            "의료/건강",
+        )
+
+    def test_fuel_is_not_merged_into_transport(self):
+        fuel = Transaction(
+            merchant_name="GS칼텍스 강남점",
+            payment_category="주유",
+        )
+        transit = Transaction(
+            merchant_name="티머니",
+            payment_category="교통",
+        )
+
+        self.assertEqual(transaction_report_category(fuel, []), "주유")
+        self.assertEqual(transaction_report_category(transit, []), "교통")
+
+
+if __name__ == "__main__":
+    unittest.main()
