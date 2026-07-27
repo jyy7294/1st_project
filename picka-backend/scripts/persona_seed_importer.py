@@ -510,7 +510,6 @@ def main() -> None:
                 usage_month=month,
                 monthly_used_amount=amount,
                 monthly_used_count=count,
-                daily_used_count=0,
             ))
             counts["benefit_usage"] += 1
 

@@ -11,12 +11,14 @@ from app.main import app
 from app.models import (
     AuthRefreshToken,
     BenefitUsage,
+    BenefitDailyUsage,
     Card,
     CardBenefit,
     MerchantAlias,
     MonthlyCardUsage,
     RecommendationAuditLog,
     Transaction,
+    TransactionBenefitApplication,
     User,
     UserCard,
 )
@@ -121,7 +123,6 @@ class UserStateRecommendationApiTest(unittest.TestCase):
                     usage_month="2026-07",
                     monthly_used_amount=4_500,
                     monthly_used_count=2,
-                    daily_used_count=1,
                 )
             )
             db.add(
@@ -351,6 +352,24 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             )
             self.assertEqual(monthly.current_month_spending, 160_000)
             self.assertEqual(monthly.card_monthly_benefit_used, 4_000)
+            application = db.scalar(
+                select(TransactionBenefitApplication).where(
+                    TransactionBenefitApplication.transaction_id
+                    == transaction.id
+                )
+            )
+            self.assertIsNotNone(application)
+            self.assertEqual(application.applied_amount, 1_000)
+            self.assertEqual(application.status, "APPLIED")
+            daily = db.scalar(
+                select(BenefitDailyUsage).where(
+                    BenefitDailyUsage.card_benefit_id
+                    == application.card_benefit_id
+                )
+            )
+            self.assertIsNotNone(daily)
+            self.assertEqual(daily.daily_used_amount, 1_000)
+            self.assertEqual(daily.daily_used_count, 1)
 
             # 집계 캐시에는 기존 3,000원이 들어 있어도 API 계산 기준은
             # 승인 거래의 실제 saved_amount(1,000원)여야 한다.
@@ -389,6 +408,50 @@ class UserStateRecommendationApiTest(unittest.TestCase):
                 )
             )
             self.assertEqual(saved_total, 1_800)
+
+    def test_payment_enforces_daily_benefit_count_limit(self):
+        with self.Session() as db:
+            benefit = db.scalar(
+                select(CardBenefit).where(CardBenefit.card_id == 2)
+            )
+            benefit.daily_count_limit = 1
+            db.commit()
+
+        first = self._transaction_request().json()
+        second = self._transaction_request().json()
+
+        self.assertEqual(first["payment"]["saved_amount"], 1_000)
+        self.assertEqual(second["payment"]["saved_amount"], 0)
+        with self.Session() as db:
+            daily = db.scalar(select(BenefitDailyUsage))
+            self.assertEqual(daily.daily_used_count, 1)
+            self.assertEqual(
+                db.scalar(
+                    select(func.count()).select_from(
+                        TransactionBenefitApplication
+                    )
+                ),
+                1,
+            )
+
+    def test_payment_enforces_monthly_benefit_count_limit(self):
+        with self.Session() as db:
+            benefit = db.scalar(
+                select(CardBenefit).where(CardBenefit.card_id == 2)
+            )
+            benefit.monthly_count_limit = 1
+            db.commit()
+
+        first = self._transaction_request().json()
+        second = self._transaction_request().json()
+
+        self.assertEqual(first["payment"]["saved_amount"], 1_000)
+        self.assertEqual(second["payment"]["saved_amount"], 0)
+        with self.Session() as db:
+            usage = db.scalar(
+                select(BenefitUsage).where(BenefitUsage.card_id == 2)
+            )
+            self.assertEqual(usage.monthly_used_count, 1)
 
     def test_create_transaction_rejects_unowned_card(self):
         response = self._transaction_request(card_id=999)

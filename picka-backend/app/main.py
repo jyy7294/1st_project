@@ -3,6 +3,7 @@ import json
 import re
 from typing import Annotated
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import (
-    BenefitUsage,
+    CardBenefit,
     Card,
     CardEligibilityRule,
     CardRecommendationSnapshot,
@@ -68,6 +69,11 @@ from app.services.category_normalization import normalize_payment_category
 from app.services.reward_service import calculate_transaction_rewards
 from app.services.recommendation_audit_service import save_recommendation_audit
 from app.services.benefit_total_service import confirmed_benefit_totals_by_card
+from app.services.benefit_usage_service import (
+    count_limit_is_available,
+    lock_benefit_usage,
+    record_applied_benefit,
+)
 from app.services.payment_gateway_service import authorize_demo_payment
 from app.services.privacy_audit_service import save_privacy_change_audit
 from app.services.pii_encryption_service import decrypt_text, encrypt_text
@@ -91,6 +97,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://picka-frontend.onrender.com",
+        "https://1st-project-gules.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -1588,16 +1595,40 @@ def create_transaction(
                 saved_amount,
                 max(int(monthly_total_limit) - confirmed_used, 0),
             )
-        applied = saved_amount > 0 and bool(calculation.get("eligible"))
-        benefit_name = calculation.get("benefit_name") if applied else None
+        benefit_id = calculation.get("card_benefit_id")
+        benefit_model = db.get(CardBenefit, benefit_id) if benefit_id else None
         benefit = next(
             (
                 item
                 for item in selected_card["benefits"]
-                if item.get("benefit_name") == benefit_name
+                if item.get("card_benefit_id") == benefit_id
             ),
             None,
         )
+        monthly_benefit_usage = None
+        daily_benefit_usage = None
+        benefit_usage_date = datetime.now(ZoneInfo("Asia/Seoul")).date()
+        if saved_amount > 0 and benefit_model is not None:
+            monthly_benefit_usage, daily_benefit_usage = lock_benefit_usage(
+                db,
+                user_id=request.user_id,
+                card_id=request.card_id,
+                card_benefit_id=benefit_model.id,
+                usage_month=usage_month,
+                usage_date=benefit_usage_date,
+            )
+            if not count_limit_is_available(
+                benefit_model,
+                monthly_benefit_usage,
+                daily_benefit_usage,
+            ):
+                saved_amount = 0
+        applied = (
+            saved_amount > 0
+            and bool(calculation.get("eligible"))
+            and benefit_model is not None
+        )
+        benefit_name = calculation.get("benefit_name") if applied else None
 
         authorization = authorize_demo_payment(
             selected_user_card,
@@ -1658,29 +1689,21 @@ def create_transaction(
         monthly_usage.current_month_spending += request.payment_amount
         monthly_usage.card_monthly_benefit_used += saved_amount
 
-        if applied and benefit and benefit.get("card_benefit_id") is not None:
-            benefit_usage = db.scalar(
-                select(BenefitUsage).where(
-                    BenefitUsage.user_id == request.user_id,
-                    BenefitUsage.card_benefit_id
-                    == benefit["card_benefit_id"],
-                    BenefitUsage.usage_month == usage_month,
-                )
+        if (
+            applied
+            and benefit_model is not None
+            and monthly_benefit_usage is not None
+            and daily_benefit_usage is not None
+        ):
+            record_applied_benefit(
+                db,
+                transaction=transaction,
+                benefit=benefit_model,
+                monthly=monthly_benefit_usage,
+                daily=daily_benefit_usage,
+                applied_amount=saved_amount,
+                applied_at=approved_at,
             )
-            if benefit_usage is None:
-                benefit_usage = BenefitUsage(
-                    user_id=request.user_id,
-                    card_id=request.card_id,
-                    card_benefit_id=benefit["card_benefit_id"],
-                    usage_month=usage_month,
-                    monthly_used_amount=0,
-                    monthly_used_count=0,
-                    daily_used_count=0,
-                )
-                db.add(benefit_usage)
-            benefit_usage.monthly_used_amount += saved_amount
-            benefit_usage.monthly_used_count += 1
-            benefit_usage.daily_used_count += 1
 
         db.commit()
         db.refresh(transaction)

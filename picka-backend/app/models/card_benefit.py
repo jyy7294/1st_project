@@ -127,6 +127,13 @@ class CardBenefit(Base):
         back_populates="card_benefit",
         cascade="all, delete-orphan",
     )
+    daily_usage_records: Mapped[list["BenefitDailyUsage"]] = relationship(
+        back_populates="card_benefit",
+        cascade="all, delete-orphan",
+    )
+    transaction_applications: Mapped[list["TransactionBenefitApplication"]] = relationship(
+        back_populates="card_benefit",
+    )
     eligibility_rules: Mapped[list["CardBenefitEligibilityRule"]] = relationship(
         back_populates="card_benefit",
         cascade="all, delete-orphan",
