@@ -1,10 +1,10 @@
 import unittest
 
-from app.services.recommendation_service import should_use_llm
+from app.services.recommendation_service import requires_merchant_scope_review
 
 
-class LlmReviewGateTest(unittest.TestCase):
-    def test_merchant_scope_keywords_require_llm_review(self):
+class MerchantScopeReviewGateTest(unittest.TestCase):
+    def test_merchant_scope_keywords_require_manual_review(self):
         keywords = [
             "일부 입점 매장",
             "일부 매장",
@@ -18,9 +18,9 @@ class LlmReviewGateTest(unittest.TestCase):
         for keyword in keywords:
             with self.subTest(keyword=keyword):
                 benefit = {"source_detail": f"혜택은 {keyword}에 적용됩니다."}
-                self.assertTrue(should_use_llm(benefit))
+                self.assertTrue(requires_merchant_scope_review(benefit))
 
-    def test_item_and_generic_exclusion_keywords_do_not_require_llm_review(self):
+    def test_generic_exclusion_keywords_do_not_require_manual_review(self):
         keywords = [
             "제외",
             "제외됩니다",
@@ -33,7 +33,7 @@ class LlmReviewGateTest(unittest.TestCase):
         for keyword in keywords:
             with self.subTest(keyword=keyword):
                 benefit = {"source_detail": f"{keyword} 관련 안내 문구"}
-                self.assertFalse(should_use_llm(benefit))
+                self.assertFalse(requires_merchant_scope_review(benefit))
 
 
 if __name__ == "__main__":
