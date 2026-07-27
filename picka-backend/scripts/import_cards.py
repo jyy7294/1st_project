@@ -1,3 +1,4 @@
+import csv
 import json
 import math
 from pathlib import Path
@@ -12,6 +13,24 @@ JSON_PATH = (
     / "data"
     / "backend_recommendation_export.json"
 )
+MERCHANT_CORRECTIONS_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "data"
+    / "merchant_list_handoff_corrections.csv"
+)
+
+
+def load_merchant_corrections() -> dict[str, str]:
+    if not MERCHANT_CORRECTIONS_PATH.exists():
+        return {}
+    with MERCHANT_CORRECTIONS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        return {
+            row["source_benefit_id"]: row["merchant_list"]
+            for row in csv.DictReader(file)
+        }
+
+
+MERCHANT_CORRECTIONS = load_merchant_corrections()
 
 
 def load_json(file_path: Path) -> Any:
@@ -36,13 +55,15 @@ def clean_value(value: Any) -> Any:
     if isinstance(value, float) and math.isnan(value):
         return None
 
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped or stripped.lower() in {"nan", "null", "none", "<na>"}:
+            return None
+
     return value
 
 def clean_nested_value(value: Any) -> Any:
     """dict와 list 내부의 NaN까지 모두 None으로 변환한다."""
-
-    if isinstance(value, float) and math.isnan(value):
-        return None
 
     if isinstance(value, dict):
         return {
@@ -56,7 +77,7 @@ def clean_nested_value(value: Any) -> Any:
             for item in value
         ]
 
-    return value
+    return clean_value(value)
 
 
 def extract_cards(data: Any) -> list[dict[str, Any]]:
@@ -119,6 +140,11 @@ def create_benefit_models(
             benefit_data
         )
 
+        source_benefit_id = clean_value(benefit_data.get("혜택ID"))
+        merchant_list = MERCHANT_CORRECTIONS.get(
+            str(source_benefit_id),
+            clean_value(benefit_data.get("가맹점목록")),
+        )
         additional_conditions = {
             "benefit_id": clean_value(
                 benefit_data.get("혜택ID")
@@ -135,9 +161,7 @@ def create_benefit_models(
             "merchant_level": clean_value(
                 benefit_data.get("가맹점수준")
             ),
-            "merchant_list": clean_value(
-                benefit_data.get("가맹점목록")
-            ),
+            "merchant_list": merchant_list,
             "scoring_grade": clean_value(
                 benefit_data.get("스코어링등급")
             ),
@@ -183,9 +207,7 @@ def create_benefit_models(
         }
 
         benefit = CardBenefit(
-            source_benefit_id=clean_value(
-                benefit_data.get("혜택ID")
-            ),
+            source_benefit_id=source_benefit_id,
             benefit_name=clean_value(
                 benefit_data.get("요약")
             ),
