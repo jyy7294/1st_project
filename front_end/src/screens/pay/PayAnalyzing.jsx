@@ -85,7 +85,7 @@ export default function PayAnalyzing() {
       </div>
 
       <div className={styles.head}>
-        <div className={styles.headTitle}>AI 분석 중</div>
+        <div className={styles.headTitle}>혜택 분석 중</div>
         <div className={styles.headSub}>
           현재 고객님께 가장 유리한 혜택을
           <br />
