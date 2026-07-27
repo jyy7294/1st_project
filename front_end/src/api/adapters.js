@@ -32,6 +32,8 @@ export function adaptCard(card) {
   return {
     card_id: card.card_id,
     user_card_id: card.user_card_id,
+    // 카드고릴라 원본 카드 id. 상세 혜택 화면이 카드사 안내 링크를 만들 때 씁니다.
+    source_card_id: card.source_card_id ?? null,
     card_company: card.card_company || card.issuer || '',
     card_name: card.card_name || '',
     last_four: card.card_number_last4 || '',
@@ -48,11 +50,7 @@ export function adaptCard(card) {
     // 카드 한 장에 걸린 월 통합 혜택 한도와 이번 달 사용분
     benefit_limit: card.monthly_total_limit || 0,
     benefit_used: card.card_monthly_benefit_used || 0,
-    benefits: Array.isArray(card.benefits)
-      ? card.benefits
-          .filter((benefit) => benefit.category !== '유의사항' && benefit.benefit_type !== '유의사항')
-          .map(adaptBenefit)
-      : [],
+    benefits: Array.isArray(card.benefits) ? card.benefits.map(adaptBenefit) : [],
   }
 }
 
@@ -63,9 +61,7 @@ export function adaptCard(card) {
 export function adaptBenefit(benefit) {
   // 정률(%)·정액(원)이 한 필드에 섞여 오므로 여기서 단위를 정상화합니다.
   // (예: 단위 '%' + 값 1000 → '원'으로 되돌려 '1000% 할인' 표기 방지)
-  const displayValue = benefit.display_benefit_value ?? benefit.benefit_value
-  const displayUnit = benefit.display_benefit_unit ?? benefit.benefit_unit
-  const { value, unit } = normalizeBenefitRate(displayValue, displayUnit)
+  const { value, unit } = normalizeBenefitRate(benefit.benefit_value, benefit.benefit_unit)
   return {
     id: String(benefit.card_benefit_id ?? benefit.source_benefit_id ?? benefit.benefit_name),
     category: benefit.category || '기타',
@@ -76,14 +72,12 @@ export function adaptBenefit(benefit) {
     condition: benefit.required_spending || null,
     limitMonth: benefit.monthly_benefit_limit || null,
     limitPerUse: benefit.per_transaction_limit || null,
+    limitYear: benefit.annual_limit || null,
     brands: benefit.merchant_list || null,
     desc: benefit.benefit_name || benefit.source_summary || benefit.condition_text || '',
-    displayValueText: benefit.display_value_text || null,
-    // condition_text/limit_status can contain importer-facing values such as
-    // "300000" or "혜택한도확정". Only explicit API display fields are UI text.
-    displayConditionText: benefit.display_condition_text || null,
-    displayLimitText: benefit.display_limit_text || null,
-    displayReviewRequired: Boolean(benefit.display_review_required),
+    // 카드사 원문. benefitView 가 첫 줄은 부제로, 나머지는 유의사항으로 풀어 씁니다.
+    summary: benefit.source_summary || null,
+    detailText: benefit.source_detail || null,
   }
 }
 

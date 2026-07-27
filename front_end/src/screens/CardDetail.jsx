@@ -3,7 +3,7 @@ import { useApp } from '../state/AppContext.jsx'
 import { A, cardStatsVisible } from '../state/appReducer.js'
 import CardFace from '../components/CardFace.jsx'
 import { fetchCardDetail, removeCard } from '../api/picka.js'
-import { benefitView } from '../utils/benefit.js'
+import { benefitView, isDisplayableBenefit } from '../utils/benefit.js'
 import { krw, krwMinus } from '../utils/format.js'
 import styles from './CardDetail.module.css'
 
@@ -160,7 +160,11 @@ export default function CardDetail() {
 
   // 백엔드가 혜택을 주면 그걸, 없으면(데모 등록 카드) 카드에 담긴 혜택을 씁니다.
   const benefits = detail.benefits.length > 0 ? detail.benefits : (card.benefits || [])
-  const highlights = benefits.slice(0, HIGHLIGHT_COUNT).map(benefitView)
+  // 대표 혜택을 고르기 전에 걸러야 디자인 안내가 상위 3개를 차지하지 않습니다.
+  const highlights = benefits
+    .filter(isDisplayableBenefit)
+    .slice(0, HIGHLIGHT_COUNT)
+    .map(benefitView)
   const allTx = detail.transactions
   // 전체보기는 최근 1달치만, 접힌 상태는 최신 5건만 보여줍니다.
   const monthTx = lastMonthTx(allTx)
@@ -323,7 +327,7 @@ export default function CardDetail() {
                 <span className={styles.benefitTitle}>{b.title}</span>
                 <span className={styles.benefitRate}>{b.rate}</span>
               </div>
-              <div className={styles.benefitDesc}>{b.desc}</div>
+              {b.desc && <div className={styles.benefitDesc}>{b.desc}</div>}
             </div>
           </div>
         ))}

@@ -5,7 +5,7 @@ import { gradientForCard } from '../data/cards.js'
 import { fetchCardDetail } from '../api/picka.js'
 import { selectRecoCard } from '../utils/recommend.js'
 import { benefitsForRecoCard } from '../data/recommendBenefits.js'
-import { benefitView } from '../utils/benefit.js'
+import { benefitView, isDisplayableBenefit } from '../utils/benefit.js'
 import styles from './CardBenefits.module.css'
 
 /** 카드가 가진 모든 혜택을 한도·실적·유의사항까지 펼쳐 보여줍니다. */
@@ -57,7 +57,14 @@ export default function CardBenefits() {
         back: 'detail',
       }
 
-  const benefits = view.rows.map(benefitView)
+  // 플레이트 디자인 안내·홍보 문장은 혜택이 아니므로 세기 전에 걸러냅니다.
+  const benefits = view.rows.filter(isDisplayableBenefit).map(benefitView)
+
+  // 카드고릴라 원본 카드 페이지. id 를 모르면 링크를 걸지 않습니다.
+  const gorillaId = fromReco ? recoCard.id : ownedCard.source_card_id
+  const gorillaUrl = gorillaId
+    ? `https://www.card-gorilla.com/card/detail/${gorillaId}`
+    : null
 
   return (
     <div className={`${styles.screen} pk-screen`}>
@@ -103,31 +110,51 @@ export default function CardBenefits() {
               </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemTitle}>{b.title}</div>
-                <div className={styles.itemDesc}>{b.desc}</div>
+                {b.desc && <div className={styles.itemDesc}>{b.desc}</div>}
               </div>
               <span className={styles.itemRate}>{b.rate}</span>
             </div>
 
-            <div className={styles.facts}>
-              <div className={styles.fact}>
-                <div className={styles.factLabel}>{b.limitLabel}</div>
-                <div className={styles.factValue}>{b.limitText}</div>
-              </div>
-              <div className={styles.fact}>
-                <div className={styles.factLabel}>{b.conditionLabel}</div>
-                <div className={styles.factValue}>{b.conditionText}</div>
-              </div>
-            </div>
+            {/*
+              안내 카드는 알릴 내용이 '카드사 안내를 보라'는 것뿐입니다.
+              빈 한도·실적 대신 원본 카드 페이지로 가는 길만 놓아 줍니다.
+            */}
+            {b.kind === 'notice' ? (
+              gorillaUrl && (
+                <a
+                  className={styles.sourceLink}
+                  href={gorillaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  카드고릴라에서 전체 혜택 보기
+                  <span aria-hidden="true"> ↗</span>
+                </a>
+              )
+            ) : (
+              <>
+                <div className={styles.facts}>
+                  <div className={styles.fact}>
+                    <div className={styles.factLabel}>월 통합한도</div>
+                    <div className={styles.factValue}>{b.limitText}</div>
+                  </div>
+                  <div className={styles.fact}>
+                    <div className={styles.factLabel}>전월 실적</div>
+                    <div className={styles.factValue}>{b.conditionText}</div>
+                  </div>
+                </div>
 
-            <div className={styles.notesLabel}>유의사항</div>
-            <ul className={styles.notes}>
-              {b.notes.map((note) => (
-                <li key={note} className={styles.note}>
-                  <span className={styles.bullet}>•</span>
-                  {note}
-                </li>
-              ))}
-            </ul>
+                <div className={styles.notesLabel}>유의사항</div>
+                <ul className={styles.notes}>
+                  {b.notes.map((note) => (
+                    <li key={note} className={styles.note}>
+                      <span className={styles.bullet}>•</span>
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         ))}
 
