@@ -160,11 +160,17 @@ export function benefitView(benefit) {
     title,
     rate,
     desc: benefit.desc || title,
+    limitLabel: benefit.limitMonth
+      ? '월 통합한도'
+      : benefit.limitPerUse
+        ? '건당 한도'
+        : '혜택 한도',
     limitText: benefit.displayLimitText || (benefit.limitMonth
       ? `월 ${krw(benefit.limitMonth)}원`
       : benefit.limitPerUse
         ? `건당 ${krw(benefit.limitPerUse)}원`
         : '한도 정보 확인 필요'),
+    conditionLabel: benefit.displayConditionText ? '적용 조건' : '전월 실적',
     conditionText: benefit.displayConditionText
       || (benefit.condition ? `전월 ${moneyShort(benefit.condition)}` : '조건 정보 확인 필요'),
     notes,
