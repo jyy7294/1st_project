@@ -1308,6 +1308,7 @@ def calculate_card_benefit(
 
         applicable_benefits.append({
             "benefit_id": benefit_id,
+            "card_benefit_id": get_field(benefit, "card_benefit_id"),
             "expected_benefit": expected_benefit,
             "benefit_rate": get_field(
                 benefit,
@@ -1477,6 +1478,7 @@ def calculate_card_benefit(
         "reason": reason,
         "reason_details": reason_details,
         "benefit_name": best_benefit["benefit_name"],
+        "card_benefit_id": best_benefit["card_benefit_id"],
         "summary": best_benefit["summary"],
         "detail": best_benefit["detail"],
         "benefit_summary": best_benefit["summary"],

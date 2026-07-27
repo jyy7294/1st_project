@@ -156,3 +156,7 @@ class Transaction(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    benefit_applications: Mapped[list["TransactionBenefitApplication"]] = relationship(
+        back_populates="transaction",
+        cascade="all, delete-orphan",
+    )

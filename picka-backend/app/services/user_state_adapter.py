@@ -178,7 +178,6 @@ def build_user_card_states(
             benefit_usage[str(benefit.source_benefit_id)] = {
                 "monthly_used_amount": usage.monthly_used_amount,
                 "monthly_used_count": usage.monthly_used_count,
-                "daily_used_count": usage.daily_used_count,
             }
 
         # 월 집계 캐시가 아니라 승인 거래의 실제 saved_amount를 단일 기준으로 사용한다.
