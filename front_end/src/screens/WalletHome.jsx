@@ -326,7 +326,19 @@ export default function WalletHome() {
                 selected ? styles.selected : '',
                 grabbed === i ? styles.grabbed : '',
               ].join(' ')}
-              style={{ top: i * offset, zIndex: grabbed === i ? 30 : selected ? 20 : i }}
+              style={{
+                top: i * offset,
+                // 펼친 상태에서는 선택한 카드를 맨 위에 두고, 선택 카드와 가까운
+                // 카드부터 차례대로 그 아래에 포갭니다.
+                // 예: 1-2-3 중 3을 누르면 레이어는 3 → 2 → 1 순서가 됩니다.
+                zIndex: grabbed === i
+                  ? cards.length + 20
+                  : selected
+                    ? cards.length + 10
+                    : expanded
+                      ? cards.length - Math.abs(i - active)
+                      : cards.length - i,
+              }}
               // 잡기 확대는 실제로 끌기 시작했을 때만 켭니다.
               // 그냥 탭할 때까지 커졌다 작아지면 선택 애니메이션과 겹쳐 산만합니다.
               onPointerDown={() => {

@@ -175,6 +175,135 @@
   margin-top: 10px;
   font-size: 11.5px;
   color: var(--text-4);
+  line-height: 1.5;
+}
+
+/* 결제 후 추천 근거: 업종 혜택 후보 선별 → 최근 3개월 소비로 최종 비교 */
+.selectionFlow {
+  margin-top: 14px;
+  padding: 18px 16px;
+  border-radius: 18px;
+  background: var(--bg-app);
+}
+
+.flowStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.flowStep + .flowStep {
+  margin-top: 22px;
+}
+
+.flowMarker {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--navy-grad);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.flowMarkerFinal {
+  background: var(--navy-grad);
+  color: #fff;
+}
+
+.flowBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.flowEyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--teal-deep);
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.flowHeadline {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--navy-text);
+}
+
+.flowHeadline span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.flowHeadline strong {
+  flex: none;
+  margin-left: auto;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--teal-deep);
+  white-space: nowrap;
+}
+
+.flowDescription {
+  margin-top: 9px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  word-break: keep-all;
+}
+
+.flowBenefitName {
+  margin-top: 11px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.flowBenefitName span {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.flowBenefitName strong {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--navy-text);
+}
+
+.flowAnalysis {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #e2e7ef;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.flowAnalysis span {
+  color: var(--text-3);
+}
+
+.flowAnalysis strong {
+  color: var(--navy-text);
+  font-size: 12.5px;
 }
 
 /* 소비 성향 원형 차트 2개 (빈도 / 금액) — 하나의 카드 안에 차트/토글/범례 순 */
