@@ -186,7 +186,7 @@ export default function PayRecommend() {
         {chosen && !error && !mustSelect && (
           <>
             <div className={styles.title}>
-              {performanceOnly ? '실적 달성 추천 카드' : 'AI 추천 카드'}
+              {performanceOnly ? '실적 달성 추천 카드' : 'PICKA 추천 카드'}
             </div>
 
             {/* 혜택 기준 추천은 백엔드 문구를 그대로 쓰고,
