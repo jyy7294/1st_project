@@ -1,12 +1,4 @@
-import logging
-
 from app.services.category_normalization import normalize_payment_category
-from app.services.llm_service import (
-    LLMServiceError,
-    judge_ambiguous_benefit,
-)
-
-logger = logging.getLogger(__name__)
 
 DEFAULT_BENEFIT_DETAIL = (
     "상세 유의사항은 카드사 공식 상품설명서를 확인해 주세요."
@@ -140,7 +132,7 @@ def get_scoring_grade(benefit: dict) -> str | None:
 
     return None
 
-LLM_REVIEW_KEYWORDS = [
+AMBIGUOUS_MERCHANT_SCOPE_KEYWORDS = [
     "일부 입점 매장",
     "일부 매장",
     "입점 매장 제외",
@@ -158,6 +150,9 @@ ITEM_CAVEAT_KEYWORDS = [
 ]
 
 ITEM_CAVEAT_MESSAGE = "상품권·선불카드·충전 등 일부 품목은 혜택에서 제외될 수 있습니다."
+MERCHANT_SCOPE_CAVEAT_MESSAGE = (
+    "해당 매장이 카드사 지정·제휴 가맹점인지 확인이 필요합니다."
+)
 
 
 def get_benefit_rule_text(
@@ -209,7 +204,7 @@ def get_benefit_rule_text(
     )
 
 
-def should_use_llm(
+def requires_merchant_scope_review(
     benefit: dict | object,
 ) -> bool:
     if get_exclusion_reason(benefit) is not None:
@@ -222,7 +217,7 @@ def should_use_llm(
 
     return any(
         keyword in rule_text
-        for keyword in LLM_REVIEW_KEYWORDS
+        for keyword in AMBIGUOUS_MERCHANT_SCOPE_KEYWORDS
     )
 
 
@@ -1243,43 +1238,9 @@ def calculate_card_benefit(
         ):
             continue
 
-        if should_use_llm(benefit) and merchant_name:
-            try:
-                judgment = judge_ambiguous_benefit(
-                    merchant_name=merchant_name,
-                    payment_category=payment_category,
-                    payment_amount=payment_amount,
-                    benefit_name=get_field(
-                        benefit,
-                        "benefit_name",
-                        "혜택명",
-                        default="혜택명 없음",
-                    ),
-                    benefit_rule=get_benefit_rule_text(benefit),
-                )
-
-            except LLMServiceError:
-                logger.exception(
-                    "LLM benefit judgment failed",
-                    extra={
-                        "benefit_id": benefit_id,
-                    },
-                )
-                is_conditional = True
-                caveats.append(
-                    "AI 판단 오류로 세부 적용 여부 확인이 필요합니다."
-                )
-
-            else:
-                if judgment.needs_human_review:
-                    is_conditional = True
-                    caveats.append(judgment.caveat or judgment.reason)
-
-                if not judgment.applicable and not judgment.needs_human_review:
-                    failure_reasons.append(
-                        f"혜택 적용 불가: {judgment.reason}"
-                    )
-                    continue
+        if requires_merchant_scope_review(benefit) and merchant_name:
+            is_conditional = True
+            caveats.append(MERCHANT_SCOPE_CAVEAT_MESSAGE)
 
         calculation = calculate_scored_benefit(
             card=card,

@@ -1,7 +1,5 @@
 import unittest
-from unittest.mock import patch
 
-from app.services.llm_service import BenefitJudgment, LLMServiceError
 from app.services.recommendation_service import calculate_card_benefit
 
 
@@ -39,26 +37,13 @@ class ConditionalBenefitTest(unittest.TestCase):
         )
 
     def test_item_exception_keeps_confirmed_benefit_with_caveat(self):
-        with patch(
-            "app.services.recommendation_service.judge_ambiguous_benefit"
-        ) as judge:
-            result = self.calculate("편의점 10% 할인, 상품권 구매 제외")
+        result = self.calculate("편의점 10% 할인, 상품권 구매 제외")
 
-        judge.assert_not_called()
         self.assertEqual(result["expected_benefit"], 5_000)
         self.assertFalse(result["is_conditional"])
         self.assertIsNotNone(result["caveat"])
 
-    @patch("app.services.recommendation_service.judge_ambiguous_benefit")
-    def test_ambiguous_merchant_scope_is_conditional(self, judge):
-        judge.return_value = BenefitJudgment(
-            applicable=True,
-            confidence=0.5,
-            reason="해당 매장이 적용 대상인지 확인이 필요합니다.",
-            needs_human_review=True,
-            caveat="해당 매장이 카드사 지정 가맹점인지 확인이 필요합니다.",
-        )
-
+    def test_ambiguous_merchant_scope_is_conditional(self):
         result = self.calculate("편의점 10% 할인, 일부 입점 매장 제외")
 
         self.assertEqual(result["expected_benefit"], 5_000)
@@ -73,19 +58,11 @@ class ConditionalBenefitTest(unittest.TestCase):
         self.assertFalse(result["is_conditional"])
         self.assertIsNone(result["caveat"])
 
-    @patch("app.services.recommendation_service.judge_ambiguous_benefit")
-    def test_llm_failure_fails_open_and_logs_exception(self, judge):
-        judge.side_effect = LLMServiceError("timeout")
-
-        with self.assertLogs(
-            "app.services.recommendation_service", level="ERROR"
-        ) as logs:
-            result = self.calculate("편의점 10% 할인, 일부 매장만 적용")
-
+    def test_ambiguous_scope_uses_deterministic_caveat(self):
+        result = self.calculate("편의점 10% 할인, 일부 매장만 적용")
         self.assertEqual(result["expected_benefit"], 5_000)
         self.assertTrue(result["is_conditional"])
-        self.assertIn("AI 판단 오류", result["caveat"])
-        self.assertIn("LLM benefit judgment failed", " ".join(logs.output))
+        self.assertIn("지정·제휴 가맹점", result["caveat"])
 
 
 if __name__ == "__main__":
