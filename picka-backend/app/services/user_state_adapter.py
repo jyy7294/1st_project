@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -50,8 +51,62 @@ def _tier_to_state(tier: object) -> dict[str, Any]:
     }
 
 
-def _benefit_to_state(benefit: CardBenefit) -> dict[str, Any]:
+_FIXED_MILEAGE_PATTERN = re.compile(r"([\d,]+)\s*마일")
+
+
+def _is_notice_benefit(benefit: CardBenefit) -> bool:
+    """Return whether a source row is explanatory text, not a benefit."""
+    category = (benefit.category or "").strip()
+    benefit_type = (benefit.benefit_type or "").strip()
+    return category == "유의사항" or benefit_type == "유의사항"
+
+
+def _display_fields(benefit: CardBenefit) -> dict[str, Any]:
+    """Build truthful display metadata without changing calculation fields.
+
+    Some imported annual bonuses were encoded as ``0 마일/천원`` because the
+    source schema had no fixed-bonus representation.  The original structured
+    fields stay untouched for the recommendation engine, while the API exposes
+    an explicit display value and marks the row as non-transaction-calculable.
+    """
+    summary = benefit.source_summary or benefit.benefit_name or ""
+    detail = benefit.source_detail or benefit.condition_text or ""
+    value = benefit.benefit_value
+    unit = benefit.benefit_unit
+    fixed_bonus_match = None
+    if (
+        (value is None or value <= 0)
+        and "보너스" in f"{summary} {detail}"
+        and "마일" in f"{summary} {detail}"
+    ):
+        fixed_bonus_match = _FIXED_MILEAGE_PATTERN.search(f"{summary} {detail}")
+
+    if fixed_bonus_match:
+        fixed_value = int(fixed_bonus_match.group(1).replace(",", ""))
+        return {
+            "display_benefit_value": fixed_value,
+            "display_benefit_unit": "마일",
+            "display_value_text": f"조건 충족 시 {fixed_value:,}마일",
+            "display_condition_text": summary or detail,
+            "display_limit_text": "연 1회" if "연 1회" in f"{summary} {detail}" else None,
+            "is_transaction_calculable": False,
+            "display_review_required": False,
+        }
+
+    has_positive_value = isinstance(value, (int, float)) and value > 0
     return {
+        "display_benefit_value": value if has_positive_value else None,
+        "display_benefit_unit": unit if has_positive_value else None,
+        "display_value_text": None,
+        "display_condition_text": benefit.condition_text,
+        "display_limit_text": None,
+        "is_transaction_calculable": has_positive_value,
+        "display_review_required": not has_positive_value,
+    }
+
+
+def _benefit_to_state(benefit: CardBenefit) -> dict[str, Any]:
+    state = {
         "card_benefit_id": benefit.id,
         "source_benefit_id": benefit.source_benefit_id,
         "benefit_name": benefit.benefit_name,
@@ -87,6 +142,8 @@ def _benefit_to_state(benefit: CardBenefit) -> dict[str, Any]:
         ),
         "benefit_tiers": [_tier_to_state(tier) for tier in benefit.tiers],
     }
+    state.update(_display_fields(benefit))
+    return state
 
 
 def build_user_card_states(
@@ -223,7 +280,9 @@ def build_user_card_states(
                 ),
                 "benefit_usage_this_month": benefit_usage,
                 "benefits": [
-                    _benefit_to_state(benefit) for benefit in card.benefits
+                    _benefit_to_state(benefit)
+                    for benefit in card.benefits
+                    if not _is_notice_benefit(benefit)
                 ],
             }
         )
