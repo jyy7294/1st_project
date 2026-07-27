@@ -226,12 +226,29 @@
 .benefitHead {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  /* 제목이 두 줄로 넘어가도 혜택값이 첫 줄에 붙어 있게 합니다. */
+  align-items: flex-start;
   gap: 8px;
 }
 
-.benefitTitle { font-size: 14px; font-weight: 700; color: var(--navy-text); }
-.benefitRate { font-size: 12.5px; font-weight: 700; color: var(--blue-hover); flex: none; }
+/* keep-all 이 없으면 한글이 단어 한가운데서 끊깁니다. */
+.benefitTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-text);
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.benefitRate {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--blue-hover);
+  flex: none;
+  line-height: 1.4;
+  white-space: nowrap;
+}
 
 .benefitDesc {
   font-size: 12px;

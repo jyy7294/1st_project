@@ -81,6 +81,90 @@ const STYLE_BY_CATEGORY = {
 
 const DEFAULT_STYLE = { icon: '✦', tint: GRAY }
 
+/*
+ * 카드 DB 의 카테고리·혜택유형에는 뜻이 없는 자리표시 값이 섞여 있습니다.
+ * 제목을 '카테고리 + 값 + 유형'으로 이어 붙일 때 이 토큰이 그대로 남으면
+ * '기타' 나 '프리미엄서비스 기타' 처럼 무슨 혜택인지 알 수 없는 제목이 됩니다.
+ */
+const GENERIC_TOKENS = new Set(['기타', '일반', '불명', '해당없음'])
+
+/** 유의사항으로 펼칠 카드사 원문 줄 수. 이보다 길면 잘라내고 안내 문구를 답니다. */
+const NOTE_LIMIT = 4
+
+/** 부제로 쓰기에 무리 없는 길이. 넘으면 짧은 요약을 찾아 쓰고 원문은 유의사항으로 내립니다. */
+const DESC_LIMIT = 70
+
+/*
+ * 카드 '혜택'이 아니라 플레이트 디자인 안내이거나 순수 홍보 문장인 행을 걸러내기 위한 패턴.
+ * (예: '메탈 플레이트 제공', '꼭 확인하세요!', 'the Red Edition5의 특별한 디자인을 소개합니다.')
+ *
+ * 다만 '메탈 플레이트 제공·공항 라운지 무료 이용' 처럼 실제 혜택이 함께 적힌 행도 있어,
+ * REAL_BENEFIT 이 걸리면 디자인 문구가 섞여 있어도 남깁니다.
+ */
+const DESIGN_ONLY = /디자인|플레이트|plate|소재/i
+const PROMO_ONLY = /소개합니다|뿜뿜|꼭 확인하세요|당신을 위해|만나보세요|선보입니다|새롭고/
+const REAL_BENEFIT =
+  /라운지|발레파킹|priority\s*pass|무료\s?이용|할인|적립|면제|바우처|쿠폰|캐시백/i
+
+/** 카드사가 쓴 문구의 첫 줄. 제목 후보이자 표시 여부 판단의 근거입니다. */
+function headline(benefit) {
+  const raw = benefit.desc || benefit.summary || benefit.detailText || ''
+  return String(raw).split('\n')[0].trim()
+}
+
+/** '[특별 서비스] 전월실적 채워드림' → '전월실적 채워드림' */
+function stripTag(text) {
+  return text.replace(/^\[[^\]]*\]\s*/, '').trim()
+}
+
+/** '제공대상', '[마이신한포인트 적립]' 처럼 내용이 아니라 구획을 나누는 줄. */
+function isHeadingLine(line) {
+  if (/^\[[^\]]*\]$/.test(line)) return true
+  return line.length <= 6 && !/[.,·:]/.test(line)
+}
+
+/*
+ * 카드사 상세 설명에서 문장만 골라 냅니다.
+ *
+ * 원문에는 표가 줄바꿈으로 눌러 담겨 있습니다. 예를 들어 '할인기준' 표는
+ *   '구분 전월 30만원 이상 … 쇼핑 4,000원' / '8,000원' / '16,000원' / '보육 4,000원'
+ * 처럼 셀 하나가 한 줄씩 떨어져 들어옵니다. 이걸 줄마다 유의사항으로 찍으면
+ * '8,000원' 같은 조각이 그대로 노출되고, '넷플릭스,' 와 '유튜브 프리미엄 …' 처럼
+ * 한 문장이 두 개로 잘려 보입니다.
+ *
+ * 실제 설명 문장은 예외 없이 '-' 나 '*' 로 시작하고 표 조각·구획 머리글은 그렇지 않아,
+ * 머리 기호가 있는 줄만 남깁니다.
+ */
+const BULLET = /^[\s]*[-*※·•]+\s*/
+
+function detailLines(benefit) {
+  return String(benefit.detailText || '')
+    .split('\n')
+    .filter((line) => BULLET.test(line))
+    .map((line) => line.replace(BULLET, '').trim())
+    .filter(Boolean)
+}
+
+/**
+ * 화면에 보여줄 혜택인지 판단합니다.
+ *
+ * 값이 없다고 해서 혜택이 아닌 건 아닙니다 — '해외 이용 수수료 면제'처럼 수치로
+ * 표현할 수 없는 서비스가 전체의 절반 가까이 됩니다. 그래서 값 유무가 아니라
+ * '카드 플레이트 디자인 안내인가 / 홍보 문장인가'로만 걸러냅니다.
+ *
+ * @param {object} benefit adaptBenefit() 결과 또는 data/benefits.js 의 원소
+ */
+export function isDisplayableBenefit(benefit) {
+  const text = headline(benefit)
+  if (!text) return false
+  // 수치나 한도가 붙은 행은 따질 것 없이 혜택입니다.
+  if (benefit.value > 0) return true
+  if (benefit.limitMonth || benefit.limitPerUse || benefit.limitYear) return true
+  // 디자인 문구에 걸려도 실제 혜택이 함께 적혀 있으면 남깁니다.
+  if (REAL_BENEFIT.test(text)) return true
+  return !(DESIGN_ONLY.test(text) || PROMO_ONLY.test(text))
+}
+
 /**
  * 카테고리 → 표시 아이콘·배경색. 혜택 목록·결제내역이 같은 표기를 쓰도록
  * 이 한 곳에서 정합니다. 모르는 카테고리는 중립 아이콘으로 떨어집니다.
@@ -94,13 +178,6 @@ export function categoryStyle(category) {
 function moneyShort(won) {
   if (won >= 10000 && won % 10000 === 0) return `${won / 10000}만원`
   return `${krw(won)}원`
-}
-
-/** 혜택 수치도 금액처럼 천 단위 구분을 적용합니다. */
-function benefitRateText(value, unit) {
-  if (value === null || value === undefined || value === '') return ''
-  const formatted = typeof value === 'number' ? value.toLocaleString('ko-KR') : value
-  return `${formatted}${unit || ''}`
 }
 
 /**
@@ -122,16 +199,22 @@ export function benefitView(benefit) {
    * 그래서 뜻이 분명한 안내 문구로 바꿔, 알려주려는 바(조건 확인 필요)를 명확히 합니다.
    */
   if (benefit.category === '유의사항') {
+    /*
+     * 알릴 내용이 '카드사 안내를 보라'는 것뿐이라 한도·실적·유의사항을 붙여 봐야
+     * '한도 없음 / 실적 무관' 같은 빈 칸만 늘어납니다. 문구만 남기고, 화면이
+     * 카드고릴라 링크를 대신 달 수 있도록 kind 로 알려 줍니다.
+     */
     return {
+      kind: 'notice',
       id: benefit.id,
       icon: style.icon,
       tint: style.tint,
       title: '혜택 조건 확인 필요',
       rate: '',
       desc: '적용 조건·한도는 카드사 안내를 확인하세요',
-      limitText: '한도 정보 확인 필요',
-      conditionText: '조건 정보 확인 필요',
-      notes: ['혜택마다 적용 조건·한도가 다를 수 있어요. 카드사 상세 안내를 확인하세요.'],
+      limitText: '',
+      conditionText: '',
+      notes: [],
     }
   }
 
@@ -141,18 +224,76 @@ export function benefitView(benefit) {
    * '해외 수수료 면제'처럼 숫자가 없는 혜택은 value 가 비어 옵니다.
    * 그대로 이어붙이면 '금융서비스 null 면제/우대' 가 되므로 숫자 부분을 통째로 뺍니다.
    */
-  const hasValue = benefit.value !== null && benefit.value !== undefined && benefit.value !== '' && benefit.value !== 0
+  const hasValue = benefit.value !== null && benefit.value !== undefined && benefit.value !== ''
   // 정률(%)에 100 초과 값이 오면 정액(원)으로 정상화해 '1000%' 표기를 막습니다.
   const { value: rateValue, unit: rateUnit } = normalizeBenefitRate(benefit.value, benefit.unit)
-  const rate = benefit.displayValueText || (hasValue ? benefitRateText(rateValue, rateUnit) : '')
+  // 금액·마일은 천 단위로 끊어 씁니다. ('15000마일' → '15,000마일')
+  const rate = hasValue ? `${krw(rateValue)}${rateUnit}` : ''
 
-  // 제목은 있는 조각만 이어 붙입니다. 카테고리와 유형이 같으면(기타/기타) 한 번만 씁니다.
-  const title = [where, rate, benefit.type !== where ? benefit.type : '']
-    .filter(Boolean)
-    .join(' ')
+  /*
+   * 제목 조각을 모읍니다. 뜻 없는 토큰('기타')과 중복은 여기서 빠집니다.
+   * 혜택값은 화면이 제목 오른쪽에 따로 크게 찍으므로 제목에 넣지 않습니다 —
+   * 넣으면 '멤버십/포인트 15,000마일 마일리지 적립  15,000마일' 처럼 두 번 나옵니다.
+   */
+  const parts = []
+  for (const token of [where, benefit.type]) {
+    const piece = String(token || '').trim()
+    if (!piece || GENERIC_TOKENS.has(piece) || parts.includes(piece)) continue
+    parts.push(piece)
+  }
+  const combined = parts.join(' ')
 
-  const notes = []
-  if (benefit.desc) notes.push(benefit.desc)
+  /*
+   * '카페/디저트 10% 할인'처럼 업종이나 유형이 남았으면 그 조합이 이미 명확합니다.
+   * 남은 게 숫자뿐이거나 아무것도 없으면(카테고리·유형이 전부 '기타') 카드사가 쓴
+   * 이름을 제목으로 올립니다 — 예전에는 이 경우 제목이 그냥 '기타'였습니다.
+   */
+  const issuerLabel = stripTag(headline(benefit))
+  const title = rate
+    ? combined || issuerLabel
+    : issuerLabel || combined || '카드 서비스'
+
+  /*
+   * 카드사 상세 설명은 '이름 줄 + 설명 줄들' 구조입니다. 이름 줄은 제목과 겹치므로
+   * 버리고, 첫 설명 줄을 부제로, 나머지를 유의사항으로 내립니다.
+   * (지금까지는 이 설명이 통째로 버려져 '기타 / 전월실적 채워드림'만 남았습니다.)
+   */
+  const body = detailLines(benefit).filter(
+    (line) => line !== title && line !== issuerLabel && !title.startsWith(line),
+  )
+  /*
+   * 원문에는 '제공대상', '[마이신한포인트 적립]' 같은 머리말 줄이 섞여 있습니다.
+   * 부제로 올리면 무슨 혜택인지 알 수 없으니 실제 설명이 나올 때까지 건너뜁니다.
+   */
+  while (body.length > 1 && isHeadingLine(body[0])) body.shift()
+  const [lead, ...rest] = body
+
+  /*
+   * 카드사 원문 첫 줄이 100자를 넘는 경우가 있습니다(LOCA 365 의 구독 할인은 147자).
+   * 부제로 올리면 카드 머리가 문단이 되므로, 짧은 요약이 따로 있으면 그걸 부제로 쓰고
+   * 긴 원문은 유의사항으로 내립니다.
+   */
+  const tooLong = lead && lead.length > DESC_LIMIT
+  const shortAlt = tooLong && benefit.desc && benefit.desc.length <= DESC_LIMIT
+    ? benefit.desc
+    : ''
+  const candidate = shortAlt || lead || benefit.desc || ''
+  // 제목을 그대로 되풀이하는 부제는 한 줄만 낭비하므로 비웁니다(화면이 건너뜁니다).
+  const desc = candidate === title ? '' : candidate
+  if (shortAlt) rest.unshift(lead)
+
+  /*
+   * 카드사 원문은 60줄이 넘기도 합니다(예: The CLASSIC-Y 의 Gift Option). 그대로 펼치면
+   * 전화번호·약관까지 쏟아져 오히려 읽기 어려워지므로 앞부분만 남기고 잘라 냅니다.
+   */
+  const detail = []
+  for (const line of rest) {
+    if (line !== desc && !detail.includes(line)) detail.push(line)
+  }
+  const notes = detail.slice(0, NOTE_LIMIT)
+  if (detail.length > NOTE_LIMIT) notes.push('자세한 조건은 카드사 안내를 확인하세요')
+  // 설명이 아예 없던 혜택은 예전처럼 카드사 문구를 유의사항에 남겨 둡니다.
+  if (notes.length === 0 && benefit.desc && benefit.desc !== desc) notes.push(benefit.desc)
   notes.push(
     benefit.brands
       ? `적용처 · ${benefit.brands.split('|').join(', ')}`
@@ -161,25 +302,19 @@ export function benefitView(benefit) {
   if (benefit.limitPerUse) notes.push(`건당 최대 ${krw(benefit.limitPerUse)}원까지 적용`)
 
   return {
+    kind: 'benefit',
     id: benefit.id,
     icon: style.icon,
     tint: style.tint,
     title,
     rate,
-    desc: benefit.desc || title,
-    limitLabel: benefit.limitMonth
-      ? '월 통합한도'
+    desc,
+    limitText: benefit.limitMonth
+      ? `월 ${krw(benefit.limitMonth)}원`
       : benefit.limitPerUse
-        ? '건당 한도'
-        : '혜택 한도',
-    limitText: benefit.displayLimitText || (benefit.limitMonth
-      ? `${krw(benefit.limitMonth)}원`
-      : benefit.limitPerUse
-        ? `${krw(benefit.limitPerUse)}원`
-        : '한도 정보 확인 필요'),
-    conditionLabel: benefit.displayConditionText ? '적용 조건' : '전월 실적',
-    conditionText: benefit.displayConditionText
-      || (benefit.condition ? `${moneyShort(benefit.condition)} 이상` : '조건 정보 확인 필요'),
+        ? `건당 ${krw(benefit.limitPerUse)}원`
+        : '한도 없음',
+    conditionText: benefit.condition ? `전월 ${moneyShort(benefit.condition)}` : '실적 무관',
     notes,
   }
 }

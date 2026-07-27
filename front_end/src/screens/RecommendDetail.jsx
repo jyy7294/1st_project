@@ -16,7 +16,7 @@ import {
   findCategoryBenefit,
 } from '../utils/recommend.js'
 import { benefitsForRecoCard } from '../data/recommendBenefits.js'
-import { benefitView } from '../utils/benefit.js'
+import { benefitView, isDisplayableBenefit } from '../utils/benefit.js'
 import { buildDonut, buildSpendingMix } from '../utils/report.js'
 import { fetchAllTransactions } from '../api/picka.js'
 import { krw, krwMinus, feeText } from '../utils/format.js'
@@ -84,7 +84,9 @@ export default function RecommendDetail() {
   )
 
   // 카드 상세 페이지와 같은 포맷으로 상세 혜택을 표기합니다.
-  const benefits = benefitsForRecoCard(card.id).map(benefitView)
+  const benefits = benefitsForRecoCard(card.id)
+    .filter(isDisplayableBenefit)
+    .map(benefitView)
   const highlights = benefits.slice(0, BENEFIT_PREVIEW)
 
   // (정적 카테고리 추천에서만) 총 혜택을 카테고리 비율로 나눠 보여줍니다.
@@ -496,7 +498,7 @@ function BenefitRow({ benefit }) {
           <span className={styles.benefitTitle}>{benefit.title}</span>
           <span className={styles.benefitRate}>{benefit.rate}</span>
         </div>
-        <div className={styles.benefitDesc}>{benefit.desc}</div>
+        {benefit.desc && <div className={styles.benefitDesc}>{benefit.desc}</div>}
       </div>
     </div>
   )
