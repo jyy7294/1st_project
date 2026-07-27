@@ -97,6 +97,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://picka-frontend.onrender.com",
+        "https://picka-frontend-y432.onrender.com",
         "https://1st-project-gules.vercel.app",
     ],
     allow_credentials=True,
