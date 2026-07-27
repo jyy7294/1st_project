@@ -42,8 +42,11 @@ export default function PayRecommend() {
   const ranked = orderedComparison(result?.comparison)
   const selectedIdx = payIdx < ranked.length ? payIdx : 0
   const chosen = ranked[selectedIdx] || null
+  const nextRanked = ranked[selectedIdx + 1] || null
   const amount = transaction?.payment_amount || 0
   const discount = chosen?.expected_benefit || 0
+  const nextDiscount = nextRanked?.expected_benefit || 0
+  const savingGap = nextRanked ? Math.max(0, discount - nextDiscount) : 0
   // 업종은 백엔드가 가맹점명으로 판정한 값을 씁니다.
   const category = displayCategory(result, transaction)
 
@@ -140,8 +143,30 @@ export default function PayRecommend() {
   return (
     <div className={`${styles.screen} pk-screen`}>
       <div className={`${styles.scroll} ${lowered ? styles.scrollLow : ''}`}>
-        <div className={`${shared.brandRow} ${shared.end}`}>
-          picka
+        <div className={styles.topBar}>
+          {lowered ? (
+            <button
+              type="button"
+              className={`${styles.topIconBtn} ${styles.homeIconBtn}`}
+              aria-label="홈으로 돌아가기"
+              onClick={() => dispatch({ type: A.RESET_PAY })}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3.5 11.2 12 4l8.5 7.2" />
+                <path d="M5.8 10.2V20h12.4v-9.8" />
+                <path d="M9.4 20v-5.7h5.2V20" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={styles.topIconBtn}
+              aria-label="카드 선택 창 닫기"
+              onClick={() => setLowered(true)}
+            >
+              ‹
+            </button>
+          )}
         </div>
 
         {error && <ErrorNotice message={error} onRetry={retry} />}
@@ -160,12 +185,6 @@ export default function PayRecommend() {
 
         {chosen && !error && !mustSelect && (
           <>
-            <div className={styles.badgeRow}>
-              <span className={styles.badge}>
-                {performanceOnly ? '📈 PERFORMANCE PICK' : '✦ SMART SUGGESTION'}
-              </span>
-            </div>
-
             <div className={styles.title}>
               {performanceOnly ? '실적 달성 추천 카드' : 'AI 추천 카드'}
             </div>
@@ -175,18 +194,12 @@ export default function PayRecommend() {
             <div className={styles.lead}>
               {performanceOnly ? (
                 PERFORMANCE_LEAD
+              ) : !nextRanked ? (
+                '선택한 카드가 마지막 순위 카드예요.'
+              ) : savingGap > 0 ? (
+                `다음 순위 카드보다 ${krw(savingGap)}원을 더 절약할 수 있습니다.`
               ) : (
-                result?.saving_message || (
-                  <>
-                    {chosen.card_company}가 {category}에서
-                    {' '}
-                    {/* 실제 할인액으로 말합니다. benefit_rate 는 정률·정액이 섞여 있어
-                        '%'를 붙이면 1,000원 할인이 '1000% 할인'이 됩니다. */}
-                    {discount > 0 ? `${krw(discount)}원 할인` : '가장 큰 혜택'}으로
-                    <br />
-                    혜택이 가장 좋아요. 이 카드로 결제할까요?
-                  </>
-                )
+                '다음 순위 카드와 할인 혜택 차이가 없습니다.'
               )}
             </div>
 
@@ -338,13 +351,6 @@ export default function PayRecommend() {
             onClick={() => dispatch({ type: A.SET_PAY_STEP, payStep: 'confirm' })}
           >
             이 카드로 결제
-          </button>
-          <button
-            type="button"
-            className={shared.ghostBtn}
-            onClick={() => dispatch({ type: A.RESET_PAY })}
-          >
-            홈으로 돌아가기
           </button>
         </div>
       </div>

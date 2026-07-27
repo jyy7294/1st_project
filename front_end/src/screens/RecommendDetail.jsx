@@ -74,6 +74,14 @@ export default function RecommendDetail() {
 
   // 대표 혜택 문구 — 단위(%/원)를 보고 만들어 정액 혜택에 %가 붙지 않게 합니다.
   const mainBenefitText = benefitText(findMainBenefit(card), card)
+  const paymentCategory = state.recoCategory
+  const paymentCategoryBenefit = paymentCategory
+    ? findCategoryBenefit(card, paymentCategory)
+    : null
+  const paymentCategoryBenefitText = benefitText(
+    paymentCategoryBenefit || findMainBenefit(card),
+    card,
+  )
 
   // 카드 상세 페이지와 같은 포맷으로 상세 혜택을 표기합니다.
   const benefits = benefitsForRecoCard(card.id).map(benefitView)
@@ -180,33 +188,82 @@ export default function RecommendDetail() {
           {/* 줄글 대신 근거를 항목으로 나눠 한눈에 */}
           <section className={styles.section}>
             <div className={styles.sectionTitle}>왜 이 카드인가요?</div>
-            <div className={styles.factList}>
-              {card.benefitCategory && (
-                <div className={styles.factRow}>
-                  <span className={styles.factLabel}>많이 쓴 업종</span>
-                  <span className={styles.factValue}>
-                    {card.benefitCategory}
-                    {card.monthlySpend > 0 && (
-                      <span className={styles.factSub}> · {krw(card.monthlySpend)}원</span>
+
+            {paymentCategory ? (
+              <div className={styles.selectionFlow}>
+                <div className={styles.flowStep}>
+                  <div className={styles.flowMarker}>1</div>
+                  <div className={styles.flowBody}>
+                    <div className={styles.flowEyebrow}>결제 업종 혜택으로 1차 선별</div>
+                    <div className={styles.flowHeadline}>
+                      <span>{paymentCategory} 혜택</span>
+                      <strong>{paymentCategoryBenefitText}</strong>
+                    </div>
+                    <div className={styles.flowDescription}>
+                      방금 결제한 {paymentCategory} 업종에서 혜택이 큰 카드들을 먼저 골랐어요.
+                    </div>
+                    {paymentCategoryBenefit?.name && (
+                      <div className={styles.flowBenefitName}>
+                        <span>적용 혜택</span>
+                        <strong>{paymentCategoryBenefit.name}</strong>
+                      </div>
                     )}
+                  </div>
+                </div>
+
+                <div className={styles.flowStep}>
+                  <div className={`${styles.flowMarker} ${styles.flowMarkerFinal}`}>2</div>
+                  <div className={styles.flowBody}>
+                    <div className={styles.flowEyebrow}>최근 3개월 소비로 최종 비교</div>
+                    <div className={styles.flowHeadline}>
+                      <span>최종 예상 연혜택</span>
+                      <strong>{krw(card.total)}원</strong>
+                    </div>
+                    <div className={styles.flowDescription}>
+                      1차 후보의 혜택을 최근 3개월 이용 빈도와 금액에 적용해 비교했어요.
+                      이 카드가 가장 많은 혜택을 받을 수 있는 카드예요.
+                    </div>
+                    {card.benefitCategory && (
+                      <div className={styles.flowAnalysis}>
+                        <span>소비 분석에서 확인된 주요 업종</span>
+                        <strong>
+                          {card.benefitCategory}
+                          {card.monthlySpend > 0 && ` · ${krw(card.monthlySpend)}원`}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.factList}>
+                {card.benefitCategory && (
+                  <div className={styles.factRow}>
+                    <span className={styles.factLabel}>많이 쓴 업종</span>
+                    <span className={styles.factValue}>
+                      {card.benefitCategory}
+                      {card.monthlySpend > 0 && (
+                        <span className={styles.factSub}> · {krw(card.monthlySpend)}원</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                <div className={styles.factRow}>
+                  <span className={styles.factLabel}>적용 혜택</span>
+                  <span className={styles.factValue}>{card.benefitName}</span>
+                </div>
+                <div className={styles.factRow}>
+                  <span className={styles.factLabel}>할인 조건</span>
+                  <span className={styles.factValue}>{mainBenefitText}</span>
+                </div>
+                <div className={styles.factRow}>
+                  <span className={styles.factLabel}>예상 연혜택</span>
+                  <span className={`${styles.factValue} ${styles.factStrong}`}>
+                    {krw(card.total)}원
                   </span>
                 </div>
-              )}
-              <div className={styles.factRow}>
-                <span className={styles.factLabel}>적용 혜택</span>
-                <span className={styles.factValue}>{card.benefitName}</span>
               </div>
-              <div className={styles.factRow}>
-                <span className={styles.factLabel}>할인 조건</span>
-                <span className={styles.factValue}>{mainBenefitText}</span>
-              </div>
-              <div className={styles.factRow}>
-                <span className={styles.factLabel}>예상 연혜택</span>
-                <span className={`${styles.factValue} ${styles.factStrong}`}>
-                  {krw(card.total)}원
-                </span>
-              </div>
-            </div>
+            )}
             {meta?.analysisStartDate && (
               <div className={styles.factNote}>
                 {meta.analysisStartDate} ~ {meta.analysisEndDate} 소비 기준

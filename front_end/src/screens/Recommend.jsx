@@ -20,6 +20,7 @@ const TYPE_LABEL = { credit: '신용카드', check: '체크카드' }
 // 결제 업종(카페 등) 기준으로 다시 정렬하려면 후보를 넉넉히 받아와야 합니다.
 // (백엔드 스냅샷 상한이 20장이라 그만큼 받아 업종 혜택 있는 카드를 추립니다.)
 const POOL_SIZE = 20
+const CATEGORY_FINALIST_SIZE = 5
 
 /**
  * 소비패턴 분석 카드 추천 순위.
@@ -83,9 +84,16 @@ export default function Recommend() {
   // 홈 배너: 연간 총 혜택 많은 순 상위 3장.
   // 결제 후(카테고리): 그 업종 할인율 높은 카드만 골라 정렬한 상위 3장.
   const pool = selectRecoList(state)
-  const list = category
-    ? rankByCategoryBenefit(pool, category).slice(0, 3)
-    : pool.slice(0, 3)
+  // 결제 후 추천은 2단계로 계산합니다.
+  // 1) 결제 업종 혜택이 큰 카드 5장을 후보로 선별
+  // 2) 후보 안에서 사용자의 최근 소비가 반영된 예상 연혜택(total) 순으로 최종 추천
+  const categoryFinalists = category
+    ? rankByCategoryBenefit(pool, category)
+      .filter((card) => findCategoryBenefit(card, category))
+      .slice(0, CATEGORY_FINALIST_SIZE)
+      .sort((a, b) => (b.total || 0) - (a.total || 0))
+    : []
+  const list = category ? categoryFinalists.slice(0, 3) : pool.slice(0, 3)
   const top = list[0]
   const rest = list.slice(1)
 
@@ -245,7 +253,7 @@ export default function Recommend() {
 
       <div className={styles.footNote}>
         {category
-          ? `${category} 할인율 높은 순으로 추천된 ${TYPE_LABEL[recoType]}예요`
+          ? `${category} 혜택 후보 중 최근 3개월 소비를 반영한 ${TYPE_LABEL[recoType]} 순위예요`
           : `내 소비패턴 기반으로 추천된 ${TYPE_LABEL[recoType]} 순위예요`}
       </div>
     </div>
