@@ -96,6 +96,13 @@ function moneyShort(won) {
   return `${krw(won)}원`
 }
 
+/** 혜택 수치도 금액처럼 천 단위 구분을 적용합니다. */
+function benefitRateText(value, unit) {
+  if (value === null || value === undefined || value === '') return ''
+  const formatted = typeof value === 'number' ? value.toLocaleString('ko-KR') : value
+  return `${formatted}${unit || ''}`
+}
+
 /**
  * 혜택 한 건을 화면 표기로 변환합니다.
  *
@@ -137,7 +144,7 @@ export function benefitView(benefit) {
   const hasValue = benefit.value !== null && benefit.value !== undefined && benefit.value !== '' && benefit.value !== 0
   // 정률(%)에 100 초과 값이 오면 정액(원)으로 정상화해 '1000%' 표기를 막습니다.
   const { value: rateValue, unit: rateUnit } = normalizeBenefitRate(benefit.value, benefit.unit)
-  const rate = benefit.displayValueText || (hasValue ? `${rateValue}${rateUnit}` : '')
+  const rate = benefit.displayValueText || (hasValue ? benefitRateText(rateValue, rateUnit) : '')
 
   // 제목은 있는 조각만 이어 붙입니다. 카테고리와 유형이 같으면(기타/기타) 한 번만 씁니다.
   const title = [where, rate, benefit.type !== where ? benefit.type : '']
@@ -166,13 +173,13 @@ export function benefitView(benefit) {
         ? '건당 한도'
         : '혜택 한도',
     limitText: benefit.displayLimitText || (benefit.limitMonth
-      ? `월 ${krw(benefit.limitMonth)}원`
+      ? `${krw(benefit.limitMonth)}원`
       : benefit.limitPerUse
-        ? `건당 ${krw(benefit.limitPerUse)}원`
+        ? `${krw(benefit.limitPerUse)}원`
         : '한도 정보 확인 필요'),
     conditionLabel: benefit.displayConditionText ? '적용 조건' : '전월 실적',
     conditionText: benefit.displayConditionText
-      || (benefit.condition ? `전월 ${moneyShort(benefit.condition)}` : '조건 정보 확인 필요'),
+      || (benefit.condition ? `${moneyShort(benefit.condition)} 이상` : '조건 정보 확인 필요'),
     notes,
   }
 }
