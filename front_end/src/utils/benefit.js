@@ -122,8 +122,8 @@ export function benefitView(benefit) {
       title: '혜택 조건 확인 필요',
       rate: '',
       desc: '적용 조건·한도는 카드사 안내를 확인하세요',
-      limitText: '한도 없음',
-      conditionText: '실적 무관',
+      limitText: '한도 정보 확인 필요',
+      conditionText: '조건 정보 확인 필요',
       notes: ['혜택마다 적용 조건·한도가 다를 수 있어요. 카드사 상세 안내를 확인하세요.'],
     }
   }
@@ -134,10 +134,10 @@ export function benefitView(benefit) {
    * '해외 수수료 면제'처럼 숫자가 없는 혜택은 value 가 비어 옵니다.
    * 그대로 이어붙이면 '금융서비스 null 면제/우대' 가 되므로 숫자 부분을 통째로 뺍니다.
    */
-  const hasValue = benefit.value !== null && benefit.value !== undefined && benefit.value !== ''
+  const hasValue = benefit.value !== null && benefit.value !== undefined && benefit.value !== '' && benefit.value !== 0
   // 정률(%)에 100 초과 값이 오면 정액(원)으로 정상화해 '1000%' 표기를 막습니다.
   const { value: rateValue, unit: rateUnit } = normalizeBenefitRate(benefit.value, benefit.unit)
-  const rate = hasValue ? `${rateValue}${rateUnit}` : ''
+  const rate = benefit.displayValueText || (hasValue ? `${rateValue}${rateUnit}` : '')
 
   // 제목은 있는 조각만 이어 붙입니다. 카테고리와 유형이 같으면(기타/기타) 한 번만 씁니다.
   const title = [where, rate, benefit.type !== where ? benefit.type : '']
@@ -160,12 +160,13 @@ export function benefitView(benefit) {
     title,
     rate,
     desc: benefit.desc || title,
-    limitText: benefit.limitMonth
+    limitText: benefit.displayLimitText || (benefit.limitMonth
       ? `월 ${krw(benefit.limitMonth)}원`
       : benefit.limitPerUse
         ? `건당 ${krw(benefit.limitPerUse)}원`
-        : '한도 없음',
-    conditionText: benefit.condition ? `전월 ${moneyShort(benefit.condition)}` : '실적 무관',
+        : '한도 정보 확인 필요'),
+    conditionText: benefit.displayConditionText
+      || (benefit.condition ? `전월 ${moneyShort(benefit.condition)}` : '조건 정보 확인 필요'),
     notes,
   }
 }
