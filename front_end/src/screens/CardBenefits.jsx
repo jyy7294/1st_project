@@ -110,11 +110,11 @@ export default function CardBenefits() {
 
             <div className={styles.facts}>
               <div className={styles.fact}>
-                <div className={styles.factLabel}>월 통합한도</div>
+                <div className={styles.factLabel}>{b.limitLabel}</div>
                 <div className={styles.factValue}>{b.limitText}</div>
               </div>
               <div className={styles.fact}>
-                <div className={styles.factLabel}>전월 실적</div>
+                <div className={styles.factLabel}>{b.conditionLabel}</div>
                 <div className={styles.factValue}>{b.conditionText}</div>
               </div>
             </div>
