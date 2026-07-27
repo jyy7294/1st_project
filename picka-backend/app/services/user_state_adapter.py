@@ -75,9 +75,9 @@ def _display_fields(benefit: CardBenefit) -> dict[str, Any]:
     unit = benefit.benefit_unit
     fixed_bonus_match = None
     if (
-        (value is None or value <= 0)
-        and "보너스" in f"{summary} {detail}"
+        "보너스" in f"{summary} {detail}"
         and "마일" in f"{summary} {detail}"
+        and "연 1회" in f"{summary} {detail}"
     ):
         fixed_bonus_match = _FIXED_MILEAGE_PATTERN.search(f"{summary} {detail}")
 

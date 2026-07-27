@@ -48,7 +48,11 @@ export function adaptCard(card) {
     // 카드 한 장에 걸린 월 통합 혜택 한도와 이번 달 사용분
     benefit_limit: card.monthly_total_limit || 0,
     benefit_used: card.card_monthly_benefit_used || 0,
-    benefits: Array.isArray(card.benefits) ? card.benefits.map(adaptBenefit) : [],
+    benefits: Array.isArray(card.benefits)
+      ? card.benefits
+          .filter((benefit) => benefit.category !== '유의사항' && benefit.benefit_type !== '유의사항')
+          .map(adaptBenefit)
+      : [],
   }
 }
 
@@ -59,7 +63,9 @@ export function adaptCard(card) {
 export function adaptBenefit(benefit) {
   // 정률(%)·정액(원)이 한 필드에 섞여 오므로 여기서 단위를 정상화합니다.
   // (예: 단위 '%' + 값 1000 → '원'으로 되돌려 '1000% 할인' 표기 방지)
-  const { value, unit } = normalizeBenefitRate(benefit.benefit_value, benefit.benefit_unit)
+  const displayValue = benefit.display_benefit_value ?? benefit.benefit_value
+  const displayUnit = benefit.display_benefit_unit ?? benefit.benefit_unit
+  const { value, unit } = normalizeBenefitRate(displayValue, displayUnit)
   return {
     id: String(benefit.card_benefit_id ?? benefit.source_benefit_id ?? benefit.benefit_name),
     category: benefit.category || '기타',
@@ -72,6 +78,10 @@ export function adaptBenefit(benefit) {
     limitPerUse: benefit.per_transaction_limit || null,
     brands: benefit.merchant_list || null,
     desc: benefit.benefit_name || benefit.source_summary || benefit.condition_text || '',
+    displayValueText: benefit.display_value_text || null,
+    displayConditionText: benefit.display_condition_text || benefit.condition_text || null,
+    displayLimitText: benefit.display_limit_text || benefit.limit_status || null,
+    displayReviewRequired: Boolean(benefit.display_review_required),
   }
 }
 
