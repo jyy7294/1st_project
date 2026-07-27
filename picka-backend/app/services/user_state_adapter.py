@@ -98,7 +98,10 @@ def _display_fields(benefit: CardBenefit) -> dict[str, Any]:
         "display_benefit_value": value if has_positive_value else None,
         "display_benefit_unit": unit if has_positive_value else None,
         "display_value_text": None,
-        "display_condition_text": benefit.condition_text,
+        # Numeric monthly requirements are formatted by the client from
+        # required_spending. condition_text may be an importer value such as
+        # "300000", so it must not be exposed as presentation text here.
+        "display_condition_text": None,
         "display_limit_text": None,
         "is_transaction_calculable": has_positive_value,
         "display_review_required": not has_positive_value,

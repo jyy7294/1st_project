@@ -79,8 +79,10 @@ export function adaptBenefit(benefit) {
     brands: benefit.merchant_list || null,
     desc: benefit.benefit_name || benefit.source_summary || benefit.condition_text || '',
     displayValueText: benefit.display_value_text || null,
-    displayConditionText: benefit.display_condition_text || benefit.condition_text || null,
-    displayLimitText: benefit.display_limit_text || benefit.limit_status || null,
+    // condition_text/limit_status can contain importer-facing values such as
+    // "300000" or "혜택한도확정". Only explicit API display fields are UI text.
+    displayConditionText: benefit.display_condition_text || null,
+    displayLimitText: benefit.display_limit_text || null,
     displayReviewRequired: Boolean(benefit.display_review_required),
   }
 }
