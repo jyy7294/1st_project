@@ -17,6 +17,7 @@ from app.models import (
     UserCard,
 )
 from app.services.merchant_service import get_merchant_category
+from app.services.benefit_total_service import customer_visible_transaction_filter
 
 
 class UserNotFoundError(LookupError):
@@ -182,10 +183,13 @@ def build_user_card_states(
     monthly_results = db.execute(
         select(
             MonthlyCardUsage,
-            func.count(Transaction.id),
+            func.count(Transaction.id).filter(
+                customer_visible_transaction_filter()
+            ),
             func.coalesce(
                 func.sum(Transaction.saved_amount).filter(
-                    Transaction.status == "APPROVED"
+                    Transaction.status == "APPROVED",
+                    customer_visible_transaction_filter(),
                 ),
                 0,
             ),
