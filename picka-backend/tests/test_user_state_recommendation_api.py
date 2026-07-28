@@ -381,11 +381,9 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             "/api/v1/users/2/spending-report",
             params={"month": "2026-07"},
         ).json()
-        self.assertEqual(report["totalBenefit"], 1_000)
-        report_card = next(
-            card for card in report["cardBenefits"] if card["cardId"] == 2
-        )
-        self.assertEqual(report_card["benefit"], 1_000)
+        self.assertEqual(report["totalSpending"], 0)
+        self.assertEqual(report["totalBenefit"], 0)
+        self.assertEqual(report["cardBenefits"], [])
 
     def test_payment_clamps_discount_to_card_monthly_total_limit(self):
         with self.Session() as db:
@@ -529,6 +527,13 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             payment_amount=10_000,
             usage_month="2026-06",
         )
+
+        # The report includes persisted/imported consumption, while repeated
+        # demo checkout attempts remain isolated from it.
+        with self.Session() as db:
+            for transaction in db.scalars(select(Transaction)).all():
+                transaction.data_source = "SEED"
+            db.commit()
 
         response = self.client.get(
             "/api/v1/users/2/spending-report",
