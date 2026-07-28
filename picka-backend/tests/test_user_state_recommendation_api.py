@@ -371,11 +371,11 @@ class UserStateRecommendationApiTest(unittest.TestCase):
             self.assertEqual(daily.daily_used_amount, 1_000)
             self.assertEqual(daily.daily_used_count, 1)
 
-            # 집계 캐시에는 기존 3,000원이 들어 있어도 API 계산 기준은
-            # 승인 거래의 실제 saved_amount(1,000원)여야 한다.
+            # 결제 결과와 한도 원장에는 반영되지만, 7월 26일 이후의
+            # 팀 DEMO 결제는 사용자 화면 집계에서 제외한다.
             states = build_user_card_states(db, 2, "2026-07")
             card_two = next(card for card in states if card["card_id"] == 2)
-            self.assertEqual(card_two["card_monthly_benefit_used"], 1_000)
+            self.assertEqual(card_two["card_monthly_benefit_used"], 0)
 
         report = self.client.get(
             "/api/v1/users/2/spending-report",

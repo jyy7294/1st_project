@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.models import Card, MerchantAlias, Transaction, TransactionReward, User
 from app.services.category_normalization import normalize_payment_category
-from app.services.benefit_total_service import confirmed_benefit_totals_by_card
+from app.services.benefit_total_service import (
+    confirmed_benefit_totals_by_card,
+    customer_visible_transaction_filter,
+)
 from app.services.user_state_adapter import resolve_merchant_alias
 
 
@@ -55,10 +58,6 @@ REPORT_CATEGORY_ORDER = [
     "기타",
 ]
 
-# Demo payments exercise the payment flow but must not alter consumption data.
-SPENDING_REPORT_EXCLUDED_DATA_SOURCES = {"DEMO"}
-
-
 class SpendingReportUserNotFoundError(Exception):
     pass
 
@@ -92,7 +91,7 @@ def _month_rows(db: Session, user_id: int, usage_month: str):
             Transaction.user_id == user_id,
             Transaction.usage_month == usage_month,
             Transaction.status == "APPROVED",
-            Transaction.data_source.not_in(SPENDING_REPORT_EXCLUDED_DATA_SOURCES),
+            customer_visible_transaction_filter(),
         )
         .order_by(Transaction.approved_at)
     ).all()
@@ -129,11 +128,11 @@ def build_monthly_spending_report(
     previous_total = sum(row.original_payment_amount for row, _ in previous_rows)
     current_benefits_by_card = confirmed_benefit_totals_by_card(
         db, user_id=user_id, usage_month=usage_month,
-        exclude_data_sources=SPENDING_REPORT_EXCLUDED_DATA_SOURCES,
+        customer_visible_only=True,
     )
     previous_benefits_by_card = confirmed_benefit_totals_by_card(
         db, user_id=user_id, usage_month=previous_usage_month,
-        exclude_data_sources=SPENDING_REPORT_EXCLUDED_DATA_SOURCES,
+        customer_visible_only=True,
     )
     current_benefit = sum(current_benefits_by_card.values())
     previous_benefit = sum(previous_benefits_by_card.values())
@@ -149,7 +148,7 @@ def build_monthly_spending_report(
             Transaction.user_id == user_id,
             Transaction.usage_month == usage_month,
             Transaction.status == "APPROVED",
-            Transaction.data_source.not_in(SPENDING_REPORT_EXCLUDED_DATA_SOURCES),
+            customer_visible_transaction_filter(),
         )
         .group_by(
             TransactionReward.reward_type,
