@@ -55,6 +55,9 @@ REPORT_CATEGORY_ORDER = [
     "기타",
 ]
 
+# Demo payments exercise the payment flow but must not alter consumption data.
+SPENDING_REPORT_EXCLUDED_DATA_SOURCES = {"DEMO"}
+
 
 class SpendingReportUserNotFoundError(Exception):
     pass
@@ -89,6 +92,7 @@ def _month_rows(db: Session, user_id: int, usage_month: str):
             Transaction.user_id == user_id,
             Transaction.usage_month == usage_month,
             Transaction.status == "APPROVED",
+            Transaction.data_source.not_in(SPENDING_REPORT_EXCLUDED_DATA_SOURCES),
         )
         .order_by(Transaction.approved_at)
     ).all()
@@ -124,10 +128,12 @@ def build_monthly_spending_report(
     current_total = sum(row.original_payment_amount for row, _ in current_rows)
     previous_total = sum(row.original_payment_amount for row, _ in previous_rows)
     current_benefits_by_card = confirmed_benefit_totals_by_card(
-        db, user_id=user_id, usage_month=usage_month
+        db, user_id=user_id, usage_month=usage_month,
+        exclude_data_sources=SPENDING_REPORT_EXCLUDED_DATA_SOURCES,
     )
     previous_benefits_by_card = confirmed_benefit_totals_by_card(
-        db, user_id=user_id, usage_month=previous_usage_month
+        db, user_id=user_id, usage_month=previous_usage_month,
+        exclude_data_sources=SPENDING_REPORT_EXCLUDED_DATA_SOURCES,
     )
     current_benefit = sum(current_benefits_by_card.values())
     previous_benefit = sum(previous_benefits_by_card.values())
@@ -143,6 +149,7 @@ def build_monthly_spending_report(
             Transaction.user_id == user_id,
             Transaction.usage_month == usage_month,
             Transaction.status == "APPROVED",
+            Transaction.data_source.not_in(SPENDING_REPORT_EXCLUDED_DATA_SOURCES),
         )
         .group_by(
             TransactionReward.reward_type,
